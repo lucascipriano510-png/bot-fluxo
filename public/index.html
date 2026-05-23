@@ -5,814 +5,923 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>BOT FLUXO — CMD</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --green:        #00ff41;
-      --green-glow:   rgba(0, 255, 65, 0.15);
-      --green-border: rgba(0, 255, 65, 0.25);
-      --green-dim:    rgba(0, 255, 65, 0.06);
-      --bg:           #000000;
-      --card:         #080808;
-      --card-hover:   #0e0e0e;
-      --border:       #161616;
-      --border-mid:   #222222;
-      --text:         #f0f0f0;
-      --muted:        #444444;
-      --dim:          #222222;
-      --red:          #ff3c3c;
-      --yellow:       #ffaa00;
-      --font:         'Space Mono', 'Courier New', monospace;
-      --header-h:     52px;
-      --tabs-h:       40px;
+      --g:      #00ff41;
+      --g2:     rgba(0,255,65,.18);
+      --gb:     rgba(0,255,65,.28);
+      --gd:     rgba(0,255,65,.06);
+      --bg:     #000;
+      --c1:     #0a0a0a;
+      --c2:     #111;
+      --b1:     #181818;
+      --b2:     #242424;
+      --tx:     #e8e8e8;
+      --mu:     #3a3a3a;
+      --dim:    #1e1e1e;
+      --red:    #ff3c3c;
+      --yel:    #ffaa00;
+      --blu:    #4da6ff;
+      --pur:    #b06bff;
+      --font:   'Space Mono','Courier New',monospace;
+      --hh:     52px;
+      --th:     38px;
     }
 
     html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--tx); font-family: var(--font); font-size: 13px; min-height: 100dvh; -webkit-font-smoothing: antialiased; }
 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font);
-      font-size: 13px;
-      min-height: 100dvh;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* ── HEADER ─────────────────────────────────────────────── */
-    .header {
-      position: sticky;
-      top: 0;
-      z-index: 200;
-      background: rgba(0,0,0,0.95);
-      backdrop-filter: blur(10px);
-      border-bottom: 1px solid var(--border);
+    /* ─ HEADER ─────────────────────────────────────────────── */
+    .hdr {
+      position: sticky; top: 0; z-index: 200;
+      height: var(--hh);
+      background: rgba(0,0,0,.96);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--b1);
       padding: 0 16px;
-      height: var(--header-h);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
     }
 
-    .brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .brand { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
 
     .led {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 8px var(--green), 0 0 16px rgba(0,255,65,0.4);
-      flex-shrink: 0;
-      animation: blink 3s ease-in-out infinite;
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--g);
+      box-shadow: 0 0 6px var(--g), 0 0 14px rgba(0,255,65,.35);
+      animation: blink 4s ease-in-out infinite;
     }
+    @keyframes blink { 0%,88%,100%{opacity:1} 94%{opacity:.15} }
 
-    @keyframes blink {
-      0%, 90%, 100% { opacity: 1; }
-      95% { opacity: 0.2; }
-    }
+    .brand-name { font-size: 11px; font-weight: 700; letter-spacing: .22em; color: var(--g); text-transform: uppercase; }
+    .brand-sep  { color: var(--mu); }
 
-    .brand-name {
-      font-size: 13px; font-weight: 700;
-      letter-spacing: 0.2em; color: var(--green); text-transform: uppercase;
-    }
+    .hdr-stats { display: flex; gap: 20px; align-items: center; }
+    .hstat { text-align: right; line-height: 1.25; }
+    .hstat-v { font-size: 15px; font-weight: 700; color: var(--g); }
+    .hstat-l { font-size: 8px; letter-spacing: .14em; color: var(--mu); text-transform: uppercase; }
 
-    .brand-sep { color: var(--dim); font-weight: 400; }
-
-    .header-stats { display: flex; gap: 16px; align-items: center; }
-
-    .stat { text-align: right; line-height: 1.3; }
-
-    .stat-val { font-size: 14px; font-weight: 700; color: var(--green); letter-spacing: 0.05em; }
-
-    .stat-label { font-size: 8px; letter-spacing: 0.15em; color: var(--muted); text-transform: uppercase; }
-
-    /* ── TABS ───────────────────────────────────────────────── */
+    /* ─ TABS ────────────────────────────────────────────────── */
     .tabs {
-      position: sticky;
-      top: var(--header-h);
-      z-index: 199;
-      background: var(--bg);
-      border-bottom: 1px solid var(--border);
+      position: sticky; top: var(--hh); z-index: 190;
+      height: var(--th);
+      background: var(--bg); border-bottom: 1px solid var(--b1);
       display: flex;
-      height: var(--tabs-h);
     }
 
-    .tab-btn {
-      flex: 1;
-      padding: 0 8px;
-      font-family: var(--font);
-      font-size: 9px; font-weight: 700;
-      letter-spacing: 0.2em; text-transform: uppercase;
-      background: none; border: none;
-      border-bottom: 2px solid transparent;
-      color: var(--muted);
-      cursor: pointer;
-      transition: color 0.15s, border-color 0.15s;
+    .tab {
+      flex: 1; padding: 0 6px;
+      font-family: var(--font); font-size: 9px; font-weight: 700;
+      letter-spacing: .18em; text-transform: uppercase;
+      background: none; border: none; border-bottom: 2px solid transparent;
+      color: var(--mu); cursor: pointer;
+      transition: color .12s, border-color .12s;
       position: relative;
     }
+    .tab.on { color: var(--g); border-bottom-color: var(--g); }
 
-    .tab-btn.active { color: var(--green); border-bottom-color: var(--green); }
-
-    .tab-badge {
-      position: absolute;
-      top: 6px; right: calc(50% - 22px);
-      background: var(--green); color: #000;
-      font-size: 8px; font-weight: 700;
-      padding: 1px 4px; border-radius: 2px;
-      min-width: 16px; text-align: center;
+    .tbadge {
+      position: absolute; top: 5px; right: calc(50% - 20px);
+      background: var(--g); color: #000;
+      font-size: 7px; font-weight: 700; padding: 1px 4px; border-radius: 2px;
+      min-width: 14px; text-align: center; display: none;
     }
 
-    /* ── CONTENT ────────────────────────────────────────────── */
-    .content {
-      max-width: 640px;
-      margin: 0 auto;
-      padding: 16px 14px 100px;
+    /* ─ CONTENT ─────────────────────────────────────────────── */
+    .wrap { max-width: 640px; margin: 0 auto; padding: 16px 14px 90px; }
+    .wrap.chat-mode { padding: 0; }
+
+    .pane { display: none; }
+    .pane.on { display: block; }
+
+    /* ─ SECTION HEADER ─────────────────────────────────────── */
+    .sec {
+      font-size: 8px; letter-spacing: .2em; color: var(--mu); text-transform: uppercase;
+      margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
     }
+    .sec::after { content: ''; flex: 1; height: 1px; background: var(--b1); }
 
-    .content.chat-mode { padding: 0; }
-
-    .panel { display: none; }
-    .panel.active { display: block; }
-
-    /* ── SECTION LABEL ──────────────────────────────────────── */
-    .section-label {
-      font-size: 9px; letter-spacing: 0.2em;
-      color: var(--muted); text-transform: uppercase;
-      margin-bottom: 14px;
-      display: flex; align-items: center; gap: 8px;
-    }
-
-    .section-label::after {
-      content: ''; flex: 1; height: 1px; background: var(--border);
-    }
-
-    /* ── CARDS ──────────────────────────────────────────────── */
+    /* ─ CARDS ───────────────────────────────────────────────── */
     .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 3px;
-      padding: 14px 16px; margin-bottom: 8px;
-      cursor: pointer;
-      transition: background 0.15s, border-color 0.15s;
-      position: relative; overflow: hidden;
+      background: var(--c1); border: 1px solid var(--b1); border-radius: 3px;
+      padding: 13px 15px; margin-bottom: 7px; cursor: pointer; position: relative;
+      overflow: hidden; transition: background .12s, border-color .12s;
     }
-
-    .card::after {
-      content: '';
-      position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-      background: var(--green); opacity: 0; transition: opacity 0.15s;
+    .card::before {
+      content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+      background: var(--g); opacity: 0; transition: opacity .12s;
     }
+    .card:hover { background: var(--c2); border-color: var(--b2); }
+    .card:hover::before { opacity: 1; }
 
-    .card:hover { background: var(--card-hover); border-color: var(--border-mid); }
-    .card:hover::after { opacity: 1; }
+    .crow { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 4px; }
+    .cphone { font-size: 13px; font-weight: 700; letter-spacing: .03em; word-break: break-all; }
+    .cnode  { font-size: 9px; color: var(--g); letter-spacing: .07em; font-style: italic; margin-bottom: 5px; }
+    .cinfo  { font-size: 11px; color: var(--mu); line-height: 1.5; margin-bottom: 7px; }
+    .cfoot  { display: flex; justify-content: space-between; align-items: center; }
+    .ctime  { font-size: 9px; color: var(--dim); letter-spacing: .04em; }
+    .ccta   { font-size: 9px; color: var(--g); letter-spacing: .1em; text-transform: uppercase; }
 
-    .card-row {
-      display: flex; justify-content: space-between; align-items: flex-start;
-      gap: 8px; margin-bottom: 5px;
-    }
-
-    .card-phone { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: var(--text); word-break: break-all; }
-
-    /* ── BADGES ─────────────────────────────────────────────── */
+    /* ─ BADGES ──────────────────────────────────────────────── */
     .badge {
-      font-size: 8px; font-weight: 700;
-      letter-spacing: 0.12em; text-transform: uppercase;
-      padding: 3px 7px; border-radius: 2px;
-      flex-shrink: 0; white-space: nowrap;
+      font-size: 7px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      padding: 3px 7px; border-radius: 2px; flex-shrink: 0; white-space: nowrap;
     }
+    .b-on   { background: var(--gd);              color: var(--g);   border: 1px solid var(--gb); }
+    .b-off  { background: transparent;             color: var(--mu);  border: 1px solid var(--b1); }
+    .b-lead { background: rgba(255,170,0,.07);     color: var(--yel); border: 1px solid rgba(255,170,0,.22); }
+    .b-enc  { background: rgba(77,166,255,.07);    color: var(--blu); border: 1px solid rgba(77,166,255,.2); }
+    .b-done { background: rgba(0,255,65,.04);      color: #00cc33;    border: 1px solid rgba(0,255,65,.1); }
+    .b-new  { background: transparent;             color: var(--mu);  border: 1px solid var(--b1); }
 
-    .badge-on   { background: var(--green-dim);    color: var(--green);  border: 1px solid var(--green-border); }
-    .badge-off  { background: transparent;          color: var(--muted);  border: 1px solid var(--border); }
-    .badge-lead { background: rgba(255,170,0,0.08); color: var(--yellow); border: 1px solid rgba(255,170,0,0.25); }
-    .badge-done { background: rgba(0,255,65,0.05);  color: #00cc33;       border: 1px solid rgba(0,255,65,0.12); }
-    .badge-enc  { background: rgba(0,120,255,0.08); color: #4da6ff;       border: 1px solid rgba(0,120,255,0.2); }
-
-    .card-node { font-size: 10px; color: var(--green); letter-spacing: 0.08em; margin-bottom: 5px; font-style: italic; }
-
-    .card-info { font-size: 11px; color: var(--muted); line-height: 1.5; margin-bottom: 8px; }
-
-    .card-footer { display: flex; justify-content: space-between; align-items: center; }
-
-    .card-time { font-size: 9px; color: var(--dim); letter-spacing: 0.05em; }
-    .card-cta  { font-size: 9px; color: var(--green); letter-spacing: 0.12em; text-transform: uppercase; }
-
-    /* ── MESSAGES (sessions history view) ───────────────────── */
-    .msg-header { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
-
-    .btn-back {
-      font-family: var(--font);
-      font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
-      background: none; border: 1px solid var(--border-mid); color: var(--muted);
-      padding: 7px 10px; border-radius: 2px;
-      cursor: pointer; transition: color 0.15s, border-color 0.15s;
+    /* ─ MSGS HISTORY ────────────────────────────────────────── */
+    .mhdr { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+    .mbk {
+      font-family: var(--font); font-size: 9px; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; background: none; border: 1px solid var(--b2); color: var(--mu);
+      padding: 7px 10px; border-radius: 2px; cursor: pointer; transition: color .12s, border-color .12s;
       white-space: nowrap; flex-shrink: 0;
     }
-
-    .btn-back:hover { color: var(--text); border-color: #333; }
-
-    .msg-header-phone { font-size: 12px; font-weight: 700; color: var(--green); word-break: break-all; }
-
-    .msg-list { display: flex; flex-direction: column; gap: 10px; }
-
-    .msg { display: flex; align-items: flex-start; gap: 10px; }
-
-    .msg-arrow { font-size: 11px; color: var(--muted); min-width: 14px; flex-shrink: 0; margin-top: 8px; }
-    .msg.entrada .msg-arrow { color: var(--green); }
-
-    .msg-wrap { flex: 1; min-width: 0; }
-
-    .msg-bubble {
-      background: var(--card); border: 1px solid var(--border); border-radius: 3px;
-      padding: 9px 11px; font-size: 11px; line-height: 1.65; color: var(--text);
-      white-space: pre-wrap; word-break: break-word;
+    .mbk:hover { color: var(--tx); border-color: #333; }
+    .mphone { font-size: 12px; font-weight: 700; color: var(--g); word-break: break-all; }
+    .mlist { display: flex; flex-direction: column; gap: 9px; }
+    .mmsg { display: flex; align-items: flex-start; gap: 9px; }
+    .marrow { font-size: 10px; color: var(--mu); min-width: 12px; flex-shrink: 0; margin-top: 8px; }
+    .mmsg.entrada .marrow { color: var(--g); }
+    .mwrap { flex: 1; min-width: 0; }
+    .mbubble {
+      background: var(--c1); border: 1px solid var(--b1); border-radius: 2px;
+      padding: 8px 11px; font-size: 11px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
     }
+    .mmsg.entrada .mbubble { border-left: 2px solid var(--g); background: var(--gd); }
+    .mmeta { font-size: 8px; color: var(--dim); margin-top: 3px; letter-spacing: .04em; }
 
-    .msg.entrada .msg-bubble { border-left: 2px solid var(--green); background: var(--green-dim); }
+    /* ─ LEADS FUNNEL ────────────────────────────────────────── */
+    .funnel {
+      display: flex; gap: 6px; margin-bottom: 18px;
+    }
+    .funnel-step {
+      flex: 1; background: var(--c1); border: 1px solid var(--b1); border-radius: 3px;
+      padding: 10px 8px; text-align: center;
+    }
+    .funnel-step.active { border-color: var(--gb); background: var(--gd); }
+    .funnel-n { font-size: 18px; font-weight: 700; color: var(--g); line-height: 1; margin-bottom: 4px; }
+    .funnel-step:nth-child(2) .funnel-n { color: var(--yel); }
+    .funnel-step:nth-child(3) .funnel-n { color: var(--blu); }
+    .funnel-step:nth-child(4) .funnel-n { color: #00cc33; }
+    .funnel-l { font-size: 7px; letter-spacing: .1em; text-transform: uppercase; color: var(--mu); }
 
-    .msg-meta { font-size: 9px; color: var(--dim); margin-top: 4px; letter-spacing: 0.05em; }
-
-    /* ── SHARED BUTTONS ─────────────────────────────────────── */
+    /* ─ BUTTONS ─────────────────────────────────────────────── */
     .btn {
-      font-family: var(--font);
-      font-size: 10px; font-weight: 700;
-      letter-spacing: 0.18em; text-transform: uppercase;
-      padding: 11px 16px; border-radius: 2px; border: none;
-      cursor: pointer; transition: all 0.15s;
-      -webkit-tap-highlight-color: transparent;
+      font-family: var(--font); font-size: 10px; font-weight: 700;
+      letter-spacing: .15em; text-transform: uppercase;
+      padding: 10px 16px; border-radius: 2px; border: none;
+      cursor: pointer; transition: all .12s; -webkit-tap-highlight-color: transparent;
     }
+    .btn-g { background: var(--g); color: #000; }
+    .btn-g:hover { background: #00e63a; }
+    .btn-g:active { transform: scale(.98); }
+    .btn-g:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+    .btn-ghost { background: none; border: 1px solid var(--b2); color: var(--mu); }
+    .btn-ghost:hover { border-color: #333; color: var(--tx); }
+    .btn-sm { font-size: 8px; padding: 7px 11px; letter-spacing: .12em; }
 
-    .btn-send { background: var(--green); color: #000; }
-    .btn-send:hover { background: #00e63a; }
-    .btn-send:active { transform: scale(0.98); }
-    .btn-send:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
-
-    .btn-ghost { background: none; border: 1px solid var(--border-mid); color: var(--muted); }
-    .btn-ghost:hover { border-color: #333; color: var(--text); }
-
-    .btn-sm { font-size: 9px; padding: 8px 12px; letter-spacing: 0.12em; }
-
-    /* ── INPUT ──────────────────────────────────────────────── */
-    .input {
-      width: 100%;
-      background: var(--card); border: 1px solid var(--border-mid);
-      color: var(--text); font-family: var(--font);
-      font-size: 12px; padding: 11px 13px; border-radius: 2px;
-      outline: none; transition: border-color 0.15s;
+    /* ─ INPUT ───────────────────────────────────────────────── */
+    .inp {
+      width: 100%; background: var(--c1); border: 1px solid var(--b2);
+      color: var(--tx); font-family: var(--font); font-size: 12px;
+      padding: 10px 13px; border-radius: 2px; outline: none; transition: border-color .12s;
       -webkit-appearance: none;
     }
+    .inp:focus { border-color: var(--gb); }
+    .inp::placeholder { color: var(--mu); }
 
-    .input:focus { border-color: var(--green-border); }
-    .input::placeholder { color: var(--dim); }
-
-    /* ── ERROR BANNER ───────────────────────────────────────── */
-    .error-banner {
-      background: rgba(255,60,60,0.06); border: 1px solid rgba(255,60,60,0.25);
-      border-radius: 2px; padding: 10px 14px;
-      font-size: 10px; color: var(--red); letter-spacing: 0.04em; line-height: 1.5;
-      margin-bottom: 14px; display: none;
+    /* ─ ERROR ───────────────────────────────────────────────── */
+    .err-box {
+      background: rgba(255,60,60,.05); border: 1px solid rgba(255,60,60,.22);
+      border-radius: 2px; padding: 9px 13px; font-size: 10px; color: var(--red);
+      letter-spacing: .04em; line-height: 1.5; margin-bottom: 14px; display: none;
     }
+    .err-box.on { display: block; }
 
-    .error-banner.visible { display: block; }
-
-    /* ── EMPTY ──────────────────────────────────────────────── */
+    /* ─ EMPTY ───────────────────────────────────────────────── */
     .empty {
-      text-align: center; padding: 48px 20px;
-      color: var(--dim); font-size: 10px;
-      letter-spacing: 0.15em; text-transform: uppercase; line-height: 1.8;
+      text-align: center; padding: 52px 20px;
+      color: var(--mu); font-size: 9px; letter-spacing: .14em; text-transform: uppercase; line-height: 1.9;
     }
 
-    /* ── REFRESH DOT ────────────────────────────────────────── */
+    /* ─ DOT ─────────────────────────────────────────────────── */
     .dot {
       display: inline-block; width: 5px; height: 5px; border-radius: 50%;
-      background: var(--green); margin-left: 6px; vertical-align: middle;
-      opacity: 0; transition: opacity 0.1s;
+      background: var(--g); margin-left: 5px; vertical-align: middle;
+      opacity: 0; transition: opacity .1s;
     }
+    .dot.on { opacity: 1; }
 
-    .dot.flash { opacity: 1; }
-
-    /* ── SCROLLBAR ──────────────────────────────────────────── */
+    /* ─ SCROLLBAR ───────────────────────────────────────────── */
     ::-webkit-scrollbar { width: 3px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
+    ::-webkit-scrollbar-thumb { background: var(--b2); border-radius: 2px; }
 
-    /* ── CHAT SIMULADO ──────────────────────────────────────── */
-    #panel-chat.active {
-      display: flex;
-      flex-direction: column;
-      height: calc(100dvh - var(--header-h) - var(--tabs-h));
-    }
+    /* ─ CHAT ────────────────────────────────────────────────── */
+    #chat.on { display: flex; flex-direction: column; height: calc(100dvh - var(--hh) - var(--th)); overflow: hidden; }
 
-    .chat-top {
-      padding: 8px 14px;
-      border-bottom: 1px solid var(--border);
-      background: var(--card);
+    .chat-status {
       flex-shrink: 0;
+      padding: 7px 14px; border-bottom: 1px solid var(--b1); background: var(--c1);
       display: flex; align-items: center; gap: 8px;
-      font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+      font-size: 8px; letter-spacing: .12em; text-transform: uppercase; color: var(--mu);
     }
-
-    .chat-node-id { color: var(--green); font-weight: 700; }
-
-    .chat-lead-notif {
-      margin-left: auto;
-      color: var(--green); font-weight: 700;
-      font-size: 8px; letter-spacing: 0.15em;
-      opacity: 0; transition: opacity 0.4s;
-      border: 1px solid var(--green-border);
+    .chat-node { color: var(--g); font-weight: 700; font-size: 9px; }
+    .chat-notif {
+      margin-left: auto; opacity: 0; transition: opacity .35s;
+      background: var(--gd); border: 1px solid var(--gb);
+      color: var(--g); font-size: 7px; font-weight: 700; letter-spacing: .14em;
       padding: 2px 8px; border-radius: 2px;
-      background: var(--green-dim);
     }
+    .chat-notif.on { opacity: 1; }
 
-    .chat-lead-notif.show { opacity: 1; }
-
-    .chat-window {
+    .chat-win {
       flex: 1; overflow-y: auto;
-      padding: 14px;
-      display: flex; flex-direction: column; gap: 10px;
+      padding: 14px; display: flex; flex-direction: column; gap: 8px;
     }
 
-    /* bot bubble — left */
-    .chat-msg-bot { align-self: flex-start; max-width: 85%; }
+    .cb-bot { align-self: flex-start; max-width: 86%; }
+    .cb-user { align-self: flex-end; max-width: 80%; }
 
-    .chat-bubble-bot {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-left: 2px solid var(--green);
-      border-radius: 3px 8px 8px 3px;
-      padding: 10px 13px;
-      font-size: 12px; line-height: 1.65; color: var(--text);
-      white-space: pre-wrap; word-break: break-word;
+    .cb-bot .bub {
+      background: var(--c1); border: 1px solid var(--b1); border-left: 2px solid var(--g);
+      border-radius: 2px 8px 8px 2px;
+      padding: 10px 13px; font-size: 12px; line-height: 1.65; white-space: pre-wrap; word-break: break-word;
     }
-
-    /* user bubble — right */
-    .chat-msg-user { align-self: flex-end; max-width: 80%; }
-
-    .chat-bubble-user {
-      background: var(--green); color: #000;
-      border-radius: 8px 3px 3px 8px;
-      padding: 10px 13px;
-      font-size: 12px; font-weight: 700; line-height: 1.65;
-      white-space: pre-wrap; word-break: break-word;
+    .cb-user .bub {
+      background: var(--g); color: #000;
+      border-radius: 8px 2px 2px 8px;
+      padding: 10px 13px; font-size: 12px; font-weight: 700; line-height: 1.65; white-space: pre-wrap; word-break: break-word;
     }
+    .bmeta { font-size: 7px; color: var(--mu); margin-top: 3px; letter-spacing: .04em; }
+    .cb-bot .bmeta { text-align: left; }
+    .cb-user .bmeta { text-align: right; }
 
-    .chat-msg-meta { font-size: 8px; color: var(--dim); margin-top: 3px; letter-spacing: 0.05em; }
-    .chat-msg-bot  .chat-msg-meta { text-align: left; }
-    .chat-msg-user .chat-msg-meta { text-align: right; }
+    .msg-link { color: var(--g); text-decoration: underline; word-break: break-all; }
 
-    /* typing indicator */
-    .chat-typing-dots span {
+    /* typing */
+    .typing-dots span {
       display: inline-block; width: 5px; height: 5px; border-radius: 50%;
-      background: var(--muted); margin: 0 2px;
-      animation: chatDot 1.1s ease-in-out infinite; opacity: 0.4;
+      background: var(--mu); margin: 0 1px;
+      animation: td 1.1s ease-in-out infinite; opacity: .4;
     }
+    .typing-dots span:nth-child(2) { animation-delay: .18s; }
+    .typing-dots span:nth-child(3) { animation-delay: .36s; }
+    @keyframes td { 0%,80%,100%{opacity:.4;transform:translateY(0)} 40%{opacity:1;transform:translateY(-3px)} }
 
-    .chat-typing-dots span:nth-child(2) { animation-delay: 0.18s; }
-    .chat-typing-dots span:nth-child(3) { animation-delay: 0.36s; }
-
-    @keyframes chatDot {
-      0%, 80%, 100% { opacity: 0.4; transform: translateY(0); }
-      40% { opacity: 1; transform: translateY(-3px); }
+    /* divider */
+    .chat-div {
+      text-align: center; font-size: 7px; letter-spacing: .18em; text-transform: uppercase;
+      color: var(--mu); padding: 6px 0; position: relative;
     }
+    .chat-div::before, .chat-div::after {
+      content: ''; position: absolute; top: 50%; height: 1px; background: var(--b1); width: 34%;
+    }
+    .chat-div::before { left: 0; }
+    .chat-div::after  { right: 0; }
+
+    /* quick replies */
+    .chat-qr { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 14px 8px; }
+    .qr-btn {
+      font-family: var(--font); font-size: 9px; font-weight: 700; letter-spacing: .08em;
+      background: var(--c1); border: 1px solid var(--b2); color: var(--g);
+      padding: 6px 10px; border-radius: 2px; cursor: pointer; transition: all .1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .qr-btn:hover { background: var(--gd); border-color: var(--gb); }
+    .qr-btn:active { transform: scale(.96); }
 
     /* input area */
-    .chat-input-area {
-      flex-shrink: 0;
-      border-top: 1px solid var(--border);
+    .chat-in {
+      flex-shrink: 0; border-top: 1px solid var(--b1);
+      background: rgba(0,0,0,.9); padding: 10px 14px;
+      display: flex; flex-direction: column; gap: 7px;
+    }
+    .chat-row1 { display: flex; align-items: center; gap: 7px; font-size: 8px; letter-spacing: .1em; text-transform: uppercase; color: var(--mu); }
+    .chat-row1 .inp { flex: 1; font-size: 10px; padding: 6px 10px; }
+    .chat-row2 { display: flex; gap: 7px; }
+    .chat-row2 .inp { flex: 1; }
+    .chat-row2 .btn-g { flex-shrink: 0; padding: 10px 18px; font-size: 15px; letter-spacing: 0; }
+
+    /* ─ FLOW MAP ─────────────────────────────────────────────── */
+    .flow-outer {
+      overflow: auto; padding: 16px 14px 24px;
       background: var(--bg);
-      padding: 10px 14px;
-      display: flex; flex-direction: column; gap: 8px;
     }
+    .flow-canvas { position: relative; flex-shrink: 0; }
+    .flow-svg { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
 
-    .chat-phone-row {
-      display: flex; align-items: center; gap: 7px;
-      font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+    .fn {
+      position: absolute; background: var(--c1); border-radius: 3px;
+      padding: 8px 10px; width: 160px;
+      transition: box-shadow .15s;
     }
+    .fn:hover { box-shadow: 0 0 0 1px var(--gb), 0 0 10px var(--g2); z-index: 2; }
 
-    .chat-phone-row .input { flex: 1; font-size: 11px; padding: 7px 10px; }
-
-    .chat-send-row { display: flex; gap: 7px; }
-    .chat-send-row .input { flex: 1; }
-    .chat-send-row .btn-send { flex-shrink: 0; padding: 11px 18px; font-size: 15px; letter-spacing: 0; }
+    .fn-id { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 4px; }
+    .fn-trigger {
+      font-size: 7px; letter-spacing: .06em; color: #000; font-weight: 700;
+      background: var(--g); border-radius: 2px; padding: 1px 5px;
+      display: inline-block; margin-bottom: 5px; max-width: 140px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .fn-msg { font-size: 9px; color: var(--mu); line-height: 1.45; margin-bottom: 5px; }
+    .fn-foot { display: flex; gap: 4px; flex-wrap: wrap; }
+    .fn-tag {
+      font-size: 7px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+      padding: 2px 5px; border-radius: 2px;
+    }
+    .ft-act  { background: rgba(77,166,255,.1);  color: var(--blu); border: 1px solid rgba(77,166,255,.2); }
+    .ft-term { background: rgba(255,60,60,.08);  color: var(--red); border: 1px solid rgba(255,60,60,.2); }
+    .ft-loop { background: rgba(255,170,0,.08);  color: var(--yel); border: 1px solid rgba(255,170,0,.2); }
+    .ft-root { background: var(--gd);            color: var(--g);   border: 1px solid var(--gb); }
   </style>
 </head>
 <body>
 
-<!-- ── HEADER ──────────────────────────────────────────────── -->
-<header class="header">
+<!-- ─ HEADER ──────────────────────────────────────────────── -->
+<header class="hdr">
   <div class="brand">
     <div class="led"></div>
     <div class="brand-name">Bot Fluxo <span class="brand-sep">/</span> CMD</div>
   </div>
-  <div class="header-stats">
-    <div class="stat">
-      <div class="stat-val" id="h-sessions">—</div>
-      <div class="stat-label">Sessões</div>
-    </div>
-    <div class="stat">
-      <div class="stat-val" id="h-leads">—</div>
-      <div class="stat-label">Leads</div>
-    </div>
+  <div class="hdr-stats">
+    <div class="hstat"><div class="hstat-v" id="hs">—</div><div class="hstat-l">Sessões</div></div>
+    <div class="hstat"><div class="hstat-v" id="hl">—</div><div class="hstat-l">Leads</div></div>
   </div>
 </header>
 
-<!-- ── TABS ────────────────────────────────────────────────── -->
+<!-- ─ TABS ────────────────────────────────────────────────── -->
 <nav class="tabs">
-  <button class="tab-btn active" id="tab-sessions" onclick="switchTab('sessions')">
-    Sessões
-    <span class="tab-badge" id="badge-sessions" style="display:none"></span>
+  <button class="tab on" id="t-sess" onclick="go('sess')">
+    Sessões <span class="tbadge" id="tb-sess"></span>
   </button>
-  <button class="tab-btn" id="tab-leads" onclick="switchTab('leads')">Leads</button>
-  <button class="tab-btn" id="tab-chat" onclick="switchTab('chat')">Chat</button>
+  <button class="tab" id="t-leads" onclick="go('leads')">Leads</button>
+  <button class="tab" id="t-chat"  onclick="go('chat')">Chat</button>
+  <button class="tab" id="t-flow"  onclick="go('flow')">Fluxo</button>
 </nav>
 
-<!-- ── CONTENT ─────────────────────────────────────────────── -->
-<main class="content" id="content">
-  <div class="error-banner" id="err"></div>
+<!-- ─ CONTENT ─────────────────────────────────────────────── -->
+<main class="wrap" id="wrap">
+  <div class="err-box" id="err"></div>
 
   <!-- SESSIONS -->
-  <div class="panel active" id="panel-sessions">
-    <div class="section-label">
-      Sessões ativas
-      <span class="dot" id="refresh-dot"></span>
-    </div>
-    <div id="sessions-list"><div class="empty">Carregando...</div></div>
+  <div class="pane on" id="sess">
+    <div class="sec">Sessões ativas <span class="dot" id="rdot"></span></div>
+    <div id="sess-list"><div class="empty">Carregando...</div></div>
   </div>
 
-  <!-- MESSAGES (inside sessions tab) -->
-  <div class="panel" id="panel-messages">
-    <div class="msg-header">
-      <button class="btn-back" onclick="backToSessions()">← Voltar</button>
-      <div class="msg-header-phone" id="msg-phone-label"></div>
+  <!-- MESSAGES (sub-view inside sessions) -->
+  <div class="pane" id="msgs">
+    <div class="mhdr">
+      <button class="mbk" onclick="backSess()">← Voltar</button>
+      <div class="mphone" id="mphone"></div>
     </div>
-    <div class="msg-list" id="msg-list">
-      <div class="empty">Carregando...</div>
-    </div>
+    <div class="mlist" id="mlist"><div class="empty">Carregando...</div></div>
   </div>
 
   <!-- LEADS -->
-  <div class="panel" id="panel-leads">
-    <div class="section-label">Leads qualificados</div>
+  <div class="pane" id="leads">
+    <div class="sec">Funil de leads</div>
+    <div class="funnel" id="funnel">
+      <div class="funnel-step"><div class="funnel-n" id="fn-novo">0</div><div class="funnel-l">Novo</div></div>
+      <div class="funnel-step"><div class="funnel-n" id="fn-qual">0</div><div class="funnel-l">Qualif.</div></div>
+      <div class="funnel-step"><div class="funnel-n" id="fn-enc">0</div><div class="funnel-l">Encam.</div></div>
+      <div class="funnel-step"><div class="funnel-n" id="fn-done">0</div><div class="funnel-l">Concluído</div></div>
+    </div>
+    <div class="sec">Leads</div>
     <div id="leads-list"><div class="empty">Carregando...</div></div>
   </div>
 
   <!-- CHAT SIMULADO -->
-  <div class="panel" id="panel-chat">
-
-    <!-- status bar -->
-    <div class="chat-top">
+  <div class="pane" id="chat">
+    <div class="chat-status">
       <span>nó:</span>
-      <span class="chat-node-id" id="chat-node">—</span>
-      <span class="chat-lead-notif" id="chat-lead-notif">✓ LEAD SALVO</span>
+      <span class="chat-node" id="cnod">—</span>
+      <span class="chat-notif" id="cnotif">✓ LEAD SALVO</span>
     </div>
-
-    <!-- messages window -->
-    <div class="chat-window" id="chat-window">
-      <div class="empty" id="chat-empty">Clique em <strong>Iniciar</strong> para começar.</div>
+    <div class="chat-win" id="cwin">
+      <div class="empty" id="cwelcome">Clique em <strong>Iniciar</strong> para começar.</div>
     </div>
-
-    <!-- input area -->
-    <div class="chat-input-area">
-      <div class="chat-phone-row">
+    <div class="chat-qr" id="cqr"></div>
+    <div class="chat-in">
+      <div class="chat-row1">
         <span>Tel</span>
-        <input class="input" id="c-phone" type="tel" placeholder="5534900000000" value="5534900000000">
+        <input class="inp" id="ctel" type="tel" placeholder="5534900000000" value="5534900000000">
         <button class="btn btn-ghost btn-sm" onclick="chatStart()">Iniciar</button>
       </div>
-      <div class="chat-send-row">
-        <input class="input" id="c-msg" type="text" placeholder="Digite sua mensagem..."
+      <div class="chat-row2">
+        <input class="inp" id="cmsg" type="text" placeholder="Digite sua mensagem..."
           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend();}">
-        <button class="btn btn-send" id="c-btn-send" onclick="chatSend()">↵</button>
+        <button class="btn btn-g" id="csend" onclick="chatSend()">↵</button>
       </div>
+    </div>
+  </div>
+
+  <!-- FLUXO (mind map) -->
+  <div class="pane" id="flow">
+    <div class="flow-outer" id="flow-outer">
+      <div class="empty">Carregando mapa...</div>
     </div>
   </div>
 </main>
 
 <script>
-  // ── Estado global ─────────────────────────────────────────
-  let currentTab = 'sessions';
-  let chatBusy = false;
-  let chatCurrentNode = '—';
+// ── globals ───────────────────────────────────────────────
+let curTab = 'sess';
+let chatBusy = false;
+let chatNode = 'INICIO';
+let chatAutoRestarting = false;
 
-  // ── Utilitários ───────────────────────────────────────────
-  const $ = id => document.getElementById(id);
+// ── utils ─────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
 
-  function esc(str) {
-    return String(str ?? '')
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function esc(s) {
+  return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function rt(s) {
+  // render text: escape + bold + links
+  return esc(s)
+    .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
+    .replace(/(https?:\/\/\S+)/g, '<a href="$1" target="_blank" class="msg-link">$1</a>');
+}
+
+function ago(iso) {
+  if (!iso) return '—';
+  const s = Math.floor((Date.now()-new Date(iso))/1000);
+  if (s<60)    return s+'s';
+  if (s<3600)  return Math.floor(s/60)+'min';
+  if (s<86400) return Math.floor(s/3600)+'h';
+  return Math.floor(s/86400)+'d';
+}
+
+function hhmm(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+function nowT() {
+  return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+}
+
+function active5(iso) { return iso && (Date.now()-new Date(iso))<300000; }
+
+function setErr(m) {
+  if (m) { $('err').textContent='⚠  '+m; $('err').classList.add('on'); }
+  else   { $('err').classList.remove('on'); }
+}
+
+function flashDot() {
+  const d=$('rdot'); d.classList.add('on'); setTimeout(()=>d.classList.remove('on'),400);
+}
+
+// ── tab routing ───────────────────────────────────────────
+function go(tab) {
+  ['sess','leads','chat','flow'].forEach(t => {
+    $('t-'+t).classList.toggle('on', t===tab);
+    $(t).classList.toggle('on', t===tab);
+  });
+  // hide messages sub-view unless we're in sess
+  if (tab!=='sess') $('msgs').classList.remove('on');
+  $('wrap').classList.toggle('chat-mode', tab==='chat');
+  curTab = tab;
+  if (tab==='leads') loadLeads();
+  if (tab==='flow')  loadFlow();
+}
+
+// ── sessions ──────────────────────────────────────────────
+async function loadSessions() {
+  try {
+    const j = await fetch('/api/sessions').then(r=>r.json());
+    if (!j.ok) throw new Error(j.error||'Supabase indisponível');
+    setErr(null);
+
+    const all = j.data||[];
+    $('hs').textContent = all.length;
+
+    const online = all.filter(s=>active5(s.atualizado_em)).length;
+    const tb = $('tb-sess');
+    if (online) { tb.textContent=online; tb.style.display='inline-block'; }
+    else tb.style.display='none';
+
+    const el = $('sess-list');
+    if (!all.length) {
+      el.innerHTML='<div class="empty">Nenhuma sessão.<br>Abra a aba Chat e inicie uma conversa.</div>';
+      return;
+    }
+
+    el.innerHTML = all.map(s => {
+      const ctx = s.context||{};
+      const on = active5(s.atualizado_em);
+      const info = [ctx.nome, ctx.interesse?'int: '+ctx.interesse:null].filter(Boolean).join(' · ');
+      return `<div class="card" onclick="viewMsgs('${esc(s.phone)}')">
+        <div class="crow">
+          <div class="cphone">${esc(s.phone)}</div>
+          <span class="badge ${on?'b-on':'b-off'}">${on?'● ao vivo':'● off'}</span>
+        </div>
+        <div class="cnode">⌗ ${esc(s.current_node)}</div>
+        ${info?`<div class="cinfo">${esc(info)}</div>`:''}
+        <div class="cfoot">
+          <div class="ctime">${ago(s.atualizado_em)} atrás</div>
+          <div class="ccta">msgs →</div>
+        </div>
+      </div>`;
+    }).join('');
+    flashDot();
+  } catch(e) { console.error('[sessions]',e); setErr(e.message); }
+}
+
+// ── message history ────────────────────────────────────────
+async function viewMsgs(phone) {
+  $('sess').classList.remove('on');
+  $('msgs').classList.add('on');
+  $('mphone').textContent = phone;
+  $('mlist').innerHTML = '<div class="empty">Carregando...</div>';
+  try {
+    const j = await fetch('/api/messages/'+encodeURIComponent(phone)).then(r=>r.json());
+    if (!j.ok) throw new Error(j.error);
+    const ms = j.data||[];
+    if (!ms.length) { $('mlist').innerHTML='<div class="empty">Nenhuma mensagem.</div>'; return; }
+    $('mlist').innerHTML = ms.map(m=>`
+      <div class="mmsg ${esc(m.direcao)}">
+        <div class="marrow">${m.direcao==='entrada'?'→':'←'}</div>
+        <div class="mwrap">
+          <div class="mbubble">${rt(m.conteudo)}</div>
+          <div class="mmeta">${hhmm(m.criado_em)}${m.node?' · '+esc(m.node):''}</div>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    $('mlist').innerHTML=`<div class="empty" style="color:var(--red)">Erro: ${esc(e.message)}</div>`;
   }
+}
 
-  function ago(iso) {
-    if (!iso) return '—';
-    const s = Math.floor((Date.now() - new Date(iso)) / 1000);
-    if (s < 60) return `${s}s atrás`;
-    if (s < 3600) return `${Math.floor(s/60)}min atrás`;
-    if (s < 86400) return `${Math.floor(s/3600)}h atrás`;
-    return `${Math.floor(s/86400)}d atrás`;
-  }
+function backSess() {
+  $('msgs').classList.remove('on');
+  $('sess').classList.add('on');
+}
 
-  function hhmm(iso) {
-    if (!iso) return '';
-    return new Date(iso).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  }
+// ── leads ─────────────────────────────────────────────────
+async function loadLeads() {
+  try {
+    const j = await fetch('/api/leads').then(r=>r.json());
+    if (!j.ok) throw new Error(j.error);
+    const all = j.data||[];
+    $('hl').textContent = all.length;
 
-  function nowTime() {
-    return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-  }
+    const counts = {novo:0, qualificado:0, encaminhado:0, concluido:0};
+    all.forEach(l=>{ if(counts[l.status]!==undefined) counts[l.status]++; });
+    $('fn-novo').textContent  = counts.novo;
+    $('fn-qual').textContent  = counts.qualificado;
+    $('fn-enc').textContent   = counts.encaminhado;
+    $('fn-done').textContent  = counts.concluido;
 
-  function isOnline(iso) {
-    return iso && (Date.now() - new Date(iso)) < 300000;
-  }
+    const list = $('leads-list');
+    if (!all.length) { list.innerHTML='<div class="empty">Nenhum lead ainda.</div>'; return; }
 
-  function setError(msg) {
-    const el = $('err');
-    if (msg) { el.textContent = '⚠  ' + msg; el.classList.add('visible'); }
-    else el.classList.remove('visible');
-  }
+    const bmap = {novo:'b-new', qualificado:'b-lead', encaminhado:'b-enc', concluido:'b-done'};
+    list.innerHTML = all.map(l=>`
+      <div class="card">
+        <div class="crow">
+          <div class="cphone">${esc(l.nome||l.phone)}</div>
+          <span class="badge ${bmap[l.status]||'b-new'}">${esc(l.status)}</span>
+        </div>
+        ${l.nome?`<div class="cnode">${esc(l.phone)}</div>`:''}
+        ${l.interesse?`<div class="cinfo">Interesse: ${esc(l.interesse)}</div>`:''}
+        <div class="cfoot">
+          <div class="ctime">${ago(l.qualificado_em)} atrás</div>
+          ${l.valor_potencial?`<div class="ccta">R$ ${Number(l.valor_potencial).toFixed(2)}</div>`:''}
+        </div>
+      </div>`).join('');
+  } catch(e) { console.error('[leads]',e); setErr(e.message); }
+}
 
-  function flash() {
-    const d = $('refresh-dot');
-    if (!d) return;
-    d.classList.add('flash');
-    setTimeout(() => d.classList.remove('flash'), 400);
-  }
+// ── chat ──────────────────────────────────────────────────
+function cphone() { return $('ctel').value.trim()||'5534900000000'; }
 
-  // ── Tabs ──────────────────────────────────────────────────
-  function switchTab(tab) {
-    ['sessions','leads','chat'].forEach(t => {
-      const btn = $('tab-' + t);
-      const panel = $('panel-' + t);
-      if (btn)   btn.classList.toggle('active', t === tab);
-      if (panel) panel.classList.toggle('active', t === tab);
+function csetNode(n) {
+  chatNode = n||'INICIO';
+  $('cnod').textContent = chatNode;
+  buildQR(chatNode);
+}
+
+function buildQR(node) {
+  const qr = $('cqr');
+  qr.innerHTML = '';
+  if (node === 'INICIO') {
+    const opts = [['1','Catálogo'],['2','Pedido'],['3','Atendente']];
+    opts.forEach(([v,l]) => {
+      const b = document.createElement('button');
+      b.className = 'qr-btn';
+      b.textContent = v+' · '+l;
+      b.onclick = () => { $('cmsg').value=v; chatSend(); };
+      qr.appendChild(b);
     });
-    if (tab !== 'sessions') $('panel-messages').classList.remove('active');
-    $('content').classList.toggle('chat-mode', tab === 'chat');
-    currentTab = tab;
-    if (tab === 'leads') loadLeads();
   }
+}
 
-  // ── Sessions ──────────────────────────────────────────────
-  async function loadSessions() {
-    try {
-      const r = await fetch('/api/sessions');
-      const j = await r.json();
-      if (!j.ok) throw new Error(j.error || 'Supabase indisponível');
+function cappend(text, isUser) {
+  const win = $('cwin');
+  const we  = $('cwelcome');
+  if (we) we.remove();
 
-      setError(null);
-      const sessions = j.data || [];
-      $('h-sessions').textContent = sessions.length;
+  const t = nowT();
+  const d = document.createElement('div');
+  if (isUser) {
+    d.className = 'cb-user';
+    d.innerHTML = `<div class="bub">${esc(text)}</div><div class="bmeta">${t}</div>`;
+  } else {
+    d.className = 'cb-bot';
+    d.innerHTML = `<div class="bub">${rt(text)}</div><div class="bmeta">${t} · ${esc(chatNode)}</div>`;
+  }
+  win.appendChild(d);
+  win.scrollTop = win.scrollHeight;
+}
 
-      const badge = $('badge-sessions');
-      const online = sessions.filter(s => isOnline(s.atualizado_em)).length;
-      if (online > 0) { badge.textContent = online; badge.style.display = 'inline-block'; }
-      else badge.style.display = 'none';
+function ctyping() {
+  const win = $('cwin');
+  const d = document.createElement('div');
+  d.className = 'cb-bot'; d.id = 'ctype';
+  d.innerHTML = '<div class="bub typing-dots"><span></span><span></span><span></span></div>';
+  win.appendChild(d); win.scrollTop = win.scrollHeight;
+}
 
-      const list = $('sessions-list');
-      if (!sessions.length) {
-        list.innerHTML = '<div class="empty">Nenhuma sessão ainda.<br>Use a aba Chat para testar o bot.</div>';
-        return;
+function crm() { const t=$('ctype'); if(t) t.remove(); }
+
+function cdiv(label='reiniciado') {
+  const win = $('cwin');
+  const d = document.createElement('div');
+  d.className = 'chat-div'; d.textContent = '─── '+label+' ───';
+  win.appendChild(d); win.scrollTop = win.scrollHeight;
+}
+
+function cnotif() {
+  const el=$('cnotif'); el.classList.add('on');
+  setTimeout(()=>el.classList.remove('on'), 3500);
+  fetch('/api/leads').then(r=>r.json()).then(j=>{ if(j.ok) $('hl').textContent=(j.data||[]).length; }).catch(()=>{});
+}
+
+async function chatStart() {
+  chatAutoRestarting = false;
+  const p = cphone();
+  $('cwin').innerHTML = '<div class="empty">Iniciando...</div>';
+  csetNode('INICIO');
+  try {
+    const j = await fetch('/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:p})}).then(r=>r.json());
+    $('cwin').innerHTML = '';
+    if (j.ok) { csetNode(j.nextNode); cappend(j.text, false); $('cmsg').focus(); }
+    else $('cwin').innerHTML=`<div class="empty" style="color:var(--red)">Erro: ${esc(j.error||'?')}</div>`;
+  } catch(e) {
+    $('cwin').innerHTML=`<div class="empty" style="color:var(--red)">Erro de rede: ${esc(e.message)}</div>`;
+  }
+}
+
+async function chatSend() {
+  if (chatBusy) return;
+  const p = cphone(), txt = $('cmsg').value.trim();
+  if (!txt) return;
+
+  chatBusy = true;
+  $('csend').disabled = true;
+  $('cmsg').value = '';
+  $('cqr').innerHTML = '';
+
+  cappend(txt, true);
+  ctyping();
+
+  try {
+    const j = await fetch('/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:p,text:txt})}).then(r=>r.json());
+    crm();
+    if (j.ok) {
+      const prev = chatNode;
+      csetNode(j.nextNode);
+      cappend(j.reply, false);
+
+      // lead notification: fires when nextNode = QUALIFICACAO_INTERESSE (register_lead runs as nextNode action)
+      if (j.nextNode === 'QUALIFICACAO_INTERESSE') cnotif();
+
+      // auto-restart after terminal node (engine returns INICIO after terminal)
+      if (j.nextNode === 'INICIO' && prev !== 'INICIO' && !chatAutoRestarting) {
+        chatAutoRestarting = true;
+        setTimeout(() => { cdiv(); chatStart(); }, 1800);
       }
-
-      list.innerHTML = sessions.map(s => {
-        const ctx = s.context || {};
-        const on = isOnline(s.atualizado_em);
-        const info = [ctx.nome, ctx.interesse ? `int: ${ctx.interesse}` : null].filter(Boolean).join(' · ');
-        return `
-          <div class="card" onclick="viewMessages('${esc(s.phone)}')">
-            <div class="card-row">
-              <div class="card-phone">${esc(s.phone)}</div>
-              <span class="badge ${on ? 'badge-on' : 'badge-off'}">${on ? '● on' : '● off'}</span>
-            </div>
-            <div class="card-node">⌗ ${esc(s.current_node)}</div>
-            ${info ? `<div class="card-info">${esc(info)}</div>` : ''}
-            <div class="card-footer">
-              <div class="card-time">${ago(s.atualizado_em)}</div>
-              <div class="card-cta">ver msgs →</div>
-            </div>
-          </div>`;
-      }).join('');
-
-      flash();
-    } catch (err) {
-      console.error('[sessions]', err);
-      setError(err.message);
-    }
-  }
-
-  // ── Messages ──────────────────────────────────────────────
-  async function viewMessages(phone) {
-    $('panel-sessions').classList.remove('active');
-    $('panel-messages').classList.add('active');
-    $('msg-phone-label').textContent = phone;
-    $('msg-list').innerHTML = '<div class="empty">Carregando...</div>';
-
-    try {
-      const r = await fetch('/api/messages/' + encodeURIComponent(phone));
-      const j = await r.json();
-      if (!j.ok) throw new Error(j.error);
-
-      const msgs = j.data || [];
-      if (!msgs.length) {
-        $('msg-list').innerHTML = '<div class="empty">Nenhuma mensagem registrada.</div>';
-        return;
-      }
-
-      $('msg-list').innerHTML = msgs.map(m => `
-        <div class="msg ${esc(m.direcao)}">
-          <div class="msg-arrow">${m.direcao === 'entrada' ? '→' : '←'}</div>
-          <div class="msg-wrap">
-            <div class="msg-bubble">${esc(m.conteudo)}</div>
-            <div class="msg-meta">${hhmm(m.criado_em)}${m.node ? ' · ' + esc(m.node) : ''}</div>
-          </div>
-        </div>`).join('');
-    } catch (err) {
-      console.error('[messages]', err);
-      $('msg-list').innerHTML =
-        '<div class="empty" style="color:var(--red)">Erro ao carregar mensagens.<br>' + esc(err.message) + '</div>';
-    }
-  }
-
-  function backToSessions() {
-    $('panel-messages').classList.remove('active');
-    $('panel-sessions').classList.add('active');
-  }
-
-  // ── Leads ─────────────────────────────────────────────────
-  async function loadLeads() {
-    try {
-      const r = await fetch('/api/leads');
-      const j = await r.json();
-      if (!j.ok) throw new Error(j.error);
-
-      const leads = j.data || [];
-      $('h-leads').textContent = leads.length;
-
-      const list = $('leads-list');
-      if (!leads.length) {
-        list.innerHTML = '<div class="empty">Nenhum lead qualificado ainda.</div>';
-        return;
-      }
-
-      const badgeMap = { novo:'badge-off', qualificado:'badge-lead', encaminhado:'badge-enc', concluido:'badge-done' };
-
-      list.innerHTML = leads.map(l => `
-        <div class="card">
-          <div class="card-row">
-            <div class="card-phone">${esc(l.nome || l.phone)}</div>
-            <span class="badge ${badgeMap[l.status] || 'badge-off'}">${esc(l.status)}</span>
-          </div>
-          ${l.nome ? `<div class="card-node">${esc(l.phone)}</div>` : ''}
-          ${l.interesse ? `<div class="card-info">Interesse: ${esc(l.interesse)}</div>` : ''}
-          <div class="card-footer">
-            <div class="card-time">${ago(l.qualificado_em)}</div>
-            ${l.valor_potencial ? `<div class="card-cta">R$ ${Number(l.valor_potencial).toFixed(2)}</div>` : ''}
-          </div>
-        </div>`).join('');
-    } catch (err) {
-      console.error('[leads]', err);
-      setError(err.message);
-    }
-  }
-
-  // ── Chat Simulado ─────────────────────────────────────────
-  function chatGetPhone() {
-    return $('c-phone').value.trim() || '5534900000000';
-  }
-
-  function chatSetNode(node) {
-    chatCurrentNode = node || 'INICIO';
-    $('chat-node').textContent = chatCurrentNode;
-  }
-
-  function chatAddMessage(text, isUser) {
-    const win = $('chat-window');
-    const empty = $('chat-empty');
-    if (empty) empty.remove();
-
-    const t = nowTime();
-    const div = document.createElement('div');
-
-    if (isUser) {
-      div.className = 'chat-msg-user';
-      div.innerHTML =
-        `<div class="chat-bubble-user">${esc(text)}</div>` +
-        `<div class="chat-msg-meta">${t}</div>`;
     } else {
-      div.className = 'chat-msg-bot';
-      div.innerHTML =
-        `<div class="chat-bubble-bot">${esc(text)}</div>` +
-        `<div class="chat-msg-meta">${t} · ${esc(chatCurrentNode)}</div>`;
+      cappend('⚠ '+( j.error||'erro desconhecido'), false);
+    }
+  } catch(e) { crm(); cappend('⚠ Erro de rede: '+e.message, false); }
+  finally { chatBusy=false; $('csend').disabled=false; $('cmsg').focus(); }
+}
+
+// ── flow map ──────────────────────────────────────────────
+const NS = 'http://www.w3.org/2000/svg';
+const CW = 160, CH = 88; // card width/height
+const LAYOUT = {
+  INICIO:                  {x:20,  y:148},
+  CATALOGO:                {x:240, y:8  },
+  CONSULTA_PEDIDO:         {x:240, y:108},
+  SUPORTE:                 {x:240, y:208},
+  NAO_ENTENDI:             {x:240, y:308},
+  QUALIFICACAO_NOME:       {x:460, y:8  },
+  ENCAMINHAR_HUMANO:       {x:460, y:108},
+  QUALIFICACAO_INTERESSE:  {x:680, y:8  },
+  LEAD_REGISTRADO:         {x:900, y:8  },
+};
+const CANVAS_W = 1080, CANVAS_H = 460;
+
+const EDGES = [
+  {f:'INICIO', t:'CATALOGO',               lbl:'1 · catálogo',   col:'#00ff41'},
+  {f:'INICIO', t:'CONSULTA_PEDIDO',         lbl:'2 · pedido',     col:'#4da6ff'},
+  {f:'INICIO', t:'SUPORTE',                 lbl:'3 · ajuda',      col:'#4da6ff'},
+  {f:'INICIO', t:'NAO_ENTENDI',             lbl:'* outros',       col:'#3a3a3a'},
+  {f:'CATALOGO',        t:'QUALIFICACAO_NOME',      lbl:'qq resp', col:'#00ff41'},
+  {f:'QUALIFICACAO_NOME',t:'QUALIFICACAO_INTERESSE', lbl:'nome',   col:'#00ff41'},
+  {f:'QUALIFICACAO_INTERESSE',t:'LEAD_REGISTRADO',   lbl:'interesse', col:'#ffaa00'},
+  {f:'CONSULTA_PEDIDO', t:'ENCAMINHAR_HUMANO', lbl:'nº pedido', col:'#4da6ff'},
+];
+
+const NODE_COL = {
+  INICIO:'#00ff41', CATALOGO:'#4da6ff',
+  QUALIFICACAO_NOME:'#4da6ff', QUALIFICACAO_INTERESSE:'#4da6ff',
+  LEAD_REGISTRADO:'#ffaa00', CONSULTA_PEDIDO:'#4da6ff',
+  SUPORTE:'#4da6ff', ENCAMINHAR_HUMANO:'#b06bff',
+  NAO_ENTENDI:'#ff5555',
+};
+
+function simplifyTrigger(src) {
+  return src.split('|').map(p=>
+    p.replace(/^\^|\$$/g,'').replace(/\[áa\]/g,'á').replace(/\[úu\]/g,'ú')
+     .replace(/\\/g,'').replace(/\(.*?\)/g,'').trim()
+  ).filter(p=>p.length>0&&p.length<=14).slice(0,3).join(' · ');
+}
+
+function mkMarker(defs, id, col) {
+  const m = document.createElementNS(NS,'marker');
+  m.setAttribute('id',id); m.setAttribute('markerWidth','7'); m.setAttribute('markerHeight','7');
+  m.setAttribute('refX','6'); m.setAttribute('refY','3.5'); m.setAttribute('orient','auto');
+  const p = document.createElementNS(NS,'path');
+  p.setAttribute('d','M 0 0 L 7 3.5 L 0 7 z');
+  p.setAttribute('fill',col);
+  m.appendChild(p); defs.appendChild(m);
+}
+
+function drawEdge(svg, fx, fy, tx, ty, col, lbl, dashed) {
+  const mid = (fx+tx)/2;
+  const d = `M ${fx},${fy} C ${mid},${fy} ${mid},${ty} ${tx},${ty}`;
+  const markId = 'arr-'+col.replace('#','');
+
+  const path = document.createElementNS(NS,'path');
+  path.setAttribute('d',d); path.setAttribute('stroke',col);
+  path.setAttribute('fill','none'); path.setAttribute('stroke-width','1.5');
+  if (dashed) path.setAttribute('stroke-dasharray','4,3');
+  path.setAttribute('marker-end',`url(#${markId})`);
+  svg.appendChild(path);
+
+  if (lbl) {
+    const mx = 0.125*fx+0.375*mid+0.375*mid+0.125*tx;
+    const my = 0.125*fy+0.375*fy+0.375*ty+0.125*ty;
+    const tw = lbl.length*5+10;
+    const bg = document.createElementNS(NS,'rect');
+    bg.setAttribute('x',mx-tw/2); bg.setAttribute('y',my-7);
+    bg.setAttribute('width',tw); bg.setAttribute('height','13');
+    bg.setAttribute('fill','#000'); bg.setAttribute('rx','2');
+    svg.appendChild(bg);
+    const txt = document.createElementNS(NS,'text');
+    txt.setAttribute('x',mx); txt.setAttribute('y',my+4);
+    txt.setAttribute('text-anchor','middle');
+    txt.setAttribute('font-family','Space Mono,monospace');
+    txt.setAttribute('font-size','7'); txt.setAttribute('fill',col);
+    txt.textContent = lbl;
+    svg.appendChild(txt);
+  }
+}
+
+async function loadFlow() {
+  const outer = $('flow-outer');
+  try {
+    const j = await fetch('/api/flow').then(r=>r.json());
+    if (!j.ok) throw new Error(j.error);
+
+    const nodeMap = {};
+    (j.data||[]).forEach(n => nodeMap[n.id]=n);
+
+    // Build canvas
+    const canvas = document.createElement('div');
+    canvas.className = 'flow-canvas';
+    canvas.style.width  = CANVAS_W+'px';
+    canvas.style.height = CANVAS_H+'px';
+    canvas.style.minWidth = CANVAS_W+'px';
+
+    // SVG layer
+    const svg = document.createElementNS(NS,'svg');
+    svg.setAttribute('class','flow-svg');
+    svg.setAttribute('width',CANVAS_W);
+    svg.setAttribute('height',CANVAS_H);
+
+    const defs = document.createElementNS(NS,'defs');
+    svg.appendChild(defs);
+
+    // Markers for each color
+    const usedCols = new Set(EDGES.map(e=>e.col));
+    usedCols.add('#3a3a3a'); // fallback
+    usedCols.forEach(c => mkMarker(defs,'arr-'+c.replace('#',''),c));
+
+    // Draw edges
+    EDGES.forEach(e => {
+      const fp = LAYOUT[e.f], tp = LAYOUT[e.t];
+      if (!fp||!tp) return;
+      drawEdge(svg, fp.x+CW, fp.y+CH/2, tp.x, tp.y+CH/2, e.col, e.lbl, false);
+    });
+
+    // Loop: NAO_ENTENDI bottom → INICIO bottom (arc below canvas)
+    {
+      const lp = LAYOUT.NAO_ENTENDI, ip = LAYOUT.INICIO;
+      const sx = lp.x+CW/2, sy = lp.y+CH; // bottom center of NAO_ENTENDI
+      const ex = ip.x+CW/2, ey = ip.y+CH; // bottom center of INICIO
+      const d = `M ${sx},${sy} C ${sx},${CANVAS_H-10} ${ex},${CANVAS_H-10} ${ex},${ey}`;
+      const path = document.createElementNS(NS,'path');
+      path.setAttribute('d',d); path.setAttribute('stroke','#3a3a3a');
+      path.setAttribute('fill','none'); path.setAttribute('stroke-width','1.5');
+      path.setAttribute('stroke-dasharray','4,3');
+      path.setAttribute('marker-end','url(#arr-3a3a3a)');
+      svg.appendChild(path);
+      // label at arc midpoint
+      const mx = 0.125*sx+0.375*sx+0.375*ex+0.125*ex; // ≈ midX
+      const my = CANVAS_H-12;
+      const lbl = '↩ reinicia';
+      const tw = lbl.length*5+10;
+      const bg = document.createElementNS(NS,'rect');
+      bg.setAttribute('x',mx-tw/2); bg.setAttribute('y',my-7);
+      bg.setAttribute('width',tw); bg.setAttribute('height','13');
+      bg.setAttribute('fill','#000'); bg.setAttribute('rx','2');
+      svg.appendChild(bg);
+      const txt = document.createElementNS(NS,'text');
+      txt.setAttribute('x',mx); txt.setAttribute('y',my+4);
+      txt.setAttribute('text-anchor','middle');
+      txt.setAttribute('font-family','Space Mono,monospace');
+      txt.setAttribute('font-size','7'); txt.setAttribute('fill','#3a3a3a');
+      txt.textContent = lbl;
+      svg.appendChild(txt);
     }
 
-    win.appendChild(div);
-    win.scrollTop = win.scrollHeight;
+    canvas.appendChild(svg);
+
+    // Node cards
+    Object.entries(LAYOUT).forEach(([id, pos]) => {
+      const nd = nodeMap[id];
+      if (!nd) return;
+      const col = NODE_COL[id]||'#888';
+
+      // incoming trigger (from EDGES)
+      const incoming = EDGES.find(e=>e.t===id);
+      const trigLabel = incoming?.lbl || (id==='INICIO'?'root':'');
+
+      const card = document.createElement('div');
+      card.className = 'fn';
+      card.style.left = pos.x+'px';
+      card.style.top  = pos.y+'px';
+      card.style.height = CH+'px';
+      card.style.borderLeft = `2px solid ${col}`;
+
+      const msg = (nd.message||'').replace(/\n/g,' ').substring(0,55) + ((nd.message||'').length>55?'…':'');
+      const actionLabel = nd.action ? nd.action.replace(/_/g,' ') : null;
+
+      card.innerHTML = `
+        <div class="fn-id" style="color:${col}">${esc(id)}</div>
+        ${trigLabel?`<span class="fn-trigger" style="background:${col};color:${col==='#3a3a3a'?'#ccc':'#000'}">${esc(trigLabel)}</span>`:''}
+        <div class="fn-msg">${esc(msg)}</div>
+        <div class="fn-foot">
+          ${id==='INICIO'?'<span class="fn-tag ft-root">ROOT</span>':''}
+          ${actionLabel?`<span class="fn-tag ft-act">${esc(actionLabel)}</span>`:''}
+          ${nd.terminal?'<span class="fn-tag ft-term">TERMINAL</span>':''}
+          ${id==='NAO_ENTENDI'?'<span class="fn-tag ft-loop">LOOP</span>':''}
+        </div>`;
+      canvas.appendChild(card);
+    });
+
+    outer.innerHTML = '';
+    outer.appendChild(canvas);
+  } catch(e) {
+    console.error('[flow]',e);
+    outer.innerHTML=`<div class="empty" style="color:var(--red)">Erro ao carregar fluxo: ${esc(e.message)}</div>`;
   }
+}
 
-  function chatShowTyping() {
-    const win = $('chat-window');
-    const div = document.createElement('div');
-    div.className = 'chat-msg-bot';
-    div.id = 'chat-typing';
-    div.innerHTML =
-      `<div class="chat-bubble-bot chat-typing-dots">` +
-      `<span></span><span></span><span></span></div>`;
-    win.appendChild(div);
-    win.scrollTop = win.scrollHeight;
-  }
+// ── boot ──────────────────────────────────────────────────
+loadSessions();
+fetch('/api/leads').then(r=>r.json()).then(j=>{ if(j.ok) $('hl').textContent=(j.data||[]).length; }).catch(()=>{});
 
-  function chatHideTyping() {
-    const t = $('chat-typing');
-    if (t) t.remove();
-  }
-
-  function chatShowLeadNotif() {
-    const el = $('chat-lead-notif');
-    el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), 3500);
-    fetch('/api/leads').then(r => r.json()).then(j => {
-      if (j.ok) $('h-leads').textContent = (j.data || []).length;
-    }).catch(() => {});
-  }
-
-  async function chatStart() {
-    const phone = chatGetPhone();
-    $('chat-window').innerHTML = '<div class="empty">Iniciando...</div>';
-    chatSetNode('INICIO');
-
-    try {
-      const r = await fetch('/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
-      });
-      const j = await r.json();
-      $('chat-window').innerHTML = '';
-
-      if (j.ok) {
-        chatSetNode(j.nextNode);
-        chatAddMessage(j.text, false);
-        $('c-msg').focus();
-      } else {
-        $('chat-window').innerHTML =
-          `<div class="empty" style="color:var(--red)">Erro: ${esc(j.error || 'desconhecido')}</div>`;
-      }
-    } catch (err) {
-      $('chat-window').innerHTML =
-        `<div class="empty" style="color:var(--red)">Erro de rede: ${esc(err.message)}</div>`;
-    }
-  }
-
-  async function chatSend() {
-    if (chatBusy) return;
-    const phone = chatGetPhone();
-    const text = $('c-msg').value.trim();
-    if (!text) return;
-
-    chatBusy = true;
-    const btn = $('c-btn-send');
-    btn.disabled = true;
-    $('c-msg').value = '';
-
-    chatAddMessage(text, true);
-    chatShowTyping();
-
-    try {
-      const r = await fetch('/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, text }),
-      });
-      const j = await r.json();
-      chatHideTyping();
-
-      if (j.ok) {
-        chatSetNode(j.nextNode);
-        chatAddMessage(j.reply, false);
-        if (j.nextNode === 'LEAD_REGISTRADO') chatShowLeadNotif();
-      } else {
-        chatAddMessage('⚠ Erro: ' + (j.error || 'desconhecido'), false);
-      }
-    } catch (err) {
-      chatHideTyping();
-      chatAddMessage('⚠ Erro de rede: ' + err.message, false);
-    } finally {
-      chatBusy = false;
-      btn.disabled = false;
-      $('c-msg').focus();
-    }
-  }
-
-  // ── Inicialização e polling ───────────────────────────────
-  loadSessions();
-
-  fetch('/api/leads').then(r => r.json()).then(j => {
-    if (j.ok) $('h-leads').textContent = (j.data || []).length;
-  }).catch(() => {});
-
-  setInterval(() => {
-    if (currentTab === 'sessions') loadSessions();
-    if (currentTab === 'leads') loadLeads();
-  }, 5000);
+setInterval(()=>{
+  if (curTab==='sess')  loadSessions();
+  if (curTab==='leads') loadLeads();
+}, 5000);
 </script>
 </body>
 </html>

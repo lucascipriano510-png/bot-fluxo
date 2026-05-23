@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabase } from '../lib/supabase';
 import { fetchLeads } from '../services/leadService';
 import { fetchHistorico } from '../services/mensagemService';
+import { FLOW_MAP } from '../bot/flowMap';
 
 const router = Router();
 
@@ -39,6 +40,23 @@ router.get('/messages/:phone', async (req, res) => {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[api/messages]', msg);
+    res.json({ ok: false, data: [], error: msg });
+  }
+});
+
+router.get('/flow', (_req, res) => {
+  try {
+    const data = Object.values(FLOW_MAP).map(n => ({
+      id: n.id,
+      message: typeof n.message === 'function' ? n.message({}) : n.message,
+      options: (n.options || []).map(o => ({ trigger: o.trigger.source, next: o.next })),
+      default: n.default || null,
+      action: n.action || null,
+      terminal: n.terminal || false,
+    }));
+    res.json({ ok: true, data });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
     res.json({ ok: false, data: [], error: msg });
   }
 });
