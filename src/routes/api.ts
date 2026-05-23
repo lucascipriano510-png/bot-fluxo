@@ -44,12 +44,29 @@ router.get('/messages/:phone', async (req, res) => {
   }
 });
 
+// Leads parados no meio do funil (MORNO ou FRIO) — usados na aba de recuperação
+router.get('/recovery', async (_req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('bot_leads')
+      .select('*')
+      .in('status_comercial', ['MORNO', 'FRIO'])
+      .order('atualizado_em', { ascending: false, nullsFirst: false })
+      .limit(30);
+    if (error) throw error;
+    res.json({ ok: true, data: data || [] });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.json({ ok: false, data: [], error: msg });
+  }
+});
+
 router.get('/flow', (_req, res) => {
   try {
     const data = Object.values(FLOW_MAP).map(n => ({
       id: n.id,
       message: typeof n.message === 'function' ? n.message({}) : n.message,
-      options: (n.options || []).map(o => ({ trigger: o.trigger.source, next: o.next })),
+      options: (n.options || []).map(o => ({ trigger: o.trigger.source, next: o.next, data: o.data || null })),
       default: n.default || null,
       action: n.action || null,
       terminal: n.terminal || false,

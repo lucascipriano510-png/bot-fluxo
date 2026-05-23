@@ -132,10 +132,25 @@
       font-size: 7px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
       padding: 3px 7px; border-radius: 2px; flex-shrink: 0; white-space: nowrap;
     }
-    .b-new  { background: transparent;            color: var(--mu);  border: 1px solid var(--b1); }
-    .b-lead { background: rgba(255,170,0,.07);     color: var(--yel); border: 1px solid rgba(255,170,0,.2); }
-    .b-enc  { background: rgba(77,166,255,.07);    color: var(--blu); border: 1px solid rgba(77,166,255,.2); }
-    .b-done { background: rgba(0,255,65,.04);      color: #00cc33;    border: 1px solid rgba(0,255,65,.1); }
+    .b-new    { background: transparent;              color: var(--mu);  border: 1px solid var(--b1); }
+    .b-lead   { background: rgba(255,170,0,.07);     color: var(--yel); border: 1px solid rgba(255,170,0,.2); }
+    .b-enc    { background: rgba(77,166,255,.07);    color: var(--blu); border: 1px solid rgba(77,166,255,.2); }
+    .b-done   { background: rgba(0,255,65,.04);      color: #00cc33;    border: 1px solid rgba(0,255,65,.1); }
+    .b-quente { background: rgba(255,60,60,.08);     color: var(--red); border: 1px solid rgba(255,60,60,.3); }
+    .b-morno  { background: rgba(255,170,0,.07);     color: var(--yel); border: 1px solid rgba(255,170,0,.2); }
+    .b-frio   { background: transparent;             color: var(--mu);  border: 1px solid var(--b1); }
+
+    .card-quente { border-color: rgba(255,60,60,.25); }
+    .card-quente::before { background: var(--red); opacity: 1; }
+    .card-morno  { border-color: rgba(255,170,0,.2); }
+    .card-morno::before  { background: var(--yel); opacity: .6; }
+
+    .recover-msg {
+      background: var(--dim); border: 1px solid var(--b2); border-radius: 3px;
+      padding: 9px 12px; font-size: 11px; color: var(--tx); line-height: 1.5;
+      margin-top: 6px; cursor: pointer; transition: background .1s;
+    }
+    .recover-msg:hover { background: var(--b2); }
 
     /* ── FUNNEL ─────────────────────────────────────────── */
     .funnel { display: flex; gap: 5px; margin-bottom: 18px; }
@@ -358,9 +373,7 @@
 <body>
 
 <!-- LEAD TOAST -->
-<div class="lead-toast" id="lead-toast">
-  ✓ Lead capturado! Ver na aba Leads.
-</div>
+<div class="lead-toast" id="lead-toast">✓ Lead capturado!</div>
 
 <!-- HEADER -->
 <header class="hdr">
@@ -432,13 +445,15 @@
   <div class="pane" id="leads">
     <div class="scroll" style="width:100%;max-width:640px;margin:0 auto;overflow-y:auto;padding:16px 14px 80px;flex:1;">
       <div class="funnel">
-        <div class="fstep"><div class="fn" id="fn-novo">0</div><div class="fl">Novo</div></div>
-        <div class="fstep"><div class="fn" id="fn-qual">0</div><div class="fl">Qualif.</div></div>
+        <div class="fstep"><div class="fn" id="fn-frio">0</div><div class="fl">Frio</div></div>
+        <div class="fstep"><div class="fn" id="fn-morno">0</div><div class="fl">Morno</div></div>
+        <div class="fstep"><div class="fn" id="fn-quente">0</div><div class="fl">Quente 🔥</div></div>
         <div class="fstep"><div class="fn" id="fn-enc">0</div><div class="fl">Encam.</div></div>
-        <div class="fstep"><div class="fn" id="fn-done">0</div><div class="fl">Concluído</div></div>
       </div>
       <div class="sec">Leads capturados</div>
       <div id="leads-list"><div class="empty">Carregando...</div></div>
+      <div class="sec" style="margin-top:22px;">Recuperação — leads parados</div>
+      <div id="recovery-list"><div class="empty" style="padding:24px 0;">Carregando...</div></div>
     </div>
   </div>
 
@@ -546,7 +561,7 @@ function go(tab) {
     $(t).classList.toggle('on', t === tab);
   });
   curTab = tab;
-  if (tab === 'leads') loadLeads();
+  if (tab === 'leads') { loadLeads(); loadRecovery(); }
   if (tab === 'flow')  loadFlow();
 }
 
@@ -558,17 +573,20 @@ async function loadLeads() {
     const all = j.data || [];
 
     $('hl').textContent = all.length;
-
     const tc = $('tc-leads');
     if (all.length) { tc.textContent = all.length; tc.style.display = 'inline-block'; }
     else tc.style.display = 'none';
 
-    const counts = {novo: 0, qualificado: 0, encaminhado: 0, concluido: 0};
-    all.forEach(l => { if (counts[l.status] !== undefined) counts[l.status]++; });
-    $('fn-novo').textContent = counts.novo;
-    $('fn-qual').textContent = counts.qualificado;
-    $('fn-enc').textContent  = counts.encaminhado;
-    $('fn-done').textContent = counts.concluido;
+    const counts = { FRIO: 0, MORNO: 0, QUENTE: 0, encaminhado: 0 };
+    all.forEach(l => {
+      const sc = (l.status_comercial || 'FRIO').toUpperCase();
+      if (counts[sc] !== undefined) counts[sc]++;
+      if (l.status === 'encaminhado') counts.encaminhado++;
+    });
+    $('fn-frio').textContent   = counts.FRIO;
+    $('fn-morno').textContent  = counts.MORNO;
+    $('fn-quente').textContent = counts.QUENTE;
+    $('fn-enc').textContent    = counts.encaminhado;
 
     const list = $('leads-list');
     if (!all.length) {
@@ -576,23 +594,73 @@ async function loadLeads() {
       return;
     }
 
-    const bmap = {novo:'b-new', qualificado:'b-lead', encaminhado:'b-enc', concluido:'b-done'};
-    list.innerHTML = all.map(l => `
-      <div class="card">
+    const scBadge = { QUENTE: 'b-quente', MORNO: 'b-morno', FRIO: 'b-frio' };
+    const scCard  = { QUENTE: 'card-quente', MORNO: 'card-morno', FRIO: '' };
+    list.innerHTML = all.map(l => {
+      const sc    = (l.status_comercial || 'FRIO').toUpperCase();
+      const badge = scBadge[sc] || 'b-frio';
+      const card  = scCard[sc]  || '';
+      const details = [
+        l.origem   ? `📦 ${esc(l.origem)}`   : '',
+        l.tamanho  ? `tam ${esc(l.tamanho)}`  : '',
+        l.estilo   ? `· ${esc(l.estilo)}`     : '',
+        l.cidade   ? `📍 ${esc(l.cidade)}`   : '',
+      ].filter(Boolean).join('  ');
+      const ts = ago(l.atualizado_em || l.qualificado_em);
+      return `
+      <div class="card ${card}">
         <div class="crow">
           <div class="cname">${esc(l.nome || '—')}</div>
-          <span class="badge ${bmap[l.status] || 'b-new'}">${esc(l.status)}</span>
+          <span class="badge ${badge}">${sc}</span>
         </div>
         <div class="cnode">${esc(l.phone)}</div>
-        ${l.interesse ? `<div class="cinfo">Interesse: ${esc(l.interesse)}</div>` : ''}
-        <div class="cfoot">
-          <div class="ctime">Última interação: ${ago(l.qualificado_em)} atrás</div>
+        ${details ? `<div class="cinfo" style="margin-top:4px;">${details}</div>` : ''}
+        ${l.proxima_acao ? `<div class="cinfo" style="color:var(--blu);margin-top:2px;">→ ${esc(l.proxima_acao)}</div>` : ''}
+        <div class="cfoot" style="margin-top:6px;">
+          <div class="ctime">Atualizado ${ts} atrás</div>
           ${l.valor_potencial ? `<div style="font-size:9px;color:var(--g);">R$ ${Number(l.valor_potencial).toFixed(2)}</div>` : ''}
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   } catch(e) {
     console.error('[leads]', e);
     $('leads-list').innerHTML = `<div class="empty" style="color:var(--red)">Erro: ${esc(e.message)}</div>`;
+  }
+}
+
+async function loadRecovery() {
+  const list = $('recovery-list');
+  try {
+    const j = await fetch('/api/recovery').then(r => r.json());
+    if (!j.ok) throw new Error(j.error);
+    const all = j.data || [];
+    if (!all.length) {
+      list.innerHTML = '<div class="empty" style="padding:20px 0;">Nenhum lead parado no momento.</div>';
+      return;
+    }
+    list.innerHTML = all.map(l => {
+      const nome     = l.nome     ? l.nome.split(' ')[0] : null;
+      const produto  = l.interesse || l.origem || 'produto';
+      const tamanho  = l.tamanho  || '';
+      const sugestao = nome
+        ? `${nome}, ainda está procurando ${produto}${tamanho ? ' no tamanho ' + tamanho : ''}? Separei algumas opções aqui.`
+        : `Vi que você estava olhando ${produto}${tamanho ? ' no ' + tamanho : ''}. Quer que eu te mande as opções disponíveis?`;
+      const ts = ago(l.atualizado_em || l.qualificado_em);
+      return `
+      <div class="card">
+        <div class="crow">
+          <div class="cname">${esc(l.nome || l.phone)}</div>
+          <span class="badge b-morno">${esc((l.status_comercial || 'FRIO').toUpperCase())}</span>
+        </div>
+        <div class="cnode">${esc(l.phone)} · parado há ${ts}</div>
+        <div class="recover-msg" title="Clique para copiar" onclick="navigator.clipboard&&navigator.clipboard.writeText(${JSON.stringify(sugestao)}).then(()=>this.style.borderColor='var(--g)')">
+          💬 ${esc(sugestao)}
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    console.error('[recovery]', e);
+    list.innerHTML = `<div class="empty" style="color:var(--red)">Erro: ${esc(e.message)}</div>`;
   }
 }
 
@@ -605,18 +673,30 @@ function csetNode(n) {
   buildQR(chatCurNode);
 }
 
+const QR_HINTS = {
+  INICIO:              [['camisa','Camisa/Polo'],['tenis','Tênis'],['bermuda','Bermuda'],['promoção','Promoção 🔥']],
+  APRESENTACAO:        [['camisa polo','Camisa'],['tênis','Tênis'],['bermuda','Bermuda']],
+  CAPTURA_TAMANHO:     [['P','P'],['M','M'],['G','G'],['GG','GG']],
+  CAPTURA_NUMERO:      [['39','39'],['40','40'],['41','41'],['42','42'],['43','43']],
+  CAPTURA_ESTILO:      [['básica','Básica'],['polo','Polo'],['malha premium','Malha premium']],
+  CAPTURA_CIDADE:      [['Uberaba','Uberaba'],['envio para outra cidade','Outra cidade']],
+  RECOMENDACAO:        [['quanto custa?','Quanto custa? 💰'],['quero','Quero esse 💪'],['mais barata','Mais barata'],['foto','Ver foto']],
+  CAPTURA_NOME_QUENTE: [],
+  AGUARDAR_RESPOSTA:   [],
+  NAO_ENTENDI:         [['camisa','Camisa'],['tênis','Tênis'],['bermuda','Bermuda']],
+};
+
 function buildQR(node) {
   const qr = $('cqr');
   qr.innerHTML = '';
-  if (node === 'INICIO') {
-    [['1','Catálogo'], ['2','Pedido'], ['3','Atendente']].forEach(([v, l]) => {
-      const b = document.createElement('button');
-      b.className = 'qr-btn';
-      b.textContent = v + ' · ' + l;
-      b.onclick = () => { $('cmsg').value = v; chatSend(); };
-      qr.appendChild(b);
-    });
-  }
+  const hints = QR_HINTS[node] || [];
+  hints.forEach(([v, l]) => {
+    const b = document.createElement('button');
+    b.className = 'qr-btn';
+    b.textContent = l;
+    b.onclick = () => { $('cmsg').value = v; chatSend(); };
+    qr.appendChild(b);
+  });
 }
 
 function cappend(text, isUser) {
@@ -655,17 +735,25 @@ function cdiv(txt = 'conversa reiniciada') {
   win.scrollTop = win.scrollHeight;
 }
 
-function showLeadToast() {
+function showLeadToast(type) {
   const el = $('lead-toast');
+  if (type === 'quente') {
+    el.textContent = '🔥 Lead QUENTE! Ver na aba Leads.';
+    el.style.borderColor = 'rgba(255,60,60,.5)';
+    el.style.color = 'var(--red)';
+  } else {
+    el.textContent = '✓ Lead registrado como morno.';
+    el.style.borderColor = '';
+    el.style.color = '';
+  }
   el.classList.add('show');
   setTimeout(() => el.classList.remove('show'), 4000);
-  // refresh lead count
   fetch('/api/leads').then(r => r.json()).then(j => {
     if (!j.ok) return;
-    const all = j.data || [];
-    $('hl').textContent = all.length;
+    const n = (j.data || []).length;
+    $('hl').textContent = n;
     const tc = $('tc-leads');
-    if (all.length) { tc.textContent = all.length; tc.style.display = 'inline-block'; }
+    if (n) { tc.textContent = n; tc.style.display = 'inline-block'; }
   }).catch(() => {});
 }
 
@@ -726,8 +814,9 @@ async function chatSend() {
       csetNode(j.nextNode);
       cappend(j.reply, false);
 
-      // lead saved when nextNode = QUALIFICACAO_INTERESSE (register_lead runs as nextNode action)
-      if (j.nextNode === 'QUALIFICACAO_INTERESSE') showLeadToast();
+      // RECOMENDACAO = lead registrado como MORNO; ENCAMINHAR_HUMANO = QUENTE
+      if (j.nextNode === 'RECOMENDACAO')        showLeadToast('morno');
+      if (j.nextNode === 'ENCAMINHAR_HUMANO')   showLeadToast('quente');
 
       // auto-restart after terminal node
       if (j.nextNode === 'INICIO' && prev !== 'INICIO' && !chatAutoRestarting) {
@@ -749,35 +838,51 @@ async function chatSend() {
 
 // ── flow map ────────────────────────────────────────────
 const NS = 'http://www.w3.org/2000/svg';
-const CW = 160, CH = 88;
+const CW = 155, CH = 80;
 const LAYOUT = {
-  INICIO:                  {x: 20,  y: 148},
-  CATALOGO:                {x: 240, y: 8  },
-  CONSULTA_PEDIDO:         {x: 240, y: 108},
-  SUPORTE:                 {x: 240, y: 208},
-  NAO_ENTENDI:             {x: 240, y: 308},
-  QUALIFICACAO_NOME:       {x: 460, y: 8  },
-  ENCAMINHAR_HUMANO:       {x: 460, y: 108},
-  QUALIFICACAO_INTERESSE:  {x: 680, y: 8  },
-  LEAD_REGISTRADO:         {x: 900, y: 8  },
+  INICIO:               {x: 20,  y: 200},
+  APRESENTACAO:         {x: 220, y: 340},
+  CAPTURA_TAMANHO:      {x: 220, y: 20 },
+  CAPTURA_NUMERO:       {x: 220, y: 115},
+  CONSULTA_PEDIDO:      {x: 220, y: 215},
+  SUPORTE:              {x: 220, y: 395},
+  NAO_ENTENDI:          {x: 220, y: 490},
+  CAPTURA_ESTILO:       {x: 420, y: 20 },
+  CAPTURA_CIDADE:       {x: 625, y: 60 },
+  RECOMENDACAO:         {x: 840, y: 60 },
+  CAPTURA_NOME_QUENTE:  {x: 1060,y: 10 },
+  AGUARDAR_RESPOSTA:    {x: 1060,y: 110},
+  ENCAMINHAR_HUMANO:    {x: 1270,y: 55 },
 };
-const CANVAS_W = 1080, CANVAS_H = 450;
+const CANVAS_W = 1460, CANVAS_H = 650;
 
 const EDGES = [
-  {f:'INICIO',               t:'CATALOGO',               lbl:'1 · catálogo',  col:'#00ff41'},
-  {f:'INICIO',               t:'CONSULTA_PEDIDO',         lbl:'2 · pedido',    col:'#4da6ff'},
-  {f:'INICIO',               t:'SUPORTE',                 lbl:'3 · ajuda',     col:'#4da6ff'},
-  {f:'INICIO',               t:'NAO_ENTENDI',             lbl:'* outros',      col:'#383838'},
-  {f:'CATALOGO',             t:'QUALIFICACAO_NOME',       lbl:'qq resp',       col:'#00ff41'},
-  {f:'QUALIFICACAO_NOME',    t:'QUALIFICACAO_INTERESSE',  lbl:'nome',          col:'#00ff41'},
-  {f:'QUALIFICACAO_INTERESSE',t:'LEAD_REGISTRADO',        lbl:'interesse',     col:'#ffaa00'},
-  {f:'CONSULTA_PEDIDO',      t:'ENCAMINHAR_HUMANO',       lbl:'nº pedido',     col:'#4da6ff'},
+  {f:'INICIO',              t:'CAPTURA_TAMANHO',     lbl:'camisa/polo',    col:'#00ff41'},
+  {f:'INICIO',              t:'CAPTURA_NUMERO',      lbl:'tênis',          col:'#4da6ff'},
+  {f:'INICIO',              t:'CONSULTA_PEDIDO',     lbl:'pedido',         col:'#4da6ff'},
+  {f:'INICIO',              t:'SUPORTE',             lbl:'atendente',      col:'#b06bff'},
+  {f:'INICIO',              t:'APRESENTACAO',        lbl:'* outros',       col:'#383838'},
+  {f:'APRESENTACAO',        t:'CAPTURA_TAMANHO',     lbl:'camisa',         col:'#00ff41'},
+  {f:'APRESENTACAO',        t:'CAPTURA_NUMERO',      lbl:'tênis',          col:'#4da6ff'},
+  {f:'APRESENTACAO',        t:'NAO_ENTENDI',         lbl:'*',              col:'#383838'},
+  {f:'CAPTURA_TAMANHO',     t:'CAPTURA_ESTILO',      lbl:'tamanho',        col:'#00ff41'},
+  {f:'CAPTURA_NUMERO',      t:'CAPTURA_CIDADE',      lbl:'número',         col:'#4da6ff'},
+  {f:'CAPTURA_ESTILO',      t:'CAPTURA_CIDADE',      lbl:'estilo',         col:'#00ff41'},
+  {f:'CAPTURA_CIDADE',      t:'RECOMENDACAO',        lbl:'cidade',         col:'#ffaa00'},
+  {f:'CONSULTA_PEDIDO',     t:'ENCAMINHAR_HUMANO',   lbl:'nº pedido',      col:'#4da6ff'},
+  {f:'RECOMENDACAO',        t:'CAPTURA_NOME_QUENTE', lbl:'quente 🔥',      col:'#ff5555'},
+  {f:'RECOMENDACAO',        t:'AGUARDAR_RESPOSTA',   lbl:'barata/premium', col:'#ffaa00'},
+  {f:'CAPTURA_NOME_QUENTE', t:'ENCAMINHAR_HUMANO',   lbl:'nome',           col:'#ff5555'},
+  {f:'AGUARDAR_RESPOSTA',   t:'ENCAMINHAR_HUMANO',   lbl:'nome',           col:'#ffaa00'},
 ];
 const NODE_COL = {
-  INICIO:'#00ff41', CATALOGO:'#4da6ff', QUALIFICACAO_NOME:'#4da6ff',
-  QUALIFICACAO_INTERESSE:'#4da6ff', LEAD_REGISTRADO:'#ffaa00',
-  CONSULTA_PEDIDO:'#4da6ff', SUPORTE:'#4da6ff',
-  ENCAMINHAR_HUMANO:'#b06bff', NAO_ENTENDI:'#ff5555',
+  INICIO: '#00ff41', APRESENTACAO: '#383838',
+  CAPTURA_TAMANHO: '#4da6ff', CAPTURA_NUMERO: '#4da6ff',
+  CAPTURA_ESTILO: '#4da6ff',  CAPTURA_CIDADE: '#4da6ff',
+  RECOMENDACAO: '#ffaa00',
+  CAPTURA_NOME_QUENTE: '#ff5555', AGUARDAR_RESPOSTA: '#ffaa00',
+  CONSULTA_PEDIDO: '#4da6ff', SUPORTE: '#b06bff',
+  ENCAMINHAR_HUMANO: '#b06bff', NAO_ENTENDI: '#383838',
 };
 
 function mkMarker(defs, id, col) {

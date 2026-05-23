@@ -22,10 +22,19 @@ export interface BotLead {
   phone: string;
   nome?: string;
   interesse?: string;
+  origem?: string;
+  produto?: string;
+  tamanho?: string;
+  estilo?: string;
+  cidade?: string;
+  intencao_compra?: string;
+  status_comercial?: 'QUENTE' | 'MORNO' | 'FRIO';
+  proxima_acao?: string;
   valor_potencial?: number;
   status: 'novo' | 'qualificado' | 'encaminhado' | 'concluido';
   context?: Record<string, string>;
   qualificado_em?: string;
+  atualizado_em?: string;
 }
 
 export interface BotResponse {
