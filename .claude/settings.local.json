@@ -4,7 +4,9 @@
       "PowerShell(Get-ChildItem *)",
       "Bash(git fetch *)",
       "Bash(npx tsc *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
     ]
   }
 }
