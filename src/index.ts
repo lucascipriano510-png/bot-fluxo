@@ -4,6 +4,8 @@ import express from 'express';
 import { processMessage } from './bot/engine';
 import { getOrCreateSession, resetSession } from './services/sessionService';
 import { parseWebhookPayload, sendMessage } from './providers/messaging';
+import { FLOW_MAP } from './bot/flowMap';
+import { saveMensagem } from './services/mensagemService';
 import apiRouter from './routes/api';
 
 const app = express();
@@ -53,6 +55,23 @@ app.post('/send', async (req, res) => {
     return res.json({ ok: true, reply: response.text, nextNode: response.nextNode });
   } catch (err) {
     console.error('[send]', err);
+    return res.status(500).json({ error: 'Erro interno' });
+  }
+});
+
+// ── Iniciar chat (simulador visual) ──────────────────────────────────────────
+app.post('/start', async (req, res) => {
+  const { phone } = req.body as { phone?: string };
+  if (!phone) return res.status(400).json({ error: 'phone obrigatório' });
+
+  try {
+    await resetSession(phone);
+    const node = FLOW_MAP['INICIO'];
+    const text = typeof node.message === 'function' ? node.message({}) : node.message;
+    await saveMensagem({ phone, direcao: 'saida', conteudo: text, node: 'INICIO' });
+    return res.json({ ok: true, text, nextNode: 'INICIO' });
+  } catch (err) {
+    console.error('[start]', err);
     return res.status(500).json({ error: 'Erro interno' });
   }
 });
