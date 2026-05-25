@@ -9,11 +9,14 @@ import { isBusinessHours, openingTimeStr } from '../utils/businessHours';
 import { loadFlowConfig, triggerToRegex } from '../services/flowConfigService';
 import {
   detectProductQuery,
-  findProductsForBot,
-  formatProductsResponse,
   logInventoryQuery,
   DEFAULT_STORE_ID,
 } from '../inventory/inventoryBridge';
+import {
+  findOffers,
+  formatOffersResponse,
+  buildOfferFilters,
+} from '../catalog/catalogBridge';
 
 const LOJA_WHATSAPP = process.env.LOJA_WHATSAPP || '';
 
@@ -74,17 +77,21 @@ export async function processMessage(
   const currentNode   = FLOW_MAP[currentNodeId] || FLOW_MAP['INICIO'];
   const ctx: Record<string, string> = { ...session.context };
 
-  // ── PRÉ-CHECAGEM 4: Consulta de estoque (só leitura) ─────────────────────
-  const inventoryFilters = detectProductQuery(messageText);
-  if (inventoryFilters) {
-    const products = await findProductsForBot(DEFAULT_STORE_ID, inventoryFilters);
-    const reply    = formatProductsResponse(products, inventoryFilters);
-    logInventoryQuery(DEFAULT_STORE_ID, session.phone, messageText, inventoryFilters, products.length, reply);
+  // ── PRÉ-CHECAGEM 4: Consulta de catálogo via CatalogBridge ──────────────
+  // detectProductQuery analisa a mensagem e extrai filtros (categoria, tamanho, cor, preço).
+  // buildOfferFilters converte para OfferSearchFilters com businessId obrigatório.
+  // findOffers roteia para o adapter correto (hoje: InventoryBridge da Fluxo Outlet;
+  // futuro: SaaSAdapter por segmento — lava-jato, barbearia, assistência técnica etc.).
+  const rawFilters = detectProductQuery(messageText);
+  if (rawFilters) {
+    const offerFilters = buildOfferFilters(DEFAULT_STORE_ID, rawFilters);
+    const offers  = await findOffers(offerFilters);
+    const reply   = formatOffersResponse(offers, offerFilters);
+    logInventoryQuery(DEFAULT_STORE_ID, session.phone, messageText, rawFilters, offers.length, reply);
 
     await saveMensagem({ phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
-    await saveMensagem({ phone: session.phone, direcao: 'saida',   conteudo: reply,       node: 'INVENTORY' });
+    await saveMensagem({ phone: session.phone, direcao: 'saida',   conteudo: reply,       node: 'CATALOG' });
 
-    // Stay at current node so the conversation continues naturally
     return { text: reply, nextNode: currentNodeId, context: ctx };
   }
 
