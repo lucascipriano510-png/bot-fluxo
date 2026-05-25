@@ -43,6 +43,12 @@ export interface BotResponse {
   context?: Record<string, string>;
 }
 
+export interface BotOptOut {
+  id?: string;
+  phone: string;
+  criado_em?: string;
+}
+
 export interface IncomingMessage {
   phone: string;
   text: string;

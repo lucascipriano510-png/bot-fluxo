@@ -1,6 +1,9 @@
 import { supabase } from '../lib/supabase';
 import { BotSession } from '../types';
 
+// Sessão inativa por mais de SESSION_TIMEOUT_MINUTES volta ao INICIO automaticamente
+const SESSION_TIMEOUT_MIN = Number(process.env.SESSION_TIMEOUT_MINUTES ?? 60);
+
 export async function getOrCreateSession(phone: string): Promise<BotSession> {
   const { data, error } = await supabase
     .from('bot_sessions')
@@ -10,7 +13,21 @@ export async function getOrCreateSession(phone: string): Promise<BotSession> {
 
   if (error) throw error;
 
-  if (data) return data as BotSession;
+  if (data) {
+    // Verifica timeout de inatividade
+    if (data.current_node !== 'INICIO' && data.atualizado_em) {
+      const elapsedMin = (Date.now() - new Date(data.atualizado_em).getTime()) / 60_000;
+      if (elapsedMin > SESSION_TIMEOUT_MIN) {
+        const { error: resetErr } = await supabase
+          .from('bot_sessions')
+          .update({ current_node: 'INICIO', context: {}, atualizado_em: new Date().toISOString() })
+          .eq('phone', phone);
+        if (resetErr) throw resetErr;
+        return { ...data as BotSession, current_node: 'INICIO', context: {} };
+      }
+    }
+    return data as BotSession;
+  }
 
   const { data: created, error: createErr } = await supabase
     .from('bot_sessions')

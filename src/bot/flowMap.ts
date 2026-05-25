@@ -35,11 +35,14 @@ export type NodeId =
   | 'CONSULTA_PEDIDO'
   | 'SUPORTE'
   | 'ENCAMINHAR_HUMANO'
+  | 'FORA_HORARIO'
+  | 'OPTOUT'
   | 'NAO_ENTENDI';
 
 export type NodeAction =
   | 'save_nome'
   | 'save_tamanho'
+  | 'save_numero_pedido'
   | 'save_estilo'
   | 'save_cidade'
   | 'register_lead'
@@ -199,6 +202,7 @@ export const FLOW_MAP: Record<NodeId, FlowNode> = {
   CONSULTA_PEDIDO: {
     id: 'CONSULTA_PEDIDO',
     message: `Sem problema! Me informe o número do seu pedido:\n_(ex: #12345)_`,
+    action: 'save_numero_pedido',
     default: 'ENCAMINHAR_HUMANO',
   },
 
@@ -226,5 +230,24 @@ export const FLOW_MAP: Record<NodeId, FlowNode> = {
     id: 'NAO_ENTENDI',
     message: `Hmm, não entendi 😅\n\nMe fala o que você procura:\n\n👕  Camisa, polo ou malha\n👟  Tênis\n👖  Bermuda`,
     default: 'INICIO',
+  },
+
+  // ── FORA DO HORÁRIO DE ATENDIMENTO ────────────────────────────────────────
+  FORA_HORARIO: {
+    id: 'FORA_HORARIO',
+    message: (ctx) =>
+      `Oi! 👋 No momento estamos fora do horário de atendimento.\n\n` +
+      `Retornamos no próximo dia útil às *${ctx._abertura || '09:00'}* 🕑\n\n` +
+      `Deixa sua mensagem aqui que respondemos assim que abrirmos! 😊`,
+    default: 'INICIO',
+  },
+
+  // ── OPT-OUT (LGPD) ────────────────────────────────────────────────────────
+  OPTOUT: {
+    id: 'OPTOUT',
+    message:
+      `Tudo certo! ✅ Seus dados foram removidos e você não receberá mais mensagens automáticas da *Fluxo Outlet*.\n\n` +
+      `Para voltar a interagir a qualquer momento, basta nos mandar um "oi". 👋`,
+    terminal: true,
   },
 };

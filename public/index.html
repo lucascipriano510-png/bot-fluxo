@@ -317,30 +317,246 @@
     .lead-toast.show { opacity: 1; transform: translateY(0) scale(1); }
 
     /* ──────────────────────────────────────────────────── */
-    /*  FLUXO — mind map                                  */
+    /*  FLOW — Freeform canvas                            */
     /* ──────────────────────────────────────────────────── */
-    .flow-outer { flex: 1; overflow: auto; padding: 20px 14px 30px; }
-    .flow-canvas { position: relative; flex-shrink: 0; }
-    .flow-svg { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
 
-    .fn {
-      position: absolute; background: var(--c1); border-radius: 3px;
-      padding: 8px 10px; width: 160px; transition: box-shadow .15s; cursor: default;
+    /* Stage: viewport, captures events */
+    .flow-stage {
+      flex: 1; overflow: hidden; position: relative;
+      background: #020202;
+      background-image: radial-gradient(circle, rgba(0,255,65,.05) 1px, transparent 1px);
+      background-size: 26px 26px;
+      cursor: grab;
     }
-    .fn:hover { box-shadow: 0 0 0 1px var(--gb), 0 0 12px rgba(0,255,65,.12); z-index: 2; }
-    .fn-id { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 4px; }
-    .fn-trigger {
-      font-size: 7px; font-weight: 700; color: #000;
-      border-radius: 2px; padding: 1px 5px; display: inline-block; margin-bottom: 5px;
-      max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    .flow-stage.panning  { cursor: grabbing; }
+    .flow-stage.dragging { cursor: grabbing; }
+
+    /* Canvas: the transformable infinite surface */
+    .flow-canvas {
+      position: absolute; top: 0; left: 0;
+      transform-origin: 0 0;
+      will-change: transform;
     }
-    .fn-msg  { font-size: 9px; color: var(--mu); line-height: 1.4; margin-bottom: 5px; }
-    .fn-foot { display: flex; gap: 4px; flex-wrap: wrap; }
-    .fn-tag  { font-size: 7px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; padding: 2px 5px; border-radius: 2px; }
+
+    /* SVG edge layer sits inside canvas (so it scales/pans with nodes) */
+    .flow-svg-layer {
+      position: absolute; top: 0; left: 0;
+      pointer-events: none; overflow: visible;
+      width: 1px; height: 1px;
+    }
+
+    /* Toolbar overlay */
+    .flow-toolbar {
+      position: absolute; bottom: 14px; right: 14px; z-index: 60;
+      display: flex; gap: 5px; align-items: center;
+    }
+    .flow-tb-btn {
+      font-family: var(--font); font-weight: 700; font-size: 13px;
+      width: 30px; height: 30px; flex-shrink: 0;
+      background: rgba(12,12,12,.92); backdrop-filter: blur(8px);
+      border: 1px solid var(--b2); color: var(--tx);
+      border-radius: 4px; cursor: pointer; transition: all .1s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .flow-tb-btn:hover { border-color: var(--gb); color: var(--g); }
+    .flow-tb-sm { font-size: 8px !important; letter-spacing: .08em; width: auto !important; padding: 0 9px; }
+    .flow-zoom-lbl {
+      font-family: var(--font); font-size: 9px; font-weight: 700; letter-spacing: .06em;
+      color: var(--mu); min-width: 38px; text-align: center;
+    }
+
+    /* ── Node cards ──────────────────────────────────────── */
+    .fnode {
+      position: absolute; width: 210px;
+      background: #0d0d0d;
+      border: 1px solid var(--b1);
+      border-radius: 8px;
+      box-shadow: 0 2px 16px rgba(0,0,0,.6);
+      transition: box-shadow .15s;
+      cursor: default;
+      will-change: transform;
+    }
+    .fnode:hover  { box-shadow: 0 4px 28px rgba(0,0,0,.8); z-index: 10; }
+    .fnode.active { z-index: 20; box-shadow: 0 0 0 1.5px var(--g), 0 6px 32px rgba(0,255,65,.12); }
+
+    /* Header — drag handle */
+    .fnode-hdr {
+      padding: 8px 10px 6px;
+      border-radius: 8px 8px 0 0;
+      cursor: grab; display: flex; align-items: flex-start;
+      justify-content: space-between; gap: 6px;
+      border-bottom: 1px solid var(--b1);
+    }
+    .fnode-hdr:active { cursor: grabbing; }
+    .fnode-id {
+      font-size: 8px; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; line-height: 1.4; flex: 1;
+    }
+    .fnode-tags { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; }
+
+    /* Message preview */
+    .fnode-msg {
+      padding: 7px 10px 6px;
+      font-size: 10px; color: var(--mu); line-height: 1.55;
+    }
+
+    /* ── Cloud / bubble option buttons (WhatsApp Quick Replies) ── */
+    /* Logic: same as Meta's Interactive Message buttons —           */
+    /* each bubble = one branch trigger, color = destination type.  */
+    .fnode-opts {
+      padding: 0 8px 8px;
+      display: flex; flex-direction: column; gap: 4px;
+      border-top: 1px solid var(--b1);
+      padding-top: 7px;
+    }
+    .fopt {
+      font-family: var(--font); font-size: 8px; font-weight: 700;
+      letter-spacing: .03em;
+      background: transparent;
+      border: 1px solid var(--oc, #333);
+      color: var(--oc, var(--mu));
+      padding: 4px 9px; border-radius: 999px;
+      cursor: default; transition: background .1s, opacity .1s;
+      display: flex; align-items: center; gap: 5px;
+      overflow: hidden; white-space: nowrap;
+    }
+    .fopt-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+    .fopt-arrow { opacity: .45; flex-shrink: 0; }
+    .fopt-dest  { opacity: .4; font-size: 7px; flex-shrink: 0;
+                  max-width: 64px; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Default fallback label */
+    .fnode-default {
+      padding: 5px 10px 8px;
+      font-size: 8px; color: var(--mu); font-style: italic; letter-spacing: .03em;
+      border-top: 1px dashed var(--b1); opacity: .6;
+    }
+
+    /* Badge tags */
+    .fn-tag  { font-size: 7px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; padding: 2px 5px; border-radius: 3px; }
     .ft-act  { background: rgba(77,166,255,.1);  color: var(--blu); border: 1px solid rgba(77,166,255,.2); }
     .ft-term { background: rgba(255,60,60,.08);  color: var(--red); border: 1px solid rgba(255,60,60,.2); }
     .ft-loop { background: rgba(255,170,0,.08);  color: var(--yel); border: 1px solid rgba(255,170,0,.2); }
     .ft-root { background: var(--gd);            color: var(--g);   border: 1px solid var(--gb); }
+    .ft-sys  { background: rgba(180,0,255,.07);  color: #c06bff;    border: 1px solid rgba(180,0,255,.2); }
+    .ft-custom { background: rgba(255,170,0,.07); color: var(--yel); border: 1px solid rgba(255,170,0,.25); }
+
+    /* Edit button on node */
+    .fnode-edit {
+      background: none; border: none; color: var(--mu); font-size: 11px;
+      cursor: pointer; padding: 1px 5px; border-radius: 3px; flex-shrink: 0;
+      transition: color .1s, background .1s; line-height: 1;
+    }
+    .fnode-edit:hover { color: var(--g); background: rgba(0,255,65,.08); }
+
+    /* ── Flow Editor Drawer ──────────────────────────────── */
+    .flow-editor {
+      position: absolute; top: 0; right: -390px; width: 370px; height: 100%;
+      background: #0a0a0a; border-left: 1px solid var(--b1);
+      z-index: 300; display: flex; flex-direction: column; overflow: hidden;
+      transition: right .24s cubic-bezier(.4,0,.2,1);
+      box-shadow: -8px 0 32px rgba(0,0,0,.6);
+    }
+    .flow-editor.open { right: 0; }
+
+    .fe-hdr {
+      flex-shrink: 0; padding: 14px 16px 11px;
+      border-bottom: 1px solid var(--b1);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .fe-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .fe-title { font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; flex: 1; }
+    .fe-close {
+      background: none; border: none; color: var(--mu); cursor: pointer;
+      font-size: 16px; line-height: 1; padding: 2px 6px; border-radius: 3px;
+      transition: color .1s;
+    }
+    .fe-close:hover { color: var(--tx); }
+
+    .fe-body { flex: 1; overflow-y: auto; padding: 16px; }
+
+    .fe-section { margin-bottom: 18px; }
+    .fe-label {
+      font-size: 8px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+      color: var(--mu); margin-bottom: 6px; display: block;
+    }
+    .fe-hint {
+      font-size: 9px; color: var(--mu); line-height: 1.55; margin-top: 5px;
+      letter-spacing: .02em;
+    }
+
+    .fe-textarea {
+      width: 100%; background: var(--c1); border: 1px solid var(--b2);
+      color: var(--tx); font-family: var(--font); font-size: 11px; line-height: 1.6;
+      padding: 9px 11px; border-radius: 4px; resize: vertical; min-height: 96px;
+      outline: none; transition: border-color .12s; box-sizing: border-box;
+    }
+    .fe-textarea:focus { border-color: var(--gb); }
+
+    .fe-input {
+      background: var(--c1); border: 1px solid var(--b2);
+      color: var(--tx); font-family: var(--font); font-size: 11px;
+      padding: 7px 11px; border-radius: 4px; outline: none;
+      width: 100%; box-sizing: border-box; transition: border-color .12s;
+    }
+    .fe-input:focus { border-color: var(--gb); }
+
+    .fe-select {
+      background: var(--c1); border: 1px solid var(--b2);
+      color: var(--tx); font-family: var(--font); font-size: 11px;
+      padding: 7px 11px; border-radius: 4px; outline: none;
+      width: 100%; box-sizing: border-box; cursor: pointer;
+      transition: border-color .12s;
+    }
+    .fe-select:focus { border-color: var(--gb); }
+
+    /* Option rows (Quick Reply branches) */
+    .fe-opt-row {
+      background: var(--c1); border: 1px solid var(--b2); border-radius: 5px;
+      padding: 10px 11px; margin-bottom: 7px; position: relative;
+    }
+    .fe-opt-del {
+      position: absolute; top: 7px; right: 9px;
+      background: none; border: none; color: var(--mu); cursor: pointer;
+      font-size: 12px; line-height: 1; padding: 2px 4px; border-radius: 3px;
+      transition: color .1s;
+    }
+    .fe-opt-del:hover { color: var(--red); }
+    .fe-opt-label { font-size: 8px; color: var(--mu); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 4px; margin-top: 8px; display: block; }
+    .fe-opt-label:first-child { margin-top: 0; }
+
+    .fe-add-opt {
+      font-family: var(--font); font-size: 8px; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; background: none; border: 1px dashed var(--b2);
+      color: var(--mu); padding: 8px; border-radius: 4px; cursor: pointer; width: 100%;
+      transition: all .1s;
+    }
+    .fe-add-opt:hover { border-color: var(--g); color: var(--g); }
+
+    .fe-footer {
+      flex-shrink: 0; padding: 11px 16px;
+      border-top: 1px solid var(--b1); display: flex; gap: 8px;
+    }
+    .fe-btn-save {
+      flex: 1; font-family: var(--font); font-size: 9px; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; background: var(--g); color: #000;
+      border: none; padding: 10px; border-radius: 4px; cursor: pointer; transition: all .12s;
+    }
+    .fe-btn-save:hover { background: #00e63a; }
+    .fe-btn-save:disabled { opacity: .4; cursor: not-allowed; }
+    .fe-btn-reset {
+      font-family: var(--font); font-size: 9px; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; background: none; color: var(--mu);
+      border: 1px solid var(--b2); padding: 10px 14px; border-radius: 4px;
+      cursor: pointer; transition: all .12s; white-space: nowrap;
+    }
+    .fe-btn-reset:hover { color: var(--red); border-color: rgba(255,60,60,.35); }
+
+    .fe-status {
+      font-size: 9px; padding: 6px 10px; border-radius: 3px; margin-bottom: 14px;
+    }
+    .fe-status.custom { background: rgba(255,170,0,.06); color: var(--yel); border: 1px solid rgba(255,170,0,.2); }
+    .fe-status.default { background: rgba(0,255,65,.04); color: #00cc33; border: 1px solid rgba(0,255,65,.1); }
 
     /* ──────────────────────────────────────────────────── */
     /*  CONFIG                                            */
@@ -459,8 +675,41 @@
 
   <!-- ── FLUXO ─────────────────────────────────────────── -->
   <div class="pane" id="flow">
-    <div class="flow-outer" id="flow-outer">
-      <div class="empty">Carregando mapa...</div>
+    <div class="flow-stage" id="flow-stage">
+
+      <!-- Canvas: scale+translate via JS -->
+      <div class="flow-canvas" id="flow-canvas">
+        <svg class="flow-svg-layer" id="flow-svg"></svg>
+      </div>
+
+      <!-- Toolbar overlay -->
+      <div class="flow-toolbar">
+        <button class="flow-tb-btn" onclick="fZoomOut()" title="Zoom out">−</button>
+        <span  class="flow-zoom-lbl" id="fzoom-lbl">100%</span>
+        <button class="flow-tb-btn" onclick="fZoomIn()"  title="Zoom in">+</button>
+        <button class="flow-tb-btn flow-tb-sm" onclick="fFit()"           title="Ajustar tudo na tela">FIT</button>
+        <button class="flow-tb-btn flow-tb-sm" onclick="fResetPositions()" title="Resetar posições">↺</button>
+      </div>
+
+      <!-- Loading placeholder -->
+      <div class="empty" id="flow-loading"
+           style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;">
+        Carregando mapa...
+      </div>
+
+      <!-- Editor drawer (slides in from right) -->
+      <div class="flow-editor" id="flow-editor">
+        <div class="fe-hdr">
+          <div class="fe-dot" id="fe-dot"></div>
+          <span class="fe-title" id="fe-title">—</span>
+          <button class="fe-close" onclick="feClose()">✕</button>
+        </div>
+        <div class="fe-body" id="fe-body"></div>
+        <div class="fe-footer">
+          <button class="fe-btn-reset" onclick="feReset()">↺ Padrão</button>
+          <button class="fe-btn-save" id="fe-save-btn" onclick="feSave()">Salvar</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -836,187 +1085,575 @@ async function chatSend() {
   }
 }
 
-// ── flow map ────────────────────────────────────────────
-const NS = 'http://www.w3.org/2000/svg';
-const CW = 155, CH = 80;
-const LAYOUT = {
-  INICIO:               {x: 20,  y: 200},
-  APRESENTACAO:         {x: 220, y: 340},
-  CAPTURA_TAMANHO:      {x: 220, y: 20 },
-  CAPTURA_NUMERO:       {x: 220, y: 115},
-  CONSULTA_PEDIDO:      {x: 220, y: 215},
-  SUPORTE:              {x: 220, y: 395},
-  NAO_ENTENDI:          {x: 220, y: 490},
-  CAPTURA_ESTILO:       {x: 420, y: 20 },
-  CAPTURA_CIDADE:       {x: 625, y: 60 },
-  RECOMENDACAO:         {x: 840, y: 60 },
-  CAPTURA_NOME_QUENTE:  {x: 1060,y: 10 },
-  AGUARDAR_RESPOSTA:    {x: 1060,y: 110},
-  ENCAMINHAR_HUMANO:    {x: 1270,y: 55 },
-};
-const CANVAS_W = 1460, CANVAS_H = 650;
+// ═══════════════════════════════════════════════════════
+//  FLOW CANVAS — Freeform-style infinite board
+//  Logic mirrors WhatsApp Business API Interactive
+//  Messages: each option bubble = one Quick Reply branch.
+// ═══════════════════════════════════════════════════════
 
-const EDGES = [
-  {f:'INICIO',              t:'CAPTURA_TAMANHO',     lbl:'camisa/polo',    col:'#00ff41'},
-  {f:'INICIO',              t:'CAPTURA_NUMERO',      lbl:'tênis',          col:'#4da6ff'},
-  {f:'INICIO',              t:'CONSULTA_PEDIDO',     lbl:'pedido',         col:'#4da6ff'},
-  {f:'INICIO',              t:'SUPORTE',             lbl:'atendente',      col:'#b06bff'},
-  {f:'INICIO',              t:'APRESENTACAO',        lbl:'* outros',       col:'#383838'},
-  {f:'APRESENTACAO',        t:'CAPTURA_TAMANHO',     lbl:'camisa',         col:'#00ff41'},
-  {f:'APRESENTACAO',        t:'CAPTURA_NUMERO',      lbl:'tênis',          col:'#4da6ff'},
-  {f:'APRESENTACAO',        t:'NAO_ENTENDI',         lbl:'*',              col:'#383838'},
-  {f:'CAPTURA_TAMANHO',     t:'CAPTURA_ESTILO',      lbl:'tamanho',        col:'#00ff41'},
-  {f:'CAPTURA_NUMERO',      t:'CAPTURA_CIDADE',      lbl:'número',         col:'#4da6ff'},
-  {f:'CAPTURA_ESTILO',      t:'CAPTURA_CIDADE',      lbl:'estilo',         col:'#00ff41'},
-  {f:'CAPTURA_CIDADE',      t:'RECOMENDACAO',        lbl:'cidade',         col:'#ffaa00'},
-  {f:'CONSULTA_PEDIDO',     t:'ENCAMINHAR_HUMANO',   lbl:'nº pedido',      col:'#4da6ff'},
-  {f:'RECOMENDACAO',        t:'CAPTURA_NOME_QUENTE', lbl:'quente 🔥',      col:'#ff5555'},
-  {f:'RECOMENDACAO',        t:'AGUARDAR_RESPOSTA',   lbl:'barata/premium', col:'#ffaa00'},
-  {f:'CAPTURA_NOME_QUENTE', t:'ENCAMINHAR_HUMANO',   lbl:'nome',           col:'#ff5555'},
-  {f:'AGUARDAR_RESPOSTA',   t:'ENCAMINHAR_HUMANO',   lbl:'nome',           col:'#ffaa00'},
+const FW = 210; // node width (sync with CSS)
+
+// Node accent colors (maps to WhatsApp message types)
+const F_COL = {
+  INICIO:              '#00ff41',
+  APRESENTACAO:        '#555',
+  CAPTURA_TAMANHO:     '#4da6ff',
+  CAPTURA_NUMERO:      '#4da6ff',
+  CAPTURA_ESTILO:      '#4da6ff',
+  CAPTURA_CIDADE:      '#4da6ff',
+  RECOMENDACAO:        '#ffaa00',
+  CAPTURA_NOME_QUENTE: '#ff5555',
+  AGUARDAR_RESPOSTA:   '#ffaa00',
+  CONSULTA_PEDIDO:     '#4da6ff',
+  SUPORTE:             '#c06bff',
+  ENCAMINHAR_HUMANO:   '#c06bff',
+  FORA_HORARIO:        '#ffaa00',
+  OPTOUT:              '#ff5555',
+  NAO_ENTENDI:         '#555',
+};
+
+// Default positions (editable, saved in localStorage)
+const F_DEFAULTS = {
+  INICIO:              { x: 60,   y: 340 },
+  APRESENTACAO:        { x: 360,  y: 540 },
+  CAPTURA_TAMANHO:     { x: 360,  y: 40  },
+  CAPTURA_NUMERO:      { x: 360,  y: 200 },
+  CONSULTA_PEDIDO:     { x: 360,  y: 400 },
+  SUPORTE:             { x: 360,  y: 660 },
+  FORA_HORARIO:        { x: 360,  y: 820 },
+  OPTOUT:              { x: 360,  y: 980 },
+  NAO_ENTENDI:         { x: 360,  y: 1140},
+  CAPTURA_ESTILO:      { x: 660,  y: 40  },
+  CAPTURA_CIDADE:      { x: 960,  y: 100 },
+  RECOMENDACAO:        { x: 1260, y: 100 },
+  CAPTURA_NOME_QUENTE: { x: 1560, y: 20  },
+  AGUARDAR_RESPOSTA:   { x: 1560, y: 200 },
+  ENCAMINHAR_HUMANO:   { x: 1860, y: 100 },
+};
+
+// Edges from engine that bypass flowMap (engine pre-checks)
+const F_SYS_EDGES = [
+  { from: 'INICIO', to: 'FORA_HORARIO', label: 'fora horário', dashed: true, sys: true },
+  { from: 'INICIO', to: 'OPTOUT',       label: 'parar/stop',   dashed: true, sys: true },
 ];
-const NODE_COL = {
-  INICIO: '#00ff41', APRESENTACAO: '#383838',
-  CAPTURA_TAMANHO: '#4da6ff', CAPTURA_NUMERO: '#4da6ff',
-  CAPTURA_ESTILO: '#4da6ff',  CAPTURA_CIDADE: '#4da6ff',
-  RECOMENDACAO: '#ffaa00',
-  CAPTURA_NOME_QUENTE: '#ff5555', AGUARDAR_RESPOSTA: '#ffaa00',
-  CONSULTA_PEDIDO: '#4da6ff', SUPORTE: '#b06bff',
-  ENCAMINHAR_HUMANO: '#b06bff', NAO_ENTENDI: '#383838',
-};
 
-function mkMarker(defs, id, col) {
-  const m = document.createElementNS(NS, 'marker');
-  m.setAttribute('id', id); m.setAttribute('markerWidth','7'); m.setAttribute('markerHeight','7');
-  m.setAttribute('refX','6'); m.setAttribute('refY','3.5'); m.setAttribute('orient','auto');
-  const p = document.createElementNS(NS, 'path');
-  p.setAttribute('d','M 0 0 L 7 3.5 L 0 7 z'); p.setAttribute('fill', col);
+// ── State ────────────────────────────────────────────────
+let fZoom = 1, fPanX = 60, fPanY = 60;
+let fPanning  = false;
+let fPanStart = { mx: 0, my: 0, px: 0, py: 0 };
+let fDragging = null;  // { id, startMx, startMy, origX, origY }
+let fPos      = {};    // { nodeId: { x, y } }
+let fData     = null;  // raw API nodes
+let fInited   = false;
+
+// ── Transform ────────────────────────────────────────────
+function fApply() {
+  const c = $('flow-canvas');
+  if (c) c.style.transform = `translate(${fPanX}px,${fPanY}px) scale(${fZoom})`;
+  const l = $('fzoom-lbl');
+  if (l) l.textContent = Math.round(fZoom * 100) + '%';
+}
+
+function fZoomAt(factor, cx, cy) {
+  const prev = fZoom;
+  fZoom = Math.max(0.12, Math.min(4, fZoom * factor));
+  fPanX = cx - (cx - fPanX) * (fZoom / prev);
+  fPanY = cy - (cy - fPanY) * (fZoom / prev);
+  fApply();
+}
+
+function fZoomIn()  { const s=$('flow-stage'),r=s.getBoundingClientRect(); fZoomAt(1.2, r.width/2, r.height/2); }
+function fZoomOut() { const s=$('flow-stage'),r=s.getBoundingClientRect(); fZoomAt(1/1.2, r.width/2, r.height/2); }
+
+function fFit() {
+  const ids = Object.keys(fPos);
+  if (!ids.length) return;
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  ids.forEach(id => {
+    const p = fPos[id];
+    const el = document.getElementById('fn-' + id);
+    const h = el ? el.offsetHeight : 130;
+    x0=Math.min(x0,p.x); y0=Math.min(y0,p.y);
+    x1=Math.max(x1,p.x+FW); y1=Math.max(y1,p.y+h);
+  });
+  const s = $('flow-stage');
+  const sw = s.clientWidth - 80, sh = s.clientHeight - 80;
+  fZoom = Math.max(0.12, Math.min(1, Math.min(sw/(x1-x0), sh/(y1-y0))));
+  fPanX = 40 - x0 * fZoom;
+  fPanY = 40 - y0 * fZoom;
+  fApply();
+}
+
+// ── Node drag ────────────────────────────────────────────
+function fStartDrag(e, id) {
+  e.stopPropagation();
+  const p = fPos[id] || { x: 0, y: 0 };
+  fDragging = { id, startMx: e.clientX, startMy: e.clientY, origX: p.x, origY: p.y };
+  document.getElementById('fn-' + id)?.classList.add('active');
+  $('flow-stage').classList.add('dragging');
+}
+
+// ── Edge drawing ─────────────────────────────────────────
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function fMkMarker(defs, col) {
+  const id = 'arr-' + col.replace('#','');
+  if (defs.querySelector('#' + id)) return;
+  const m = document.createElementNS(SVG_NS, 'marker');
+  m.setAttribute('id', id);
+  m.setAttribute('markerWidth','6'); m.setAttribute('markerHeight','6');
+  m.setAttribute('refX','5'); m.setAttribute('refY','3'); m.setAttribute('orient','auto');
+  const p = document.createElementNS(SVG_NS, 'path');
+  p.setAttribute('d','M 0 0 L 6 3 L 0 6 z'); p.setAttribute('fill', col);
   m.appendChild(p); defs.appendChild(m);
 }
 
-function drawEdge(svg, x1, y1, x2, y2, col, lbl, dash) {
-  const mx = (x1 + x2) / 2;
-  const d  = `M ${x1},${y1} C ${mx},${y1} ${mx},${y2} ${x2},${y2}`;
-  const mid = 'arr-' + col.replace('#','');
-  const path = document.createElementNS(NS, 'path');
-  path.setAttribute('d', d); path.setAttribute('stroke', col);
-  path.setAttribute('fill','none'); path.setAttribute('stroke-width','1.5');
-  if (dash) path.setAttribute('stroke-dasharray','4,3');
-  path.setAttribute('marker-end', 'url(#' + mid + ')');
-  svg.appendChild(path);
-  if (lbl) {
-    const bx = 0.125*x1+0.375*mx+0.375*mx+0.125*x2;
-    const by = 0.125*y1+0.375*y1+0.375*y2+0.125*y2;
-    const tw = lbl.length * 5 + 10;
-    const bg = document.createElementNS(NS, 'rect');
-    bg.setAttribute('x', bx-tw/2); bg.setAttribute('y', by-7);
-    bg.setAttribute('width', tw); bg.setAttribute('height','13');
-    bg.setAttribute('fill','#000'); bg.setAttribute('rx','2');
-    svg.appendChild(bg);
-    const txt = document.createElementNS(NS, 'text');
-    txt.setAttribute('x', bx); txt.setAttribute('y', by+4);
-    txt.setAttribute('text-anchor','middle'); txt.setAttribute('font-family','Space Mono,monospace');
-    txt.setAttribute('font-size','7'); txt.setAttribute('fill', col);
-    txt.textContent = lbl;
-    svg.appendChild(txt);
-  }
+function fEdgePath(x1, y1, x2, y2) {
+  const dx = x2 - x1;
+  // Horizontal bezier — control points always extend outward
+  const off = Math.max(Math.abs(dx) * 0.55, 90);
+  return `M ${x1},${y1} C ${x1+off},${y1} ${x2-off},${y2} ${x2},${y2}`;
 }
 
-let flowLoaded = false;
+function fDrawEdges() {
+  const svg = $('flow-svg');
+  if (!svg || !fData) return;
+  svg.innerHTML = '';
 
+  const defs = document.createElementNS(SVG_NS, 'defs');
+  svg.appendChild(defs);
+
+  // Collect all edges from flowMap data
+  const edges = [];
+  fData.forEach(nd => {
+    nd.options.forEach(o => {
+      edges.push({ from: nd.id, to: o.next, label: o.trigger.substring(0,14), dashed: false, sys: false });
+    });
+    if (nd.default && nd.default !== nd.id) {
+      edges.push({ from: nd.id, to: nd.default, label: 'default', dashed: true, sys: false });
+    }
+  });
+  F_SYS_EDGES.forEach(e => edges.push(e));
+
+  edges.forEach(e => {
+    const fp = fPos[e.from], tp = fPos[e.to];
+    if (!fp || !tp) return;
+    const fromEl = document.getElementById('fn-' + e.from);
+    const toEl   = document.getElementById('fn-' + e.to);
+    const fh = fromEl ? fromEl.offsetHeight : 130;
+    const th = toEl   ? toEl.offsetHeight   : 130;
+
+    const col = e.sys ? '#c06bff' : (F_COL[e.to] || '#555');
+    fMkMarker(defs, col);
+
+    const x1 = fp.x + FW, y1 = fp.y + fh / 2;
+    const x2 = tp.x,      y2 = tp.y + th / 2;
+
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', fEdgePath(x1, y1, x2, y2));
+    path.setAttribute('stroke', col);
+    path.setAttribute('stroke-width', e.sys ? '1' : (e.dashed ? '1' : '1.5'));
+    path.setAttribute('fill', 'none');
+    path.setAttribute('opacity', e.sys ? '0.3' : (e.dashed ? '0.25' : '0.55'));
+    if (e.dashed || e.sys) path.setAttribute('stroke-dasharray', '5,4');
+    path.setAttribute('marker-end', `url(#arr-${col.replace('#','')})`);
+    svg.appendChild(path);
+  });
+}
+
+// ── Positions persistence ────────────────────────────────
+function fSavePos() {
+  try { localStorage.setItem('fpos_v2', JSON.stringify(fPos)); } catch {}
+}
+function fLoadPos() {
+  try { const s = localStorage.getItem('fpos_v2'); if (s) return JSON.parse(s); } catch {}
+  return {};
+}
+function fResetPositions() {
+  try { localStorage.removeItem('fpos_v2'); } catch {}
+  if (!fData) return;
+  fData.forEach(nd => {
+    fPos[nd.id] = { ...(F_DEFAULTS[nd.id] || { x: 60, y: 60 }) };
+    const el = document.getElementById('fn-' + nd.id);
+    if (el) { el.style.left = fPos[nd.id].x + 'px'; el.style.top = fPos[nd.id].y + 'px'; }
+  });
+  fDrawEdges();
+  setTimeout(fFit, 40);
+}
+
+// ── Build node card ──────────────────────────────────────
+function fBuildNode(nd) {
+  const pos = fPos[nd.id] || F_DEFAULTS[nd.id] || { x: 60, y: 60 };
+  fPos[nd.id] = { ...pos };
+
+  const col = F_COL[nd.id] || '#555';
+
+  // Badges
+  const tags = [];
+  if (nd.id === 'INICIO')          tags.push(`<span class="fn-tag ft-root">ROOT</span>`);
+  if (nd.terminal)                  tags.push(`<span class="fn-tag ft-term">TERMINAL</span>`);
+  if (nd.id === 'FORA_HORARIO' || nd.id === 'OPTOUT')
+                                    tags.push(`<span class="fn-tag ft-sys">ENGINE</span>`);
+  if (nd.action)                    tags.push(`<span class="fn-tag ft-act">${esc(nd.action.replace(/_/g,' '))}</span>`);
+
+  // ── Cloud buttons (WhatsApp Quick Reply logic) ──────────
+  // Each option = one interactive button the user can tap.
+  // Color = destination node's accent, mirroring how platforms
+  // like Blip/Zenvia color-code branches by intent category.
+  const opts = nd.options.map(o => {
+    const nc = F_COL[o.next] || '#555';
+    const dest = o.next.replace(/_/g,' ').toLowerCase();
+    return `<div class="fopt" style="--oc:${nc}" title="${esc(o.trigger)} → ${esc(o.next)}">
+      <span class="fopt-label">${esc(o.trigger.substring(0,24))}</span>
+      <span class="fopt-arrow">→</span>
+      <span class="fopt-dest">${esc(dest)}</span>
+    </div>`;
+  }).join('');
+
+  const el = document.createElement('div');
+  el.className = 'fnode';
+  el.id = 'fn-' + nd.id;
+  el.style.left = pos.x + 'px';
+  el.style.top  = pos.y + 'px';
+  el.style.borderTop = `2px solid ${col}`;
+
+  if (nd.customized) {
+    tags.push(`<span class="fn-tag ft-custom">custom</span>`);
+    el.style.boxShadow = '0 0 0 1px rgba(255,170,0,.25)';
+  }
+
+  el.innerHTML =
+    `<div class="fnode-hdr" onmousedown="fStartDrag(event,'${nd.id}')">
+       <span class="fnode-id" style="color:${col}">${esc(nd.id)}</span>
+       <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+         <div class="fnode-tags">${tags.join('')}</div>
+         <button class="fnode-edit" onclick="event.stopPropagation();feOpen('${nd.id}')" title="Editar nó">✎</button>
+       </div>
+     </div>
+     <div class="fnode-msg">${esc((nd.message||'').substring(0,72))}${(nd.message||'').length>72?'…':''}</div>
+     ${opts ? `<div class="fnode-opts">${opts}</div>` : ''}
+     ${nd.default ? `<div class="fnode-default">↪ ${esc(nd.default.replace(/_/g,' ').toLowerCase())}</div>` : ''}`;
+
+  // Touch drag on header
+  const hdr = el.querySelector('.fnode-hdr');
+  hdr.addEventListener('touchstart', ev => {
+    ev.stopPropagation();
+    const t = ev.touches[0];
+    const p = fPos[nd.id] || { x: 0, y: 0 };
+    fDragging = { id: nd.id, startMx: t.clientX, startMy: t.clientY, origX: p.x, origY: p.y };
+    el.classList.add('active');
+  }, { passive: true });
+
+  return el;
+}
+
+// ── Stage events: pan + zoom ─────────────────────────────
+function fInitEvents() {
+  const stage = $('flow-stage');
+
+  // Mouse wheel zoom
+  stage.addEventListener('wheel', e => {
+    e.preventDefault();
+    const r = stage.getBoundingClientRect();
+    fZoomAt(e.deltaY < 0 ? 1.1 : 1/1.1, e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+
+  // Mouse pan (empty space)
+  stage.addEventListener('mousedown', e => {
+    if (e.button !== 0 || e.target.closest('.fnode')) return;
+    fPanning = true;
+    fPanStart = { mx: e.clientX, my: e.clientY, px: fPanX, py: fPanY };
+    stage.classList.add('panning');
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (fPanning) {
+      fPanX = fPanStart.px + (e.clientX - fPanStart.mx);
+      fPanY = fPanStart.py + (e.clientY - fPanStart.my);
+      fApply();
+    }
+    if (fDragging) {
+      const nx = fDragging.origX + (e.clientX - fDragging.startMx) / fZoom;
+      const ny = fDragging.origY + (e.clientY - fDragging.startMy) / fZoom;
+      fPos[fDragging.id] = { x: nx, y: ny };
+      const el = document.getElementById('fn-' + fDragging.id);
+      if (el) { el.style.left = nx + 'px'; el.style.top = ny + 'px'; }
+      fDrawEdges();
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (fPanning) { stage.classList.remove('panning'); fPanning = false; }
+    if (fDragging) {
+      document.getElementById('fn-' + fDragging.id)?.classList.remove('active');
+      $('flow-stage').classList.remove('dragging');
+      fSavePos();
+      fDragging = null;
+    }
+  });
+
+  // Touch pan + pinch zoom
+  let tPinchDist = 0, tPinchZoom = 1, tPinchPan = { x: 0, y: 0 };
+
+  stage.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const ts = Array.from(e.touches);
+    if (ts.length === 1 && !e.target.closest('.fnode')) {
+      fPanning = true;
+      fPanStart = { mx: ts[0].clientX, my: ts[0].clientY, px: fPanX, py: fPanY };
+    } else if (ts.length === 2) {
+      fPanning = false;
+      tPinchDist = Math.hypot(ts[1].clientX-ts[0].clientX, ts[1].clientY-ts[0].clientY);
+      tPinchZoom = fZoom;
+      tPinchPan  = { x: fPanX, y: fPanY };
+    }
+  }, { passive: false });
+
+  stage.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const ts = Array.from(e.touches);
+    if (fPanning && ts.length === 1) {
+      fPanX = fPanStart.px + (ts[0].clientX - fPanStart.mx);
+      fPanY = fPanStart.py + (ts[0].clientY - fPanStart.my);
+      fApply();
+    } else if (ts.length === 2) {
+      const dist = Math.hypot(ts[1].clientX-ts[0].clientX, ts[1].clientY-ts[0].clientY);
+      const prev = fZoom;
+      fZoom = Math.max(0.12, Math.min(4, tPinchZoom * (dist / tPinchDist)));
+      const cx = (ts[0].clientX + ts[1].clientX) / 2 - stage.getBoundingClientRect().left;
+      const cy = (ts[0].clientY + ts[1].clientY) / 2 - stage.getBoundingClientRect().top;
+      fPanX = cx - (cx - tPinchPan.x) * (fZoom / tPinchZoom);
+      fPanY = cy - (cy - tPinchPan.y) * (fZoom / tPinchZoom);
+      fApply();
+    }
+    if (fDragging) {
+      const t = ts[0];
+      const nx = fDragging.origX + (t.clientX - fDragging.startMx) / fZoom;
+      const ny = fDragging.origY + (t.clientY - fDragging.startMy) / fZoom;
+      fPos[fDragging.id] = { x: nx, y: ny };
+      const el = document.getElementById('fn-' + fDragging.id);
+      if (el) { el.style.left = nx + 'px'; el.style.top = ny + 'px'; }
+      fDrawEdges();
+    }
+  }, { passive: false });
+
+  stage.addEventListener('touchend', () => {
+    fPanning = false;
+    if (fDragging) {
+      document.getElementById('fn-' + fDragging.id)?.classList.remove('active');
+      fSavePos();
+      fDragging = null;
+    }
+  });
+}
+
+// ── Main loader ──────────────────────────────────────────
 async function loadFlow() {
-  if (flowLoaded) return;
-  const outer = $('flow-outer');
+  if (fInited) { fFit(); return; }
+  const loading = $('flow-loading');
   try {
     const j = await fetch('/api/flow').then(r => r.json());
     if (!j.ok) throw new Error(j.error);
-    const nodeMap = {};
-    (j.data || []).forEach(n => nodeMap[n.id] = n);
+    fData = j.data || [];
 
-    const canvas = document.createElement('div');
-    canvas.className = 'flow-canvas';
-    canvas.style.width  = CANVAS_W + 'px';
-    canvas.style.height = CANVAS_H + 'px';
-    canvas.style.minWidth = CANVAS_W + 'px';
-
-    const svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('class','flow-svg');
-    svg.setAttribute('width', CANVAS_W);
-    svg.setAttribute('height', CANVAS_H);
-    const defs = document.createElementNS(NS, 'defs');
-    svg.appendChild(defs);
-
-    const usedCols = new Set([...EDGES.map(e => e.col), '#383838']);
-    usedCols.forEach(c => mkMarker(defs, 'arr-' + c.replace('#',''), c));
-
-    EDGES.forEach(e => {
-      const fp = LAYOUT[e.f], tp = LAYOUT[e.t];
-      if (!fp || !tp) return;
-      drawEdge(svg, fp.x+CW, fp.y+CH/2, tp.x, tp.y+CH/2, e.col, e.lbl, false);
+    // Load saved positions, fall back to defaults
+    const saved = fLoadPos();
+    fData.forEach(nd => {
+      fPos[nd.id] = saved[nd.id] || F_DEFAULTS[nd.id] || { x: 60, y: 60 };
     });
 
-    // loop: NAO_ENTENDI bottom → INICIO bottom (arc below canvas)
-    {
-      const lp = LAYOUT.NAO_ENTENDI, ip = LAYOUT.INICIO;
-      const sx = lp.x + CW/2, sy = lp.y + CH;
-      const ex = ip.x + CW/2, ey = ip.y + CH;
-      const bot = CANVAS_H - 15;
-      const loopPath = document.createElementNS(NS, 'path');
-      loopPath.setAttribute('d', `M ${sx},${sy} C ${sx},${bot} ${ex},${bot} ${ex},${ey}`);
-      loopPath.setAttribute('stroke','#383838'); loopPath.setAttribute('fill','none');
-      loopPath.setAttribute('stroke-width','1.5'); loopPath.setAttribute('stroke-dasharray','4,3');
-      loopPath.setAttribute('marker-end','url(#arr-383838)');
-      svg.appendChild(loopPath);
+    const canvas = $('flow-canvas');
+    fData.forEach(nd => canvas.appendChild(fBuildNode(nd)));
 
-      const lx = (sx + ex) / 2, ly = bot;
-      const lbl = '↩ reinicia';
-      const tw = lbl.length * 5 + 10;
-      const bg = document.createElementNS(NS,'rect');
-      bg.setAttribute('x',lx-tw/2); bg.setAttribute('y',ly-7);
-      bg.setAttribute('width',tw); bg.setAttribute('height','13');
-      bg.setAttribute('fill','#000'); bg.setAttribute('rx','2');
-      svg.appendChild(bg);
-      const txt = document.createElementNS(NS,'text');
-      txt.setAttribute('x',lx); txt.setAttribute('y',ly+4);
-      txt.setAttribute('text-anchor','middle'); txt.setAttribute('font-family','Space Mono,monospace');
-      txt.setAttribute('font-size','7'); txt.setAttribute('fill','#383838');
-      txt.textContent = lbl;
-      svg.appendChild(txt);
-    }
+    fInitEvents();
+    fApply();
 
-    canvas.appendChild(svg);
-
-    Object.entries(LAYOUT).forEach(([id, pos]) => {
-      const nd = nodeMap[id];
-      if (!nd) return;
-      const col = NODE_COL[id] || '#888';
-      const incoming = EDGES.find(e => e.t === id);
-      const trigLabel = incoming ? incoming.lbl : (id === 'INICIO' ? 'root' : '');
-      const msg = (nd.message || '').replace(/\n/g,' ').substring(0, 52) + ((nd.message || '').length > 52 ? '…' : '');
-      const actLabel = nd.action ? nd.action.replace(/_/g,' ') : null;
-
-      const card = document.createElement('div');
-      card.className = 'fn';
-      card.style.cssText = `left:${pos.x}px;top:${pos.y}px;height:${CH}px;border-left:2px solid ${col};`;
-      card.innerHTML =
-        `<div class="fn-id" style="color:${col}">${esc(id)}</div>` +
-        (trigLabel ? `<span class="fn-trigger" style="background:${col};color:${col==='#383838'?'#999':'#000'}">${esc(trigLabel)}</span>` : '') +
-        `<div class="fn-msg">${esc(msg)}</div>` +
-        `<div class="fn-foot">` +
-        (id==='INICIO' ? '<span class="fn-tag ft-root">ROOT</span>' : '') +
-        (actLabel ? `<span class="fn-tag ft-act">${esc(actLabel)}</span>` : '') +
-        (nd.terminal ? '<span class="fn-tag ft-term">TERMINAL</span>' : '') +
-        (id==='NAO_ENTENDI' ? '<span class="fn-tag ft-loop">LOOP</span>' : '') +
-        '</div>';
-      canvas.appendChild(card);
+    // Draw edges and fit after first paint (need offsetHeight)
+    requestAnimationFrame(() => {
+      fDrawEdges();
+      fFit();
+      if (loading) loading.style.display = 'none';
+      fInited = true;
     });
-
-    outer.innerHTML = '';
-    outer.appendChild(canvas);
-    flowLoaded = true;
   } catch(e) {
     console.error('[flow]', e);
-    outer.innerHTML = `<div class="empty" style="color:var(--red)">Erro ao carregar fluxo: ${esc(e.message)}</div>`;
+    if (loading) { loading.style.color = 'var(--red)'; loading.textContent = 'Erro: ' + e.message; }
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  FLOW EDITOR — controle de mensagens e gatilhos
+// ═══════════════════════════════════════════════════════
+
+let feNodeId  = null;   // nó aberto no editor
+let feAllIds  = [];     // todos os IDs para os selects
+
+async function feOpen(nodeId) {
+  feNodeId = nodeId;
+  feAllIds = (fData || []).map(n => n.id);
+
+  const nd  = (fData || []).find(n => n.id === nodeId);
+  if (!nd) return;
+
+  // Atualiza cabeçalho
+  const col = F_COL[nodeId] || '#e4e4e4';
+  $('fe-dot').style.background  = col;
+  $('fe-dot').style.boxShadow   = `0 0 6px ${col}`;
+  $('fe-title').textContent     = nodeId;
+  $('fe-title').style.color     = col;
+
+  // Busca config salva
+  let cfg = {};
+  try {
+    const j = await fetch('/api/flow/config').then(r => r.json());
+    const found = (j.data || []).find(c => c.node_id === nodeId);
+    if (found) cfg = found;
+  } catch {}
+
+  feRender(nd, cfg);
+  $('flow-editor').classList.add('open');
+}
+
+function feClose() {
+  $('flow-editor').classList.remove('open');
+  feNodeId = null;
+}
+
+function feRender(nd, cfg) {
+  const isCustom = !!(cfg.message || cfg.options || cfg.default_next);
+  const allIds   = feAllIds;
+
+  // Mensagem efetiva no editor
+  const currentMsg  = cfg.message != null ? cfg.message : (nd.message || '');
+
+  // Opções efetivas
+  const currentOpts = cfg.options
+    ? cfg.options
+    : nd.options.map(o => ({ trigger: o.trigger, next: o.next, data: o.data }));
+
+  const currentDef = cfg.default_next || nd.default || '';
+
+  const statusHtml = isCustom
+    ? `<div class="fe-status custom">⚡ Usando configuração personalizada.</div>`
+    : `<div class="fe-status default">✓ Usando configuração padrão do código.</div>`;
+
+  const optsHtml = currentOpts.map((o, i) => feOptRow(o, i, allIds)).join('');
+
+  const defOptions = ['', ...allIds].map(id =>
+    `<option value="${esc(id)}" ${id===currentDef?'selected':''}>${id || '— sem padrão —'}</option>`
+  ).join('');
+
+  $('fe-body').innerHTML = `
+    ${statusHtml}
+
+    <div class="fe-section">
+      <label class="fe-label">Mensagem do bot</label>
+      <textarea class="fe-textarea" id="fe-msg" rows="5" placeholder="Texto que o bot envia...">${esc(currentMsg)}</textarea>
+      <div class="fe-hint">Variáveis: <strong>{nome}</strong> <strong>{tamanho}</strong> <strong>{estilo}</strong> <strong>{cidade}</strong> <strong>{interesse}</strong> <strong>{wa_link}</strong></div>
+    </div>
+
+    <div class="fe-section">
+      <label class="fe-label">Opções / Quick Replies</label>
+      <div id="fe-opts">${optsHtml}</div>
+      <button class="fe-add-opt" onclick="feAddOpt()">+ Adicionar opção</button>
+      <div class="fe-hint" style="margin-top:8px;">Gatilho: palavras separadas por vírgula — ex: <em>camisa, polo, camiseta</em><br>Ou regex direto — ex: <em>camis[ae]t?a?|polo</em></div>
+    </div>
+
+    <div class="fe-section">
+      <label class="fe-label">Destino padrão (sem match)</label>
+      <select class="fe-select" id="fe-default">${defOptions}</select>
+    </div>
+  `;
+}
+
+function feOptRow(o, i, allIds) {
+  const destOptions = allIds.map(id =>
+    `<option value="${id}" ${id===o.next?'selected':''}>${id}</option>`
+  ).join('');
+  return `
+    <div class="fe-opt-row" id="feopt-${i}">
+      <button class="fe-opt-del" onclick="feDelOpt(${i})" title="Remover">✕</button>
+      <span class="fe-opt-label">Gatilho</span>
+      <input class="fe-input" id="feopt-trig-${i}" value="${esc(o.trigger||'')}" placeholder="ex: camisa, polo, camiseta" style="margin-bottom:7px">
+      <span class="fe-opt-label">Ir para</span>
+      <select class="fe-select" id="feopt-next-${i}">${destOptions}</select>
+    </div>`;
+}
+
+function feAddOpt() {
+  const container = $('fe-opts');
+  const i = container.children.length;
+  const allIds = feAllIds;
+  const div = document.createElement('div');
+  div.innerHTML = feOptRow({ trigger: '', next: allIds[0] || '' }, i, allIds);
+  container.appendChild(div.firstElementChild);
+}
+
+function feDelOpt(i) {
+  const el = $('feopt-' + i);
+  if (el) el.remove();
+}
+
+function feCollectOpts() {
+  const rows = $('fe-opts').children;
+  const opts = [];
+  Array.from(rows).forEach(row => {
+    const idx  = row.id.replace('feopt-','');
+    const trig = document.getElementById('feopt-trig-' + idx);
+    const next = document.getElementById('feopt-next-' + idx);
+    if (trig && next && trig.value.trim()) {
+      opts.push({ trigger: trig.value.trim(), next: next.value });
+    }
+  });
+  return opts;
+}
+
+async function feSave() {
+  const btn = $('fe-save-btn');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  try {
+    const msg   = $('fe-msg')?.value?.trim() || null;
+    const opts  = feCollectOpts();
+    const def   = $('fe-default')?.value || null;
+
+    const r = await fetch('/api/flow/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nodeId:       feNodeId,
+        message:      msg,
+        options:      opts.length ? opts : null,
+        default_next: def || null,
+      }),
+    }).then(r => r.json());
+
+    if (!r.ok) throw new Error(r.error);
+
+    feClose();
+    // Recarrega o canvas para refletir as mudanças
+    fInited = false;
+    $('flow-canvas').innerHTML = '<svg class="flow-svg-layer" id="flow-svg"></svg>';
+    fData = null;
+    await loadFlow();
+  } catch(e) {
+    alert('Erro ao salvar: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Salvar';
+  }
+}
+
+async function feReset() {
+  if (!confirm(`Resetar "${feNodeId}" para o padrão do código?`)) return;
+  try {
+    const r = await fetch('/api/flow/config/' + feNodeId, { method: 'DELETE' }).then(r => r.json());
+    if (!r.ok) throw new Error(r.error);
+    feClose();
+    fInited = false;
+    $('flow-canvas').innerHTML = '<svg class="flow-svg-layer" id="flow-svg"></svg>';
+    fData = null;
+    await loadFlow();
+  } catch(e) {
+    alert('Erro ao resetar: ' + e.message);
   }
 }
 

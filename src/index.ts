@@ -6,11 +6,16 @@ import { getOrCreateSession, resetSession } from './services/sessionService';
 import { parseWebhookPayload, sendMessage } from './providers/messaging';
 import { FLOW_MAP } from './bot/flowMap';
 import { saveMensagem } from './services/mensagemService';
+import { checkRateLimit } from './utils/rateLimiter';
 import apiRouter from './routes/api';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
+
+// Delay realista para webhook (simula digitação do bot no WhatsApp real)
+const TYPING_DELAY_MS = Number(process.env.TYPING_DELAY_MS ?? 800);
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 app.use(express.json());
 
@@ -33,9 +38,17 @@ app.post('/webhook', async (req, res) => {
   const parsed = parseWebhookPayload(req.body);
   if (!parsed) return res.status(400).json({ error: 'Payload não reconhecido' });
 
+  // Rate limiting silencioso — ignora spam sem responder ao usuário
+  if (!checkRateLimit(parsed.phone)) {
+    console.warn(`[webhook] rate limit atingido para ${parsed.phone}`);
+    return res.json({ ok: true, ratelimited: true });
+  }
+
   try {
     const session = await getOrCreateSession(parsed.phone);
     const response = await processMessage(session, parsed.text);
+    // Delay antes de enviar — faz o bot parecer mais humano no WhatsApp
+    if (TYPING_DELAY_MS > 0) await sleep(TYPING_DELAY_MS + Math.random() * 400);
     await sendMessage(parsed.phone, response.text);
     return res.json({ ok: true, nextNode: response.nextNode });
   } catch (err) {
@@ -48,6 +61,10 @@ app.post('/webhook', async (req, res) => {
 app.post('/send', async (req, res) => {
   const { phone, text } = req.body as { phone?: string; text?: string };
   if (!phone || !text) return res.status(400).json({ error: 'phone e text obrigatórios' });
+
+  if (!checkRateLimit(phone)) {
+    return res.status(429).json({ ok: false, error: 'Muitas mensagens. Aguarde um momento.' });
+  }
 
   try {
     const session = await getOrCreateSession(phone);
