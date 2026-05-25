@@ -12,6 +12,7 @@ import {
   findProductsForBot,
   formatProductsResponse,
   logInventoryQuery,
+  DEFAULT_STORE_ID,
 } from '../inventory/inventoryBridge';
 
 const LOJA_WHATSAPP = process.env.LOJA_WHATSAPP || '';
@@ -76,9 +77,9 @@ export async function processMessage(
   // ── PRÉ-CHECAGEM 4: Consulta de estoque (só leitura) ─────────────────────
   const inventoryFilters = detectProductQuery(messageText);
   if (inventoryFilters) {
-    const products = await findProductsForBot(inventoryFilters);
+    const products = await findProductsForBot(DEFAULT_STORE_ID, inventoryFilters);
     const reply    = formatProductsResponse(products, inventoryFilters);
-    logInventoryQuery(session.phone, messageText, inventoryFilters, products.length, reply);
+    logInventoryQuery(DEFAULT_STORE_ID, session.phone, messageText, inventoryFilters, products.length, reply);
 
     await saveMensagem({ phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
     await saveMensagem({ phone: session.phone, direcao: 'saida',   conteudo: reply,       node: 'INVENTORY' });

@@ -3,6 +3,7 @@
 
 export interface BotProduct {
   id: string | number;
+  storeId: string;          // loja à qual o produto pertence
   name: string;
   category?: string;
   price?: number;              // undefined = não encontrado no banco

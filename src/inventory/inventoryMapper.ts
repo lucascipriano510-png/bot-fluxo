@@ -22,7 +22,7 @@ const COLOR_TERMS: string[] = [
 ];
 const COLOR_TERMS_NORM = COLOR_TERMS.map(normalizeText);
 
-export function mapSiteProductToBotProduct(row: SiteProductRow): BotProduct {
+export function mapSiteProductToBotProduct(row: SiteProductRow, storeId: string): BotProduct {
   const availableSizes = (row.sizes || [])
     .filter(s => s.stock > 0)
     .map(s => s.size);
@@ -32,6 +32,7 @@ export function mapSiteProductToBotProduct(row: SiteProductRow): BotProduct {
 
   return {
     id:            row.id,
+    storeId,
     name:          row.name,
     category:      mapCategory(row.category),
     price:         row.price ?? undefined,
@@ -46,8 +47,8 @@ export function mapSiteProductToBotProduct(row: SiteProductRow): BotProduct {
   };
 }
 
-export function mapMany(rows: SiteProductRow[]): BotProduct[] {
-  return rows.map(mapSiteProductToBotProduct);
+export function mapMany(rows: SiteProductRow[], storeId: string): BotProduct[] {
+  return rows.map(row => mapSiteProductToBotProduct(row, storeId));
 }
 
 // Normaliza a categoria do banco para exibição ao cliente
@@ -60,5 +61,5 @@ function extractColors(name: string): string[] {
   const norm = normalizeText(name);
   return COLOR_TERMS_NORM
     .filter(c => norm.includes(c))
-    .map(c => COLOR_TERMS[COLOR_TERMS_NORM.indexOf(c)]);  // retorna versão original com acento
+    .map(c => COLOR_TERMS[COLOR_TERMS_NORM.indexOf(c)]);
 }

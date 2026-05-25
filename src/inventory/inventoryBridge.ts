@@ -1,6 +1,12 @@
 /**
- * InventoryBridge — READ-ONLY bridge entre o bot e o catálogo do site.
- * Zero escrita: nenhum INSERT, UPDATE ou DELETE no Supabase do site.
+ * InventoryBridge — READ-ONLY bridge entre o bot e o catálogo de produtos.
+ * Zero escrita: nenhum INSERT, UPDATE ou DELETE.
+ *
+ * Arquitetura multi-tenant:
+ * - Toda consulta recebe storeId para garantir isolamento entre lojas.
+ * - DEFAULT_STORE_ID = 'fluxo-outlet' (loja padrão enquanto há apenas uma loja).
+ * - Fluxo Outlet usa o Supabase do site (SITE_SUPABASE_URL) como fonte atual.
+ * - Futuras lojas usarão o Supabase do próprio bot com store_id.
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -8,7 +14,12 @@ import { BotProduct, BotProductSearchFilters, SiteProductRow } from './inventory
 import { mapMany, mapSiteProductToBotProduct } from './inventoryMapper';
 import { normalizeText, normalizeSize } from './inventoryUtils';
 
-// ── Cliente Supabase do site (anon key — somente leitura) ─────────────────────
+// ── Loja padrão — usada enquanto o bot atende apenas a Fluxo Outlet ──────────
+export const DEFAULT_STORE_ID = 'fluxo-outlet';
+
+// ── Cliente Supabase do SITE da Fluxo Outlet (anon key — somente leitura) ────
+// Fonte atual de produtos enquanto o catálogo vive no Supabase do site.
+// Quando o cliente migrar para o painel SaaS, isso pode ser removido.
 let _siteClient: SupabaseClient | null = null;
 
 function getSiteClient(): SupabaseClient | null {
@@ -23,9 +34,8 @@ function getSiteClient(): SupabaseClient | null {
   return _siteClient;
 }
 
-// ── Mapa categoria → valor exato no banco (uppercase conforme DB) ─────────────
-// Padrões testados contra texto NORMALIZADO (sem acento, minúsculo)
-// DB: CAMISA | CALÇA | BERMUDA | CHINELO | KITS | ÓCULOS  | TÊNIS
+// ── Mapa categoria → valor exato no banco (uppercase conforme DB do site) ─────
+// Padrões aplicados sobre texto NORMALIZADO (sem acento, minúsculo)
 const CATEGORY_MAP: Array<[RegExp, string]> = [
   [/\b(camis[ae]t?a?|polo|regata|blusa)\b/, 'CAMISA'],
   [/\btenis\b/,                              'TÊNIS'],
@@ -36,8 +46,6 @@ const CATEGORY_MAP: Array<[RegExp, string]> = [
   [/\b(kit|combo)\b/,                        'KITS'],
 ];
 
-// Converte categoria digitada pelo cliente → valor exato do banco
-// Normaliza a entrada antes de testar os padrões
 function buildCategoryFilter(raw: string): string[] {
   const norm = normalizeText(raw);
   for (const [re, dbValue] of CATEGORY_MAP) {
@@ -46,7 +54,7 @@ function buildCategoryFilter(raw: string): string[] {
   return [raw.trim().toUpperCase()];
 }
 
-// ── Query base ────────────────────────────────────────────────────────────────
+// ── Query base (somente produtos com estoque) ─────────────────────────────────
 function baseQuery(client: SupabaseClient) {
   return client
     .from('products')
@@ -57,9 +65,9 @@ function baseQuery(client: SupabaseClient) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1. searchProducts — busca livre no nome do produto
+// 1. searchProducts — busca livre no nome
 // ─────────────────────────────────────────────────────────────────────────────
-export async function searchProducts(query: string): Promise<BotProduct[]> {
+export async function searchProducts(storeId: string, query: string): Promise<BotProduct[]> {
   const client = getSiteClient();
   if (!client) return [];
 
@@ -68,16 +76,16 @@ export async function searchProducts(query: string): Promise<BotProduct[]> {
     .limit(10);
 
   if (error) {
-    console.error('[InventoryBridge] searchProducts error:', error.message);
+    console.error(`[InventoryBridge][${storeId}] searchProducts error:`, error.message);
     return [];
   }
-  return mapMany((data || []) as SiteProductRow[]);
+  return mapMany((data || []) as SiteProductRow[], storeId);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. getProductsByCategory — busca por categoria (tolerante a variações)
+// 2. getProductsByCategory — busca por categoria
 // ─────────────────────────────────────────────────────────────────────────────
-export async function getProductsByCategory(category: string): Promise<BotProduct[]> {
+export async function getProductsByCategory(storeId: string, category: string): Promise<BotProduct[]> {
   const client = getSiteClient();
   if (!client) return [];
 
@@ -87,24 +95,23 @@ export async function getProductsByCategory(category: string): Promise<BotProduc
     .limit(50);
 
   if (error) {
-    console.error('[InventoryBridge] getProductsByCategory error:', error.message);
+    console.error(`[InventoryBridge][${storeId}] getProductsByCategory error:`, error.message);
     return [];
   }
-  return mapMany((data || []) as SiteProductRow[]);
+  return mapMany((data || []) as SiteProductRow[], storeId);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. getProductsBySize — produtos com esse tamanho em estoque
-//    Filtragem em JS porque sizes é JSONB
+// 3. getProductsBySize — produtos com tamanho em estoque (filtro em JS, JSONB)
 // ─────────────────────────────────────────────────────────────────────────────
-export async function getProductsBySize(size: string): Promise<BotProduct[]> {
+export async function getProductsBySize(storeId: string, size: string): Promise<BotProduct[]> {
   const client = getSiteClient();
   if (!client) return [];
 
   const { data, error } = await baseQuery(client).limit(200);
 
   if (error) {
-    console.error('[InventoryBridge] getProductsBySize error:', error.message);
+    console.error(`[InventoryBridge][${storeId}] getProductsBySize error:`, error.message);
     return [];
   }
 
@@ -113,13 +120,13 @@ export async function getProductsBySize(size: string): Promise<BotProduct[]> {
     (row.sizes || []).some(s => normalizeSize(s.size) === sz && s.stock > 0)
   );
 
-  return mapMany(filtered).slice(0, 20);
+  return mapMany(filtered, storeId).slice(0, 20);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. getProductAvailability — verifica se produto específico tem estoque
+// 4. getProductAvailability — verifica disponibilidade de produto específico
 // ─────────────────────────────────────────────────────────────────────────────
-export async function getProductAvailability(productId: string | number): Promise<BotProduct | null> {
+export async function getProductAvailability(storeId: string, productId: string | number): Promise<BotProduct | null> {
   const client = getSiteClient();
   if (!client) return null;
 
@@ -131,18 +138,18 @@ export async function getProductAvailability(productId: string | number): Promis
 
   if (error || !data) {
     if (error?.code !== 'PGRST116') {
-      console.error('[InventoryBridge] getProductAvailability error:', error?.message);
+      console.error(`[InventoryBridge][${storeId}] getProductAvailability error:`, error?.message);
     }
     return null;
   }
 
-  return mapSiteProductToBotProduct(data as SiteProductRow);
+  return mapSiteProductToBotProduct(data as SiteProductRow, storeId);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 5. getProductForBotContext — filtros combinados (principal)
+// 5. getProductForBotContext — filtros combinados (função central)
 // ─────────────────────────────────────────────────────────────────────────────
-export async function getProductForBotContext(filters: BotProductSearchFilters): Promise<BotProduct[]> {
+export async function getProductForBotContext(storeId: string, filters: BotProductSearchFilters): Promise<BotProduct[]> {
   const client = getSiteClient();
   if (!client) return [];
 
@@ -172,13 +179,13 @@ export async function getProductForBotContext(filters: BotProductSearchFilters):
   const { data, error } = await q.limit(100);
 
   if (error) {
-    console.error('[InventoryBridge] getProductForBotContext error:', error.message);
+    console.error(`[InventoryBridge][${storeId}] getProductForBotContext error:`, error.message);
     return [];
   }
 
   let rows = (data || []) as SiteProductRow[];
 
-  // Post-filtro por tamanho — normaliza ambos os lados para comparação segura
+  // Post-filtro por tamanho — normaliza ambos os lados
   if (filters.size) {
     const sz = normalizeSize(filters.size);
     rows = rows.filter(r =>
@@ -186,29 +193,29 @@ export async function getProductForBotContext(filters: BotProductSearchFilters):
     );
   }
 
-  // Post-filtro por cor — normaliza nome do produto e o filtro
+  // Post-filtro por cor — normaliza nome e filtro
   if (filters.color) {
     const cl = normalizeText(filters.color);
     rows = rows.filter(r => normalizeText(r.name).includes(cl));
   }
 
-  return mapMany(rows).slice(0, 20);
+  return mapMany(rows, storeId).slice(0, 20);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Função principal — chamada pelo motor do bot
+// findProductsForBot — função principal chamada pelo motor do bot
+// Garante que NENHUMA consulta de produto ocorre sem contexto de loja (storeId)
 // ─────────────────────────────────────────────────────────────────────────────
-export async function findProductsForBot(filters: BotProductSearchFilters): Promise<BotProduct[]> {
+export async function findProductsForBot(storeId: string, filters: BotProductSearchFilters): Promise<BotProduct[]> {
   const hasSpecific = filters.category || filters.size || filters.query || filters.color;
   if (!hasSpecific) return [];
-  return getProductForBotContext(filters);
+  return getProductForBotContext(storeId, filters);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// formatProductsResponse — monta a resposta do bot a partir da lista de produtos
+// formatProductsResponse — monta a resposta do bot a partir da lista
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Exibição com acentos para mensagens ao cliente
 const CAT_DISPLAY: Record<string, string> = {
   camisa: 'camisa', tenis: 'tênis', calca: 'calça',
   bermuda: 'bermuda', chinelo: 'chinelo', oculos: 'óculos', kit: 'kit',
@@ -266,10 +273,8 @@ export function formatProductsResponse(
 
 // ─────────────────────────────────────────────────────────────────────────────
 // detectProductQuery — extrai filtros de uma mensagem livre do cliente
-// Normaliza a mensagem antes de aplicar os padrões (case + acento insensitive)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Padrões de categoria — aplicados sobre texto normalizado (sem acento, minúsculo)
 const CATEGORY_PATTERNS: Array<[RegExp, string]> = [
   [/\b(camis[ae]t?a?|polo|regata|blusa)\b/, 'camisa'],
   [/\btenis\b/,                              'tenis'],
@@ -280,23 +285,18 @@ const CATEGORY_PATTERNS: Array<[RegExp, string]> = [
   [/\b(kit|combo)\b/,                        'kit'],
 ];
 
-// Padrões de tamanho — aplicados sobre texto normalizado (já minúsculo)
-// normalizeSize() após extração garante retorno em MAIÚSCULO
 const SIZE_PATTERNS = [
-  /\b(gg|pp|g|p|m)\b/,       // letras — ordem: maior primeiro
-  /\b(3[5-9]|4[0-9])\b/,     // numérico 35–49
+  /\b(gg|pp|g|p|m)\b/,
+  /\b(3[5-9]|4[0-9])\b/,
 ];
 
-// Padrões de cor — aplicados sobre texto normalizado (sem acento, minúsculo)
 const COLOR_PATTERNS = [
   /\b(preta?|branca?|azul|vermelh[ao]|verde|amarela?|cinza|bege|vinho|navy|off.?white|laranja|rosa|roxo|lilas|caramelo|marrom|creme|nude)\b/,
 ];
 
-// Padrão de preço máximo — "até 100", "ate R$120", "ate 99,90"
 const PRICE_PATTERN = /\bate\s*r?\$?\s*(\d+(?:[.,]\d{1,2})?)/;
 
 export function detectProductQuery(message: string): BotProductSearchFilters | null {
-  // Normaliza a mensagem: "CAMISA BRANCA G" → "camisa branca g"
   const norm = normalizeText(message);
   const filters: BotProductSearchFilters = {};
 
@@ -306,12 +306,12 @@ export function detectProductQuery(message: string): BotProductSearchFilters | n
 
   for (const re of SIZE_PATTERNS) {
     const m = norm.match(re);
-    if (m) { filters.size = normalizeSize(m[0]); break; }  // "gg" → "GG", "42" → "42"
+    if (m) { filters.size = normalizeSize(m[0]); break; }
   }
 
   for (const re of COLOR_PATTERNS) {
     const m = norm.match(re);
-    if (m) { filters.color = m[0]; break; }  // já em minúsculo/sem acento
+    if (m) { filters.color = m[0]; break; }
   }
 
   const priceMatch = norm.match(PRICE_PATTERN);
@@ -326,9 +326,10 @@ export function detectProductQuery(message: string): BotProductSearchFilters | n
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Logging
+// logInventoryQuery — inclui storeId para rastreabilidade multi-tenant
 // ─────────────────────────────────────────────────────────────────────────────
 export function logInventoryQuery(
+  storeId: string,
   phone: string,
   message: string,
   filters: BotProductSearchFilters | null,
@@ -336,7 +337,7 @@ export function logInventoryQuery(
   botReply: string,
 ): void {
   console.log(
-    `[Inventory] phone=${phone} | msg="${message.slice(0, 60)}" | ` +
+    `[Inventory][${storeId}] phone=${phone} | msg="${message.slice(0, 60)}" | ` +
     `filters=${JSON.stringify(filters)} | found=${resultCount} | ` +
     `reply="${botReply.slice(0, 80)}"`
   );
