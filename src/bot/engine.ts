@@ -17,6 +17,8 @@ import {
   formatOffersResponse,
   buildOfferFilters,
 } from '../catalog/catalogBridge';
+import { detectIntent } from '../services/intentService';
+import { handleIntent } from '../services/chatBrainService';
 
 const VALOR_BASE: Record<string, number> = {
   tenis: 189, camisa: 89, bermuda: 99, promocao: 59,
@@ -98,6 +100,21 @@ export async function processMessage(
     await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: reply,       node: 'CATALOG' });
 
     return { text: reply, nextNode: currentNodeId, context: ctx };
+  }
+
+  // ── PRÉ-CHECAGEM 5: Camada cerebral — intenção e resposta natural ────────
+  const intentResult  = detectIntent(messageText);
+  const brainResult   = handleIntent(messageText, intentResult, ctx, currentNodeId);
+  if (brainResult) {
+    await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText,    node: currentNodeId });
+    await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: brainResult.reply, node: 'BRAIN' });
+    return {
+      text:            brainResult.reply,
+      nextNode:        currentNodeId,
+      context:         ctx,
+      detectedIntent:  brainResult.detectedIntent,
+      confidence:      brainResult.confidence,
+    };
   }
 
   const currentCfg = flowConfig.get(currentNodeId);

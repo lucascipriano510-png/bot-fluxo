@@ -330,6 +330,7 @@
             <template x-for="(m, i) in simMessages" :key="i">
               <div :class="m.from === 'bot' ? 'bubble bubble-bot' : 'bubble bubble-user'">
                 <span x-text="m.text"></span>
+                <div x-show="m.from === 'bot' && m.intent" class="bubble-intent" x-text="`intent: ${m.intent} · ${Math.round((m.confidence||0)*100)}%`"></div>
                 <div class="bubble-time" x-text="m.time"></div>
               </div>
             </template>

@@ -506,6 +506,15 @@ body {
   align-self: flex-end;
 }
 
+.bubble-intent {
+  font-size: 9px;
+  color: var(--green);
+  opacity: 0.55;
+  margin-top: 3px;
+  font-family: monospace;
+  letter-spacing: 0.03em;
+}
+
 .bubble-time {
   font-size: 10px;
   color: var(--mu2);

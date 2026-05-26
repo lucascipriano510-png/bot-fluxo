@@ -6,6 +6,8 @@ import { checkRateLimit } from '../utils/rateLimiter';
 export interface ChatResult {
   reply: string;
   nextNode: string;
+  detectedIntent?: string;
+  confidence?: number;
 }
 
 export async function processChat(phone: string, message: string): Promise<ChatResult> {
@@ -17,5 +19,10 @@ export async function processChat(phone: string, message: string): Promise<ChatR
   const storeCtx = await getStoreContext();
   const session  = await getOrCreateSession(storeCtx.storeId, phone);
   const response = await processMessage(session, message);
-  return { reply: response.text, nextNode: response.nextNode };
+  return {
+    reply:          response.text,
+    nextNode:       response.nextNode,
+    detectedIntent: response.detectedIntent,
+    confidence:     response.confidence,
+  };
 }

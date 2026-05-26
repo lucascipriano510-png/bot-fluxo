@@ -41,8 +41,13 @@ app.post('/api/chat', async (req, res) => {
   }
 
   try {
-    const { reply } = await processChat(phone, message);
-    return res.json({ ok: true, reply });
+    const result = await processChat(phone, message);
+    return res.json({
+      ok:      true,
+      reply:   result.reply,
+      intent:  result.detectedIntent,
+      confidence: result.confidence,
+    });
   } catch (err: unknown) {
     const e = err as Error & { code?: string };
     if (e?.code === 'RATE_LIMITED') {

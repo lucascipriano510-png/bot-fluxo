@@ -233,9 +233,11 @@ function FluxoCommand() {
         });
         const j = await r.json();
         if (j.ok) {
-          this.simMessages.push({ from: 'bot', text: j.reply, time: this.timeNow() });
+          const msg = { from: 'bot', text: j.reply, time: this.timeNow(), intent: null, confidence: null };
+          if (j.intent && j.intent !== 'unknown') { msg.intent = j.intent; msg.confidence = j.confidence; }
+          this.simMessages.push(msg);
         } else {
-          this.simMessages.push({ from: 'bot', text: j.error || 'Erro ao processar.', time: this.timeNow() });
+          this.simMessages.push({ from: 'bot', text: j.error || 'Erro ao processar.', time: this.timeNow(), intent: null, confidence: null });
         }
       } catch (e) {
         this.simMessages.push({ from: 'bot', text: 'Erro de conexão.', time: this.timeNow() });

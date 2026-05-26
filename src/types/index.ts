@@ -44,6 +44,8 @@ export interface BotResponse {
   text: string;
   nextNode: string;
   context?: Record<string, string>;
+  detectedIntent?: string;
+  confidence?: number;
 }
 
 export interface BotOptOut {
