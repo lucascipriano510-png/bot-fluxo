@@ -26,7 +26,7 @@ export interface BotProductSearchFilters {
   featuredOnly?: boolean;
 }
 
-// Shape bruto vindo do Supabase do site
+// Shape bruto vindo do Supabase do site (tabela products)
 export interface SiteProductRow {
   id: number;
   sku: string;
@@ -37,8 +37,4 @@ export interface SiteProductRow {
   stock: number;
   sizes: Array<{ size: string; stock: number }>;
   featured: boolean;
-  gallery?: string[];
-  subcategory?: string;
-  collection_name?: string;
-  is_kit?: boolean;
 }

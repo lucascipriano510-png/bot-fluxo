@@ -55,7 +55,7 @@ function buildCategoryFilter(raw: string): string[] {
 function baseQuery(client: SupabaseClient) {
   return client
     .from('products')
-    .select('id,sku,name,price,category,image,stock,sizes,featured,subcategory,is_kit')
+    .select('id,sku,name,price,category,image,stock,sizes,featured')
     .gt('stock', 0)
     .order('featured', { ascending: false })
     .order('name');
@@ -129,7 +129,7 @@ export async function getProductAvailability(storeId: string, productId: string 
 
   const { data, error } = await client
     .from('products')
-    .select('id,sku,name,price,category,image,stock,sizes,featured,subcategory,is_kit')
+    .select('id,sku,name,price,category,image,stock,sizes,featured')
     .eq('id', productId)
     .single();
 
@@ -152,7 +152,7 @@ export async function getProductForBotContext(storeId: string, filters: BotProdu
 
   let q = client
     .from('products')
-    .select('id,sku,name,price,category,image,stock,sizes,featured,subcategory,is_kit')
+    .select('id,sku,name,price,category,image,stock,sizes,featured')
     .gt('stock', 0)
     .order('featured', { ascending: false });
 
