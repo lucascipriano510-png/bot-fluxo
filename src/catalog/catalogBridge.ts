@@ -46,6 +46,35 @@ import {
 } from '../inventory/inventoryBridge';
 import { BotProductSearchFilters } from '../inventory/inventoryTypes';
 
+const SITE_URL = (process.env.SITE_URL || '').replace(/\/$/, '');
+
+// Mapeia categoria normalizada → valor que o site espera na URL
+const CAT_TO_URL: Record<string, string> = {
+  camisa:   'CAMISA',
+  calca:    'CALÇA',
+  bermuda:  'BERMUDA',
+  chinelo:  'CHINELO',
+  tenis:    'TÊNIS',
+  oculos:   'ÓCULOS',
+  kit:      'KITS',
+};
+
+export function buildCatalogUrl(filters: OfferSearchFilters): string | undefined {
+  if (!SITE_URL || !filters.category) return undefined;
+
+  const params = new URLSearchParams();
+  params.set('categoria', CAT_TO_URL[filters.category] ?? filters.category.toUpperCase());
+
+  if (filters.subcategory) params.set('sub', filters.subcategory.toUpperCase());
+
+  const size  = filters.attributes?.size  ? String(filters.attributes.size)  : undefined;
+  const color = filters.attributes?.color ? String(filters.attributes.color) : undefined;
+  if (size)  params.set('tamanho', size.toUpperCase());
+  if (color) params.set('cor',     color.toUpperCase());
+
+  return `${SITE_URL}/?${params.toString()}`;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // filtersToInventoryFilters
 // Traduz OfferSearchFilters → BotProductSearchFilters para o adapter atual
@@ -240,12 +269,13 @@ export function formatOffersResponse(
     return fmtOffer(offers[0], true);
   }
 
+  // Múltiplos resultados — entrega link da página filtrada do site
+  const catalogUrl = buildCatalogUrl(filters);
+  const urlLine    = catalogUrl ? `\n\n🔗 ${catalogUrl}` : '';
+
   if (catDisplay && size) {
     const brandPart = subcategory ? ` *${subcategory}*` : '';
-    return (
-      `Tenho opções em *${catDisplay}*${brandPart} no tamanho *${size}*:\n\n` +
-      offers.slice(0, 5).map(o => fmtOffer(o)).join('\n\n')
-    );
+    return `Tenho opções em *${catDisplay}*${brandPart} no tamanho *${size}*. Veja tudo aqui:${urlLine}`;
   }
 
   if (catDisplay || color || subcategory) {
@@ -255,16 +285,10 @@ export function formatOffersResponse(
     else if (subcategory)          line = `da marca *${subcategory}*`;
     else                           line = `na cor *${color}*`;
 
-    return (
-      `Tenho algumas opções ${line}. Qual tamanho você usa?\n\n` +
-      offers.slice(0, 5).map(o => fmtOffer(o)).join('\n\n')
-    );
+    return `Tenho opções ${line}. Qual tamanho você usa?${urlLine}`;
   }
 
-  return (
-    `Encontrei ${offers.length} opção(ões) pra você:\n\n` +
-    offers.slice(0, 5).map(o => fmtOffer(o)).join('\n\n')
-  );
+  return `Encontrei ${offers.length} opção(ões) pra você:${urlLine}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -311,14 +335,14 @@ export function formatFallbackResponse(
   }
 
   const notFoundStr = notFound.join(' ');
+  const catalogUrl  = buildCatalogUrl(matched);
+  const urlLine     = catalogUrl ? `\n🔗 ${catalogUrl}` : '';
 
-  // Quando o tamanho não foi encontrado, sugere verificar os tamanhos disponíveis
-  const sizeHint = (originalSize && !matched.attributes?.size)
-    ? ` Veja os tamanhos que ainda estão em estoque:`
-    : ' Mas tenho isso disponível:';
+  if (originalSize && !matched.attributes?.size) {
+    return `Não encontrei ${notFoundStr} especificamente. Veja os tamanhos disponíveis:${urlLine}`;
+  }
 
-  const prefix = `Não encontrei ${notFoundStr} especificamente.${sizeHint}\n\n`;
-  return prefix + formatOffersResponse(offers, matched);
+  return `Não encontrei ${notFoundStr} especificamente. Mas tenho isso disponível:${urlLine}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
