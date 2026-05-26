@@ -85,7 +85,7 @@ export const FLOW_MAP: Record<NodeId, FlowNode> = {
       { trigger: /pedido|status\b|rastrear|n[úu]mero\b/i,           next: 'CONSULTA_PEDIDO'                                                     },
       { trigger: /atendente|humano|ajuda|suporte|falar com|pessoa/i, next: 'SUPORTE'                                                              },
     ],
-    default: 'APRESENTACAO',
+    default: 'INICIO',
   },
 
   APRESENTACAO: {

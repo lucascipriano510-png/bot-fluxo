@@ -9,6 +9,7 @@ import { saveMensagem } from './services/mensagemService';
 import { checkRateLimit } from './utils/rateLimiter';
 import { getStoreContext } from './services/storeService';
 import { processChat } from './services/chatService';
+import { getRuntimeSettings } from './services/settingsService';
 import apiRouter from './routes/api';
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
@@ -110,12 +111,12 @@ app.post('/start', async (req, res) => {
   if (!phone) return res.status(400).json({ error: 'phone obrigatório' });
 
   try {
-    const storeCtx = await getStoreContext();
+    const storeCtx  = await getStoreContext();
+    const settings  = await getRuntimeSettings(storeCtx.storeId);
     await resetSession(storeCtx.storeId, phone);
     const node = FLOW_MAP['INICIO'];
-    const text = typeof node.message === 'function'
-      ? node.message({ _storeName: storeCtx.name })
-      : node.message;
+    const ctx  = { _storeName: storeCtx.name, _saudacao: settings.saudacao };
+    const text = typeof node.message === 'function' ? node.message(ctx) : node.message;
     await saveMensagem({ store_id: storeCtx.storeId, phone, direcao: 'saida', conteudo: text, node: 'INICIO' });
     return res.json({ ok: true, text, nextNode: 'INICIO' });
   } catch (err) {

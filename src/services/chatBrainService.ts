@@ -53,6 +53,8 @@ export function handleIntent(
   const { intent, confidence, entities } = intentResult;
 
   if (intent === 'unknown') return null;
+  // No INICIO, saudações são tratadas pelo flowMap (exibe menu com saudação configurada)
+  if (intent === 'greeting' && currentNodeId === 'INICIO') return null;
 
   const p = pend(currentNodeId);
   let reply: string;

@@ -328,7 +328,12 @@
             </div>
 
             <template x-for="(m, i) in simMessages" :key="i">
-              <div :class="m.from === 'bot' ? 'bubble bubble-bot' : 'bubble bubble-user'">
+              <div x-show="m.from === 'system'"
+                style="text-align:center;font-size:11px;color:var(--mu2);padding:8px 12px;background:rgba(255,255,255,.04);border-radius:6px;margin:4px 20px"
+                x-text="m.text">
+              </div>
+              <div x-show="m.from !== 'system'"
+                :class="m.from === 'bot' ? 'bubble bubble-bot' : 'bubble bubble-user'">
                 <span x-text="m.text"></span>
                 <div x-show="m.from === 'bot' && m.intent" class="bubble-intent" x-text="`intent: ${m.intent} · ${Math.round((m.confidence||0)*100)}%`"></div>
                 <div class="bubble-time" x-text="m.time"></div>
@@ -683,6 +688,35 @@
 
     <!-- ── CONFIGURAÇÕES ────────────────────── -->
     <div x-show="page === 'configuracoes'">
+
+      <!-- Banner: tabela bot_settings não existe -->
+      <div x-show="cfgSetupNeeded" style="
+        background:rgba(250,204,21,.08);border:1px solid rgba(250,204,21,.35);
+        border-radius:10px;padding:16px 20px;margin-bottom:20px
+      ">
+        <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:8px">
+          ⚠️ Configuração necessária — tabela <code>bot_settings</code> não existe no Supabase
+        </div>
+        <div style="font-size:12px;color:var(--mu);margin-bottom:10px">
+          Execute o SQL abaixo no Supabase Dashboard → SQL Editor, depois clique em Salvar novamente:
+        </div>
+        <pre style="
+          background:var(--bg);border:1px solid var(--border);border-radius:8px;
+          padding:12px;font-size:11px;color:#a0c4ff;overflow-x:auto;line-height:1.6
+        ">CREATE TABLE IF NOT EXISTS bot_settings (
+  store_id        uuid PRIMARY KEY REFERENCES stores(id),
+  nome_loja       text,
+  whatsapp        text,
+  saudacao        text,
+  horario_inicio  text DEFAULT '09:00',
+  horario_fim     text DEFAULT '18:00',
+  bot_ativo       boolean DEFAULT true,
+  ignorar_horario boolean DEFAULT false,
+  fallback_humano boolean DEFAULT true,
+  delay_resposta  boolean DEFAULT true,
+  updated_at      timestamptz DEFAULT now()
+);</pre>
+      </div>
 
       <!-- Feedback toast -->
       <div x-show="cfgFeedback !== null" x-transition

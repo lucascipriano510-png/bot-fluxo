@@ -62,13 +62,21 @@ function mergeDefaults(row: Record<string, unknown>): BotSettings {
   };
 }
 
-export async function loadSettings(storeId: string): Promise<BotSettings> {
+function isTableMissing(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false;
+  return err.code === '42P01' || (err.message ?? '').includes('does not exist');
+}
+
+export async function loadSettings(
+  storeId: string,
+): Promise<BotSettings & { setup_needed?: boolean }> {
   const { data, error } = await supabase
     .from('bot_settings')
     .select('*')
     .eq('store_id', storeId)
     .single();
 
+  if (isTableMissing(error)) return { ...DEFAULTS, setup_needed: true };
   if (error || !data) return { ...DEFAULTS };
   return mergeDefaults(data as Record<string, unknown>);
 }
@@ -83,6 +91,9 @@ export async function saveSettings(
       [{ store_id: storeId, ...settings, updated_at: new Date().toISOString() }],
       { onConflict: 'store_id' },
     );
+  if (isTableMissing(error)) {
+    throw new Error('TABLE_MISSING');
+  }
   if (error) throw error;
   // Invalida cache runtime para o próximo request do bot ler os novos valores
   if (_rtCache?.storeId === storeId) _rtCache = null;

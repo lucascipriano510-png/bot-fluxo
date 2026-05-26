@@ -120,9 +120,10 @@ function FluxoCommand() {
       fallback_humano: true,
       delay_resposta:  true,
     },
-    cfgSaving:  false,
-    cfgFeedback: null,   // null | 'ok' | 'erro'
+    cfgSaving:      false,
+    cfgFeedback:    null,   // null | 'ok' | 'erro'
     cfgFeedbackMsg: '',
+    cfgSetupNeeded: false,
 
     /* computed */
     get currentConvMessages() {
@@ -206,6 +207,7 @@ function FluxoCommand() {
       try {
         const r = await fetch('/api/settings');
         const j = await r.json();
+        this.cfgSetupNeeded = j.setup_needed === true;
         if (j.ok && j.data) {
           const d = j.data;
           this.cfg.nome_loja       = d.nome_loja       ?? this.cfg.nome_loja;
@@ -245,9 +247,13 @@ function FluxoCommand() {
         if (j.ok) {
           this.cfgFeedback = 'ok';
           this.cfgFeedbackMsg = 'Configurações salvas com sucesso!';
+          this.cfgSetupNeeded = false;
         } else {
           this.cfgFeedback = 'erro';
-          this.cfgFeedbackMsg = j.error || 'Erro ao salvar.';
+          this.cfgFeedbackMsg = j.error === 'TABLE_MISSING'
+            ? 'Tabela bot_settings não existe. Execute o SQL mostrado acima e tente novamente.'
+            : (j.error || 'Erro ao salvar.');
+          if (j.error === 'TABLE_MISSING') this.cfgSetupNeeded = true;
         }
       } catch (e) {
         this.cfgFeedback = 'erro';
@@ -310,17 +316,16 @@ function FluxoCommand() {
       this.simStarted = true;
 
       try {
-        const r = await fetch('/start', {
+        // Apenas reseta a sessão — o cliente envia a primeira mensagem
+        await fetch('/reset', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phone: this.simPhone }),
         });
-        const j = await r.json();
-        if (j.ok) {
-          this.simMessages.push({ from: 'bot', text: j.text, time: this.timeNow() });
-        }
+        // Nota de sistema (não é mensagem do bot)
+        this.simMessages.push({ from: 'system', text: 'Sessão iniciada. Digite a primeira mensagem como se fosse o cliente.', time: this.timeNow() });
       } catch (e) {
-        this.simMessages.push({ from: 'bot', text: 'Erro ao iniciar. Verifique o servidor.', time: this.timeNow() });
+        this.simMessages.push({ from: 'system', text: 'Erro ao iniciar sessão. Verifique o servidor.', time: this.timeNow() });
       } finally {
         this.simLoading = false;
         this.$nextTick(() => this.scrollChat());

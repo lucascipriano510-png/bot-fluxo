@@ -165,7 +165,8 @@ router.get('/settings', async (_req, res) => {
   try {
     const { storeId } = await getStoreContext();
     const data = await loadSettings(storeId);
-    res.json({ ok: true, data });
+    const { setup_needed, ...cfg } = data as typeof data & { setup_needed?: boolean };
+    res.json({ ok: true, data: cfg, setup_needed: setup_needed ?? false });
   } catch (err: unknown) {
     res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
   }
