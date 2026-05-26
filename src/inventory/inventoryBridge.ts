@@ -301,18 +301,27 @@ const PRICE_PATTERN = /\bate\s*r?\$?\s*(\d+(?:[.,]\d{1,2})?)/;
 
 // Palavras PT que não são marcas nem categorias — usadas para extrair a marca residual
 const PT_STOP = new Set([
-  'tem','ha','voce','vc','eu','quero','preciso','gostaria','poderia',
+  // verbos comuns antes de pedidos
+  'tem','ha','voce','vc','eu','quero','queria','querendo','queria',
+  'preciso','precisaria','precisando','gostaria','gosto','poderia',
+  'procuro','procurando','busco','buscando','comprar','compraria',
+  'pegar','pegaria','usar','usaria','manda','mande','manda','mostra',
+  'teria','tivesse','tenho','tinha','ter','achar','buscar',
+  'ver','mostrar','achei','vi',
+  // preposições / artigos / pronomes
   'de','da','do','dos','das','um','uma','uns','umas',
   'para','pra','por','pelo','pela','pros','pras',
   'que','com','em','na','no','nas','nos','se',
   'isso','esse','essa','aquele','aquela','este','esta',
+  'minha','meu','sua','seu','seus','suas',
+  // negação / afirmação / questão
   'nao','sim','existe','algum','alguma',
-  'tipo','modelo','ver','me','mostra','mostrar',
-  'buscar','achar','ter','disponiveis','disponivel',
+  'tipo','modelo','me','disponiveis','disponivel','foto','fotos',
   'opcoes','opcao','ai','la','e','a','o','as','os',
   'mais','menos','so','tambem','ainda','ja',
   'como','onde','qual','quais','quanto','quanta',
-  'ate','aqui','ali','bem','muito','pouco','novo','nova',
+  'ate','aqui','ali','bem','muito','pouco',
+  'novo','nova','bom','boa','top','legal','certo','certa',
 ]);
 
 export function detectProductQuery(message: string): BotProductSearchFilters | null {
@@ -353,7 +362,8 @@ export function detectProductQuery(message: string): BotProductSearchFilters | n
     .filter(w => w.length >= 3 && !PT_STOP.has(w));
 
   if (brandWords.length > 0) {
-    filters.subcategory = brandWords[0];
+    // Última palavra residual — em PT a marca vem DEPOIS da categoria ("camisa da Lacoste")
+    filters.subcategory = brandWords[brandWords.length - 1];
   }
 
   return filters;
