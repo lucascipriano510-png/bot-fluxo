@@ -49,6 +49,7 @@ export interface BusinessOffer {
   availabilityType?: AvailabilityType;
   stockQuantity?: number;
   imageUrl?: string;
+  productUrl?: string;
   isActive: boolean;
 }
 

@@ -38,6 +38,7 @@ export function botProductToOffer(product: BotProduct): BusinessOffer {
     availabilityType,
     stockQuantity:     product.stockQuantity,
     imageUrl:          product.imageUrl,
+    productUrl:        product.productUrl,
     isActive:          product.isActive,
   };
 }

@@ -121,28 +121,26 @@ export function formatOffersResponse(
   const fmtPrice = (p?: number | null) =>
     p != null ? `R$${p.toFixed(2).replace('.', ',')}` : null;
 
-  if (offers.length === 1) {
-    const o = offers[0];
-    const sizes    = (o.attributes?.sizes as string[] | undefined) || [];
+  // Formata um produto individual com link
+  const fmtOffer = (o: BusinessOffer, showSizes = false): string => {
     const priceStr = fmtPrice(o.price);
+    const sizes    = (o.attributes?.sizes as string[] | undefined) || [];
+    let line = `*${o.name}*`;
+    if (priceStr) line += ` — ${priceStr}`;
+    if (showSizes && sizes.length) line += `\n📏 Tamanhos: ${sizes.join(', ')}`;
+    if (o.productUrl) line += `\n🔗 ${o.productUrl}`;
+    return line;
+  };
 
-    let msg = `*${o.name}*\n`;
-    msg += priceStr
-      ? `💰 ${priceStr}\n`
-      : `💰 Vou confirmar o valor certinho pra você.\n`;
-    if (sizes.length) msg += `📏 Tamanhos disponíveis: ${sizes.join(', ')}\n`;
-    if (o.imageUrl)   msg += `🔗 Ver produto`;
-    return msg;
+  if (offers.length === 1) {
+    return fmtOffer(offers[0], true);
   }
 
   if (catDisplay && size) {
     const brandPart = subcategory ? ` *${subcategory}*` : '';
     return (
-      `Tenho opções em *${catDisplay}*${brandPart} no tamanho *${size}*. ` +
-      `Qual modelo te interessa?\n\n` +
-      offers.slice(0, 5).map(o =>
-        `• ${o.name}${o.price != null ? ` — ${fmtPrice(o.price)}` : ''}`
-      ).join('\n')
+      `Tenho opções em *${catDisplay}*${brandPart} no tamanho *${size}*:\n\n` +
+      offers.slice(0, 5).map(o => fmtOffer(o)).join('\n\n')
     );
   }
 
@@ -155,15 +153,13 @@ export function formatOffersResponse(
 
     return (
       `Tenho algumas opções ${line}. Qual tamanho você usa?\n\n` +
-      offers.slice(0, 5).map(o => `• ${o.name}`).join('\n')
+      offers.slice(0, 5).map(o => fmtOffer(o)).join('\n\n')
     );
   }
 
   return (
     `Encontrei ${offers.length} opção(ões) pra você:\n\n` +
-    offers.slice(0, 5).map(o =>
-      `• ${o.name}${o.price != null ? ` — ${fmtPrice(o.price)}` : ''}`
-    ).join('\n')
+    offers.slice(0, 5).map(o => fmtOffer(o)).join('\n\n')
   );
 }
 
