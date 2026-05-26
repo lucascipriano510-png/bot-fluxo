@@ -8,6 +8,7 @@ import { FLOW_MAP } from './bot/flowMap';
 import { saveMensagem } from './services/mensagemService';
 import { checkRateLimit } from './utils/rateLimiter';
 import { getStoreContext } from './services/storeService';
+import { processChat } from './services/chatService';
 import apiRouter from './routes/api';
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
@@ -26,6 +27,30 @@ app.use('/api', apiRouter);
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/status', (_req, res) => {
   res.json({ ok: true, bot: 'bot-fluxo', version: '1.0.0' });
+});
+
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true, service: 'bot-api', env: process.env.NODE_ENV || 'production' });
+});
+
+// ── Chat API (integração externa / testes de ponta a ponta) ──────────────────
+app.post('/api/chat', async (req, res) => {
+  const { message, phone } = req.body as { message?: string; phone?: string };
+  if (!phone || !message) {
+    return res.status(400).json({ ok: false, error: 'phone e message são obrigatórios' });
+  }
+
+  try {
+    const { reply } = await processChat(phone, message);
+    return res.json({ ok: true, reply });
+  } catch (err: unknown) {
+    const e = err as Error & { code?: string };
+    if (e?.code === 'RATE_LIMITED') {
+      return res.status(429).json({ ok: false, error: e.message });
+    }
+    console.error('[/api/chat]', err);
+    return res.status(500).json({ ok: false, error: 'Erro interno' });
+  }
 });
 
 // ── Webhook: recebe mensagens do provider WhatsApp ────────────────────────────

@@ -1,56 +1,83 @@
 # bot-fluxo
 
-Bot de WhatsApp independente com fluxo de conversa em árvore de decisão.
-Painel de comando visual incluso. Banco Supabase próprio, separado do site.
+Bot de WhatsApp da Fluxo Outlet.
+API independente hospedada na Vercel. Banco Supabase (mesmo projeto do site, tabelas separadas).
 
 ---
 
-## Pré-requisitos
+## URLs
 
-- Node.js 18+
-- Conta Supabase (projeto separado do site)
-- SQL `BOT_SUPABASE_SETUP.sql` executado no projeto Supabase do bot
+| O que é | URL |
+|---|---|
+| **Bot API (este projeto)** | `https://bot-fluxo.vercel.app` (ou o domínio configurado na Vercel) |
+| **Site/catálogo** | Projeto separado na Vercel — o bot NÃO depende desta URL para funcionar |
+| **Webhook WhatsApp** | `https://bot-fluxo.vercel.app/webhook` ← configurar no provider (Evolution API / Meta) |
+
+O bot é uma API Express pura. Não chama nenhuma URL do site para responder mensagens.
 
 ---
 
-## Configuração
+## Variáveis de ambiente (Vercel)
 
-```bash
-cp .env.example .env
-# Preencha SUPABASE_URL, SUPABASE_SERVICE_KEY, LOJA_WHATSAPP, LOJA_NOME
-```
+| Variável | O que é |
+|---|---|
+| `SUPABASE_URL` | URL do projeto Supabase (mesmo do site) |
+| `SUPABASE_SERVICE_KEY` | service_role key — para escrita nas tabelas bot_* |
+| `SITE_SUPABASE_URL` | Mesma URL acima — usada pelo InventoryBridge para ler produtos |
+| `SITE_SUPABASE_ANON_KEY` | anon key — leitura do catálogo (tabela products) |
+| `LOJA_WHATSAPP` | Número da loja: `5534984148067` |
+| `IGNORAR_HORARIO` | `true` para ignorar horário comercial (obrigatório em testes) |
 
 ---
 
 ## Rodar localmente
 
 ```bash
+cp .env.example .env
+# Preencha as variáveis acima no .env
+
 npm install
 npm run dev
 ```
 
-Abra no navegador: **http://localhost:3000**
+Painel: **http://localhost:3000**
 
 ---
 
-## Comandos
+## Testar `/api/health`
 
-| Comando | O que faz |
-|---|---|
-| `npm run dev` | Servidor com hot-reload |
-| `npm run simulate` | Conversa no terminal (interativo) |
-| `npm run build` | Compila para `dist/` |
-| `npm start` | Produção (requer build) |
+```bash
+curl https://bot-fluxo.vercel.app/api/health
+```
+
+Resposta esperada:
+```json
+{ "ok": true, "service": "bot-api", "env": "production" }
+```
 
 ---
 
-## Painel visual — http://localhost:3000
+## Testar `/api/chat`
 
-| Aba | O que mostra |
-|---|---|
-| **Sessões** | Sessões ativas, nó atual, contexto |
-| **Leads** | Leads qualificados com status |
-| **Testar** | Simulador de conversa no navegador |
+```bash
+curl -X POST https://bot-fluxo.vercel.app/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{ "phone": "5534999999999", "message": "oi" }'
+```
+
+Resposta esperada:
+```json
+{ "ok": true, "reply": "Olá! Seja bem-vindo à Fluxo Outlet! ..." }
+```
+
+---
+
+## Configurar webhook (quando tiver WhatsApp real)
+
+1. **Evolution API**: no painel da Evolution, configure o webhook de `MESSAGES_UPSERT` para `https://bot-fluxo.vercel.app/webhook`
+2. **Meta Cloud API**: no painel do Meta for Developers, configure o webhook para `https://bot-fluxo.vercel.app/webhook`
+
+O `parseWebhookPayload()` em `src/providers/messaging.ts` já está mapeado para o formato da Evolution API.
 
 ---
 
@@ -58,18 +85,41 @@ Abra no navegador: **http://localhost:3000**
 
 | Método | URL | Descrição |
 |---|---|---|
+| `GET` | `/api/health` | Health check |
+| `POST` | `/api/chat` | Chat (body: `{phone, message}`) |
+| `POST` | `/webhook` | Webhook do provider WhatsApp |
 | `GET` | `/` | Painel visual |
-| `GET` | `/status` | Health check |
-| `GET` | `/api/sessions` | Sessões |
-| `GET` | `/api/leads` | Leads |
-| `GET` | `/api/messages/:phone` | Histórico |
-| `POST` | `/send` | Teste manual |
-| `POST` | `/reset` | Reseta sessão |
-| `POST` | `/webhook` | Webhook do provider |
+| `GET` | `/api/sessions` | Sessões ativas |
+| `GET` | `/api/leads` | Leads qualificados |
+| `GET` | `/api/messages/:phone` | Histórico de mensagens |
+| `POST` | `/start` | Iniciar chat (painel) |
+| `POST` | `/reset` | Resetar sessão (painel) |
+| `POST` | `/send` | Envio manual (painel) |
 
 ---
 
-## Mapa mental
+## Arquitetura
+
+```
+src/
+├── app.ts                    # Express — rotas principais
+├── lib/supabase.ts           # Cliente Supabase (service_role)
+├── services/
+│   ├── chatService.ts        # Entrada limpa: phone + message → reply
+│   ├── storeService.ts       # Lookup da loja pelo LOJA_WHATSAPP
+│   ├── sessionService.ts     # CRUD de sessões
+│   ├── leadService.ts        # Registro de leads
+│   └── mensagemService.ts    # Histórico de mensagens
+├── bot/
+│   ├── engine.ts             # Motor de fluxo de decisão
+│   └── flowMap.ts            # Árvore de nós do bot
+├── providers/messaging.ts    # sendMessage() — stub (trocar por Evolution/Meta)
+└── inventory/inventoryBridge.ts  # Leitura do catálogo (READ-ONLY)
+```
+
+---
+
+## Fluxo principal
 
 ```
 INICIO
@@ -81,4 +131,21 @@ INICIO
 └── *           → NAO_ENTENDI → INICIO
 ```
 
-Para expandir o fluxo, edite `src/bot/flowMap.ts`.
+Para expandir o fluxo: edite `src/bot/flowMap.ts`.
+
+---
+
+## Comandos
+
+| Comando | O que faz |
+|---|---|
+| `npm run dev` | Servidor com hot-reload |
+| `npm run build` | Compila para `dist/` |
+| `npm start` | Produção (requer build) |
+
+---
+
+## SQL
+
+Antes do primeiro deploy, rode `BOT_RESET_CLEAN.sql` no SQL Editor do Supabase.
+Ele cria todas as tabelas do bot sem tocar em `products`, `orders` ou qualquer tabela do site.
