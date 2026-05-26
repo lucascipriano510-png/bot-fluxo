@@ -217,9 +217,8 @@ export function handleIntent(
           `Oi! Estava te esperando.${p}`,
         ], message);
       } else {
-        // Sem nó pendente — usa saudação configurada + menu natural
-        const saudacao = ctx._saudacao || `Oi! 👋 Bem-vindo à *${ctx._storeName || 'nossa loja'}*.`;
-        reply = `${saudacao}\n\nO que você procura hoje? Pode me falar: camisa, polo, tênis, bermuda ou boné 👇`;
+        // Sem nó pendente — só a saudação configurada, deixa o cliente responder
+        reply = ctx._saudacao || `Oi! 👋 Bem-vindo à *${ctx._storeName || 'nossa loja'}*.`;
       }
       break;
 
