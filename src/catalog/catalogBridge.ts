@@ -280,13 +280,15 @@ export function formatFallbackResponse(
 ): string {
   // Sem resultado em nenhuma camada
   if (offers.length === 0) {
-    const catDisplay = original.category
-      ? (CAT_DISPLAY[original.category] || original.category)
-      : 'produto';
-    const sub = original.subcategory;
-    return sub
-      ? `Não encontrei *${sub}* disponível agora. Quer que eu mostre outras opções em *${catDisplay}*?`
-      : `Não encontrei esse produto disponível agora. Quer ver outras opções?`;
+    const sub        = original.subcategory;
+    const catDisplay = original.category ? (CAT_DISPLAY[original.category] || original.category) : null;
+    const color      = original.attributes?.color ? String(original.attributes.color) : null;
+
+    if (sub && catDisplay)  return `Não encontrei *${sub}* em *${catDisplay}* disponível agora. Quer ver outras opções?`;
+    if (sub && color)       return `Não encontrei *${sub}* na cor *${color}* disponível agora. Quer ver outras opções?`;
+    if (sub)                return `Não encontrei *${sub}* disponível agora. Quer ver outras opções?`;
+    if (catDisplay)         return `Não encontrei nada em *${catDisplay}* com esses filtros. Quer ver outras opções?`;
+    return `Não encontrei esse produto disponível agora. Quer ver outras opções?`;
   }
 
   // Resultado exato — resposta normal

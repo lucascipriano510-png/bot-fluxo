@@ -256,7 +256,7 @@ export async function getProductForBotContext(storeId: string, filters: BotProdu
 // Garante que NENHUMA consulta de produto ocorre sem contexto de loja (storeId)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function findProductsForBot(storeId: string, filters: BotProductSearchFilters): Promise<BotProduct[]> {
-  const hasSpecific = filters.category || filters.size || filters.query || filters.color;
+  const hasSpecific = filters.category || filters.size || filters.query || filters.color || filters.subcategory;
   if (!hasSpecific) return [];
   return getProductForBotContext(storeId, filters);
 }
