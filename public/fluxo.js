@@ -105,6 +105,11 @@ function FluxoCommand() {
     simLoading: false,
     simStarted: false,
 
+    /* produtos */
+    productSearch: '',
+    productCategory: '',
+    productsLoading: false,
+
     /* settings */
     cfg: {
       nome: 'Fluxo Outlet',
@@ -126,6 +131,30 @@ function FluxoCommand() {
     get leadsQuentes() { return this.leads.filter(l => l.status_comercial === 'QUENTE').length; },
     get leadsMornos()  { return this.leads.filter(l => l.status_comercial === 'MORNO').length; },
     get leadsFrios()   { return this.leads.filter(l => l.status_comercial === 'FRIO').length; },
+
+    get filteredProducts() {
+      let list = this.products;
+      const q = this.productSearch.trim().toLowerCase();
+      if (q) {
+        list = list.filter(p =>
+          (p.name        || '').toLowerCase().includes(q) ||
+          (p.subcategory || '').toLowerCase().includes(q) ||
+          (p.category    || '').toLowerCase().includes(q) ||
+          (p.sku         || '').toLowerCase().includes(q)
+        );
+      }
+      if (this.productCategory) {
+        list = list.filter(p => p.category === this.productCategory);
+      }
+      return list;
+    },
+
+    get productCategories() {
+      return [...new Set(this.products.map(p => p.category).filter(Boolean))].sort();
+    },
+
+    get productsInStock()  { return this.products.filter(p => (p.stock || 0) > 0).length; },
+    get productsNoStock()  { return this.products.filter(p => (p.stock || 0) <= 0).length; },
 
     get kanban() { return MOCK.kanban; },
 
@@ -151,6 +180,7 @@ function FluxoCommand() {
       await Promise.allSettled([
         this.loadLeads(),
         this.loadSessions(),
+        this.loadProducts(),
       ]);
 
       if (this.page === 'relatorios') {
@@ -166,6 +196,18 @@ function FluxoCommand() {
         const j = await r.json();
         if (j.ok && j.data?.length) this.leads = j.data;
       } catch (_) { /* keep mock */ }
+    },
+
+    async loadProducts() {
+      this.productsLoading = true;
+      try {
+        const r = await fetch('/api/products');
+        const j = await r.json();
+        if (j.ok && Array.isArray(j.data) && j.data.length) {
+          this.products = j.data;
+        }
+      } catch (_) { /* keep mock */ }
+      finally { this.productsLoading = false; }
     },
 
     async loadSessions() {

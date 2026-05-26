@@ -370,6 +370,42 @@ export function detectProductQuery(message: string): BotProductSearchFilters | n
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// fetchProductsForPanel — leitura completa para o painel visual
+// Sem filtro de stock>0 para mostrar também produtos sem estoque no painel
+// ─────────────────────────────────────────────────────────────────────────────
+export async function fetchProductsForPanel(filters?: {
+  category?: string;
+  q?: string;
+}): Promise<SiteProductRow[]> {
+  const client = getSiteClient();
+  if (!client) return [];
+
+  let q = client
+    .from('products')
+    .select('id,sku,name,price,category,subcategory,image,stock,sizes,featured')
+    .order('featured', { ascending: false })
+    .order('category')
+    .order('name')
+    .limit(500);
+
+  if (filters?.category) {
+    q = q.eq('category', filters.category);
+  }
+
+  if (filters?.q) {
+    q = q.or(`name.ilike.%${filters.q}%,subcategory.ilike.%${filters.q}%`);
+  }
+
+  const { data, error } = await q;
+  if (error) {
+    console.error('[InventoryBridge] fetchProductsForPanel error:', error.message);
+    return [];
+  }
+
+  return (data || []) as SiteProductRow[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // logInventoryQuery — inclui storeId para rastreabilidade multi-tenant
 // ─────────────────────────────────────────────────────────────────────────────
 export function logInventoryQuery(

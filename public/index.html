@@ -461,29 +461,108 @@
 
     <!-- ── PRODUTOS ─────────────────────────── -->
     <div x-show="page === 'produtos'">
-      <div class="card-header" style="margin-bottom:16px">
-        <div style="display:flex;gap:10px;flex:1">
-          <input type="text" placeholder="Buscar produto..." style="background:var(--card);border:1px solid var(--border2);border-radius:8px;color:var(--tx);padding:8px 14px;font-size:13px;font-family:var(--font);outline:none;width:240px">
-          <select style="background:var(--card);border:1px solid var(--border2);border-radius:8px;color:var(--tx);padding:8px 12px;font-size:13px;font-family:var(--font);outline:none">
-            <option>Todas categorias</option><option>CAMISA</option><option>TÊNIS</option><option>BERMUDA</option><option>KITS</option>
+
+      <!-- Toolbar -->
+      <div class="card-header" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+        <div style="display:flex;gap:10px;flex:1;flex-wrap:wrap">
+          <input type="text" x-model="productSearch" placeholder="Buscar nome, marca, SKU..."
+            style="background:var(--card);border:1px solid var(--border2);border-radius:8px;color:var(--tx);padding:8px 14px;font-size:13px;font-family:var(--font);outline:none;flex:1;min-width:160px">
+          <select x-model="productCategory"
+            style="background:var(--card);border:1px solid var(--border2);border-radius:8px;color:var(--tx);padding:8px 12px;font-size:13px;font-family:var(--font);outline:none">
+            <option value="">Todas categorias</option>
+            <template x-for="cat in productCategories" :key="cat">
+              <option :value="cat" x-text="cat"></option>
+            </template>
           </select>
         </div>
-        <button class="btn btn-green">+ Novo produto</button>
+        <button class="btn" @click="loadProducts()" :disabled="productsLoading" style="white-space:nowrap">
+          <span x-text="productsLoading ? 'Carregando...' : '↺ Atualizar'"></span>
+        </button>
       </div>
 
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
-        <template x-for="p in products" :key="p.id">
-          <div class="card" style="padding:0;overflow:hidden;cursor:pointer" @click="">
-            <div style="height:140px;background:var(--card2);display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--border)">
-              <svg style="width:40px;height:40px;stroke:var(--mu2);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;opacity:.4" viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      <!-- Stats -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-bottom:20px">
+        <div class="card" style="padding:14px 18px">
+          <div style="font-size:10px;color:var(--mu2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Total</div>
+          <div style="font-size:24px;font-weight:800" x-text="products.length"></div>
+        </div>
+        <div class="card" style="padding:14px 18px">
+          <div style="font-size:10px;color:var(--mu2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Em estoque</div>
+          <div style="font-size:24px;font-weight:800;color:var(--green)" x-text="productsInStock"></div>
+        </div>
+        <div class="card" style="padding:14px 18px">
+          <div style="font-size:10px;color:var(--mu2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Sem estoque</div>
+          <div style="font-size:24px;font-weight:800;color:#ef4444" x-text="productsNoStock"></div>
+        </div>
+        <div class="card" style="padding:14px 18px">
+          <div style="font-size:10px;color:var(--mu2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Filtrados</div>
+          <div style="font-size:24px;font-weight:800;color:var(--blue)" x-text="filteredProducts.length"></div>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div x-show="productsLoading" style="text-align:center;padding:60px 20px;color:var(--mu2);font-size:13px">
+        Carregando catálogo da loja...
+      </div>
+
+      <!-- Empty -->
+      <div x-show="!productsLoading && filteredProducts.length === 0" style="text-align:center;padding:60px 20px;color:var(--mu2);font-size:13px">
+        <div x-show="productSearch || productCategory">Nenhum produto encontrado para essa busca.</div>
+        <div x-show="!productSearch && !productCategory && products.length === 0">
+          Catálogo vazio ou variáveis SITE_SUPABASE_URL / SITE_SUPABASE_ANON_KEY não configuradas.
+        </div>
+      </div>
+
+      <!-- Grid de produtos -->
+      <div x-show="!productsLoading && filteredProducts.length > 0"
+        style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px">
+        <template x-for="p in filteredProducts" :key="p.id">
+          <div class="card prod-card">
+
+            <!-- Imagem / placeholder -->
+            <div class="prod-img">
+              <img x-show="p.image" :src="p.image" :alt="p.name"
+                style="width:100%;height:100%;object-fit:cover" @error="$el.style.display='none'">
+              <div x-show="!p.image" class="prod-img-ph" x-text="(p.category||'?').charAt(0)"></div>
+              <span x-show="p.featured" class="prod-badge-feat">★ Destaque</span>
+              <span x-show="(p.stock||0) <= 0" class="prod-badge-out">Sem estoque</span>
             </div>
-            <div style="padding:14px">
-              <div style="font-size:12px;font-weight:700;margin-bottom:4px;line-height:1.3" x-text="p.name"></div>
-              <div style="font-size:11px;color:var(--mu);margin-bottom:10px" x-text="p.category + (p.subcategory ? ' · ' + p.subcategory : '')"></div>
-              <div style="display:flex;align-items:center;justify-content:space-between">
-                <span style="font-weight:800;color:var(--gold)" x-text="fmtBRL(p.price)"></span>
-                <span class="badge" :class="p.stock > 0 ? 'badge-green' : 'badge-red'" x-text="p.stock > 0 ? 'Em estoque' : 'Sem estoque'"></span>
+
+            <!-- Corpo -->
+            <div style="padding:12px">
+              <!-- Categoria + SKU -->
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+                <span style="font-size:10px;color:var(--mu2);text-transform:uppercase;letter-spacing:.04em"
+                  x-text="p.category + (p.subcategory ? ' · ' + p.subcategory : '')"></span>
+                <span x-show="p.sku" style="font-size:9px;color:var(--mu2);opacity:.6" x-text="p.sku"></span>
               </div>
+
+              <!-- Nome -->
+              <div style="font-size:12px;font-weight:700;line-height:1.4;margin-bottom:8px;min-height:34px" x-text="p.name"></div>
+
+              <!-- Tamanhos em estoque -->
+              <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:10px;min-height:22px">
+                <template x-for="sz in (p.sizes||[]).filter(s=>s.stock>0)" :key="sz.size">
+                  <span class="size-chip" x-text="sz.size"></span>
+                </template>
+                <span x-show="!(p.sizes||[]).length && (p.stock||0)>0"
+                  style="font-size:10px;color:var(--mu2);padding:2px 0">Tamanho único</span>
+                <span x-show="!(p.sizes||[]).filter(s=>s.stock>0).length && (p.stock||0)<=0"
+                  style="font-size:10px;color:#ef4444;padding:2px 0">Sem estoque</span>
+              </div>
+
+              <!-- Preço + estoque total -->
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-weight:800;font-size:14px;color:var(--gold)" x-text="fmtBRL(p.price)"></span>
+                <span style="font-size:11px;color:var(--mu2)" x-text="'Estoque: ' + (p.stock||0)"></span>
+              </div>
+
+              <!-- Link site -->
+              <a x-show="p.sku" :href="'https://fluxooutlet.com.br/?produto=' + p.sku"
+                target="_blank" rel="noopener"
+                style="display:block;margin-top:8px;font-size:10px;color:var(--blue);opacity:.75;text-decoration:none">
+                🔗 Ver no site
+              </a>
             </div>
           </div>
         </template>

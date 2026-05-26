@@ -5,6 +5,7 @@ import { fetchHistorico } from '../services/mensagemService';
 import { FLOW_MAP } from '../bot/flowMap';
 import { loadFlowConfig, invalidateFlowCache } from '../services/flowConfigService';
 import { getStoreContext } from '../services/storeService';
+import { fetchProductsForPanel } from '../inventory/inventoryBridge';
 
 const router = Router();
 
@@ -155,6 +156,20 @@ router.delete('/flow/config/:nodeId', async (req, res) => {
     res.json({ ok: true });
   } catch (err: unknown) {
     res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ── Products (catálogo real do site via InventoryBridge) ──────────────────────
+router.get('/products', async (req, res) => {
+  try {
+    const { category, q } = req.query as { category?: string; q?: string };
+    const data = await fetchProductsForPanel({
+      category: category && category !== 'all' ? category : undefined,
+      q:        q && q.trim() ? q.trim() : undefined,
+    });
+    res.json({ ok: true, data, count: data.length });
+  } catch (err: unknown) {
+    res.json({ ok: false, data: [], error: err instanceof Error ? err.message : String(err) });
   }
 });
 
