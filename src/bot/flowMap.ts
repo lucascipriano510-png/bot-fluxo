@@ -75,7 +75,7 @@ export const FLOW_MAP: Record<NodeId, FlowNode> = {
         return `Vi que você veio pelos tênis 👟\nQual numeração você usa?`;
       if (ctx.origem === 'promocao')
         return `Você veio pela promoção da Fluxo 🔥\nMe fala seu tamanho que eu te mostro as peças que ainda estão disponíveis.`;
-      return `Oi! 👋 Sou o assistente da *${ctx._storeName || 'nossa loja'}*.\n\nO que você procura hoje?\n\n👕  Camisa / Polo\n👟  Tênis\n👖  Bermuda\n🔥  Promoção`;
+      return `${ctx._saudacao || `Oi! 👋 Sou o assistente da *${ctx._storeName || 'nossa loja'}*.`}\n\nO que você procura hoje?\n\n👕  Camisa / Polo\n👟  Tênis\n👖  Bermuda\n🔥  Promoção`;
     },
     options: [
       { trigger: /camis[ae]t?a?|polo|malha|camisinha/i,             next: 'CAPTURA_TAMANHO', data: { origem: 'camisa',   interesse: 'camisa'  } },

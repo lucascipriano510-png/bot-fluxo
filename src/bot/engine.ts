@@ -93,6 +93,7 @@ export async function processMessage(
     ...session.context,
     _storeName: storeCtx.name,
     _wa_loja:   storeCtx.whatsappNumber,
+    _saudacao:  rtSettings.saudacao,
   };
 
   // ── PRÉ-CHECAGEM 4: Consulta de catálogo via CatalogBridge (busca em camadas) ──
