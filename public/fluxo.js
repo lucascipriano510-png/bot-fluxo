@@ -87,8 +87,6 @@ function FluxoCommand() {
     /* state */
     page: 'dashboard',
     sidebarOpen: false,
-    botOn: true,
-    ignorarHorario: true,
     selectedConv: 1,
 
     /* data — starts with mocks, replaced by real API when available */
@@ -112,12 +110,19 @@ function FluxoCommand() {
 
     /* settings */
     cfg: {
-      nome: 'Fluxo Outlet',
-      whatsapp: '5534984148067',
-      saudacao: 'Olá! Bem-vindo à Fluxo Outlet! 👋',
-      horario_inicio: '09:00',
-      horario_fim: '18:00',
+      nome_loja:       'Fluxo Outlet',
+      whatsapp:        '5534984148067',
+      saudacao:        'Olá! Bem-vindo à Fluxo Outlet! 👋',
+      horario_inicio:  '09:00',
+      horario_fim:     '18:00',
+      bot_ativo:       true,
+      ignorar_horario: true,
+      fallback_humano: true,
+      delay_resposta:  true,
     },
+    cfgSaving:  false,
+    cfgFeedback: null,   // null | 'ok' | 'erro'
+    cfgFeedbackMsg: '',
 
     /* computed */
     get currentConvMessages() {
@@ -127,6 +132,12 @@ function FluxoCommand() {
     get currentConv() {
       return this.conversations.find(c => c.id === this.selectedConv) || this.conversations[0];
     },
+
+    // botOn e ignorarHorario são aliases para os campos de cfg (única fonte de verdade)
+    get botOn()           { return this.cfg.bot_ativo; },
+    set botOn(v)          { this.cfg.bot_ativo = v; },
+    get ignorarHorario()  { return this.cfg.ignorar_horario; },
+    set ignorarHorario(v) { this.cfg.ignorar_horario = v; },
 
     get leadsQuentes() { return this.leads.filter(l => l.status_comercial === 'QUENTE').length; },
     get leadsMornos()  { return this.leads.filter(l => l.status_comercial === 'MORNO').length; },
@@ -181,11 +192,69 @@ function FluxoCommand() {
         this.loadLeads(),
         this.loadSessions(),
         this.loadProducts(),
+        this.loadSettings(),
       ]);
 
       if (this.page === 'relatorios') {
         await this.$nextTick();
         this.initCharts();
+      }
+    },
+
+    /* ── Configurações ─────────────────────────────────────────────────── */
+    async loadSettings() {
+      try {
+        const r = await fetch('/api/settings');
+        const j = await r.json();
+        if (j.ok && j.data) {
+          const d = j.data;
+          this.cfg.nome_loja       = d.nome_loja       ?? this.cfg.nome_loja;
+          this.cfg.whatsapp        = d.whatsapp        ?? this.cfg.whatsapp;
+          this.cfg.saudacao        = d.saudacao        ?? this.cfg.saudacao;
+          this.cfg.horario_inicio  = d.horario_inicio  ?? this.cfg.horario_inicio;
+          this.cfg.horario_fim     = d.horario_fim     ?? this.cfg.horario_fim;
+          this.cfg.bot_ativo       = d.bot_ativo       ?? this.cfg.bot_ativo;
+          this.cfg.ignorar_horario = d.ignorar_horario ?? this.cfg.ignorar_horario;
+          this.cfg.fallback_humano = d.fallback_humano ?? this.cfg.fallback_humano;
+          this.cfg.delay_resposta  = d.delay_resposta  ?? this.cfg.delay_resposta;
+        }
+      } catch (_) { /* mantém defaults */ }
+    },
+
+    async saveSettings() {
+      if (this.cfgSaving) return;
+      this.cfgSaving = true;
+      this.cfgFeedback = null;
+      try {
+        const r = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nome_loja:       this.cfg.nome_loja,
+            whatsapp:        this.cfg.whatsapp,
+            saudacao:        this.cfg.saudacao,
+            horario_inicio:  this.cfg.horario_inicio,
+            horario_fim:     this.cfg.horario_fim,
+            bot_ativo:       this.cfg.bot_ativo,
+            ignorar_horario: this.cfg.ignorar_horario,
+            fallback_humano: this.cfg.fallback_humano,
+            delay_resposta:  this.cfg.delay_resposta,
+          }),
+        });
+        const j = await r.json();
+        if (j.ok) {
+          this.cfgFeedback = 'ok';
+          this.cfgFeedbackMsg = 'Configurações salvas com sucesso!';
+        } else {
+          this.cfgFeedback = 'erro';
+          this.cfgFeedbackMsg = j.error || 'Erro ao salvar.';
+        }
+      } catch (e) {
+        this.cfgFeedback = 'erro';
+        this.cfgFeedbackMsg = 'Erro de conexão ao salvar.';
+      } finally {
+        this.cfgSaving = false;
+        setTimeout(() => { this.cfgFeedback = null; }, 4000);
       }
     },
 

@@ -683,33 +683,132 @@
 
     <!-- ── CONFIGURAÇÕES ────────────────────── -->
     <div x-show="page === 'configuracoes'">
+
+      <!-- Feedback toast -->
+      <div x-show="cfgFeedback !== null" x-transition
+        :style="`
+          position:fixed;bottom:28px;right:28px;z-index:999;
+          background:${cfgFeedback==='ok'?'var(--green)':'#ef4444'};
+          color:#fff;padding:12px 20px;border-radius:10px;
+          font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.4)
+        `"
+        x-text="cfgFeedbackMsg">
+      </div>
+
       <div class="grid-2">
-        <div>
+
+        <!-- COLUNA ESQUERDA -->
+        <div style="display:flex;flex-direction:column;gap:20px">
+
+          <!-- Informações da loja -->
           <div class="settings-section">
             <h3>Informações da loja</h3>
-            <div class="field"><label>Nome da loja</label><input type="text" x-model="cfg.nome"></div>
-            <div class="field"><label>WhatsApp principal</label><input type="text" x-model="cfg.whatsapp"></div>
-            <div class="field"><label>Mensagem de saudação</label><textarea x-model="cfg.saudacao" rows="3"></textarea></div>
+            <div class="field">
+              <label>Nome da loja</label>
+              <input type="text" x-model="cfg.nome_loja" placeholder="Ex: Fluxo Outlet">
+            </div>
+            <div class="field">
+              <label>WhatsApp principal</label>
+              <input type="text" x-model="cfg.whatsapp" placeholder="5534999999999">
+              <small style="font-size:11px;color:var(--mu2);margin-top:4px;display:block">Código do país + DDD + número, sem espaços ou +</small>
+            </div>
+            <div class="field">
+              <label>Mensagem de saudação</label>
+              <textarea x-model="cfg.saudacao" rows="3" placeholder="Texto que aparece quando o cliente inicia a conversa..."></textarea>
+              <small style="font-size:11px;color:var(--mu2);margin-top:4px;display:block">Referência para personalização do fluxo. Para alterar o bot, edite também o nó INICIO em Respostas Rápidas.</small>
+            </div>
           </div>
+
+          <!-- Horário de atendimento -->
           <div class="settings-section">
             <h3>Horário de atendimento</h3>
+            <p style="font-size:12px;color:var(--mu2);margin-bottom:14px">
+              Define quando o bot responde automaticamente. Fora desse horário, o bot envia mensagem de encerramento.
+            </p>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
               <div class="field"><label>Abertura</label><input type="time" x-model="cfg.horario_inicio"></div>
               <div class="field"><label>Fechamento</label><input type="time" x-model="cfg.horario_fim"></div>
             </div>
+
+            <!-- Preview horário -->
+            <div style="margin-top:14px;padding:12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--mu)">
+              <span style="font-weight:600;color:var(--tx)">Horário ativo:</span>
+              seg–sáb das <span style="color:var(--green)" x-text="cfg.horario_inicio || '09:00'"></span>
+              às <span style="color:var(--green)" x-text="cfg.horario_fim || '18:00'"></span>
+              <span x-show="cfg.ignorar_horario" style="margin-left:8px;color:var(--gold);font-weight:600">· Modo 24/7 ativo</span>
+            </div>
           </div>
         </div>
-        <div>
+
+        <!-- COLUNA DIREITA -->
+        <div style="display:flex;flex-direction:column;gap:20px">
+
+          <!-- Comportamento do bot -->
           <div class="settings-section">
             <h3>Comportamento do bot</h3>
-            <div class="toggle-row"><div class="toggle-info"><h4>Bot ativo</h4><p>Responder mensagens automaticamente</p></div><button class="toggle" :class="{ on: botOn }" @click="botOn = !botOn"></button></div>
-            <div class="toggle-row"><div class="toggle-info"><h4>Ignorar horário</h4><p>Responder 24/7 (desativar para prod)</p></div><button class="toggle" :class="{ on: ignorarHorario }" @click="ignorarHorario = !ignorarHorario"></button></div>
-            <div class="toggle-row"><div class="toggle-info"><h4>Fallback para humano</h4><p>Encaminhar quando bot não sabe responder</p></div><button class="toggle on"></button></div>
-            <div class="toggle-row"><div class="toggle-info"><h4>Delay de resposta</h4><p>Simular tempo de digitação (~800ms)</p></div><button class="toggle on"></button></div>
+
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <h4>Bot ativo</h4>
+                <p>Responder mensagens automaticamente. Desativando, o bot ignora todas as mensagens recebidas.</p>
+              </div>
+              <button class="toggle" :class="{ on: cfg.bot_ativo }" @click="cfg.bot_ativo = !cfg.bot_ativo"></button>
+            </div>
+
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <h4>Ignorar horário <span x-show="cfg.ignorar_horario" style="font-size:10px;background:var(--gold2);color:var(--gold);padding:1px 6px;border-radius:4px;margin-left:4px">24/7</span></h4>
+                <p>Responder mesmo fora do horário configurado. Útil para testes e campanhas.</p>
+              </div>
+              <button class="toggle" :class="{ on: cfg.ignorar_horario }" @click="cfg.ignorar_horario = !cfg.ignorar_horario"></button>
+            </div>
+
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <h4>Fallback para humano</h4>
+                <p>Acionar atendente quando o bot não conseguir resolver a situação do cliente.</p>
+              </div>
+              <button class="toggle" :class="{ on: cfg.fallback_humano }" @click="cfg.fallback_humano = !cfg.fallback_humano"></button>
+            </div>
+
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <h4>Delay de resposta</h4>
+                <p>Simular ~800ms de "digitando..." antes de cada resposta do bot (mais natural).</p>
+              </div>
+              <button class="toggle" :class="{ on: cfg.delay_resposta }" @click="cfg.delay_resposta = !cfg.delay_resposta"></button>
+            </div>
           </div>
-          <div style="margin-top:20px">
-            <button class="btn btn-green" style="width:100%;justify-content:center;padding:12px">Salvar configurações</button>
+
+          <!-- Status resumido -->
+          <div class="settings-section" style="background:var(--card2)">
+            <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mu2)">Resumo atual</h3>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+              <div style="display:flex;justify-content:space-between;font-size:12px">
+                <span style="color:var(--mu)">Bot</span>
+                <span :style="`font-weight:600;color:${cfg.bot_ativo?'var(--green)':'#ef4444'}`" x-text="cfg.bot_ativo ? 'Ativo' : 'Desativado'"></span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:12px">
+                <span style="color:var(--mu)">Horário</span>
+                <span style="font-weight:600;color:var(--tx)" x-text="cfg.ignorar_horario ? '24/7' : cfg.horario_inicio + ' – ' + cfg.horario_fim"></span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:12px">
+                <span style="color:var(--mu)">Fallback humano</span>
+                <span :style="`font-weight:600;color:${cfg.fallback_humano?'var(--green)':'var(--mu2)'}`" x-text="cfg.fallback_humano ? 'Sim' : 'Não'"></span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:12px">
+                <span style="color:var(--mu)">Delay digitação</span>
+                <span :style="`font-weight:600;color:${cfg.delay_resposta?'var(--green)':'var(--mu2)'}`" x-text="cfg.delay_resposta ? 'Sim' : 'Não'"></span>
+              </div>
+            </div>
           </div>
+
+          <!-- Botão salvar -->
+          <button class="btn btn-green" style="width:100%;justify-content:center;padding:14px;font-size:14px;font-weight:700"
+            @click="saveSettings()" :disabled="cfgSaving">
+            <span x-text="cfgSaving ? 'Salvando...' : 'Salvar configurações'"></span>
+          </button>
+
         </div>
       </div>
     </div>

@@ -31,6 +31,29 @@ function getSiteClient(): SupabaseClient | null {
   return _siteClient;
 }
 
+// ── Logging de queries Supabase ───────────────────────────────────────────────
+function qlog(op: string, detail: Record<string, unknown>, cacheHit = false): void {
+  const tag = cacheHit ? '📦 CACHE HIT' : '🔍 SUPABASE';
+  console.log(`[InventoryBridge][${tag}] ${op} | ${JSON.stringify(detail)}`);
+}
+
+// ── Cache em memória — TTL 5 minutos ─────────────────────────────────────────
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const _cache = new Map<string, { data: unknown; expiresAt: number }>();
+
+function cacheGet<T>(key: string): T | null {
+  const entry = _cache.get(key);
+  if (!entry || Date.now() > entry.expiresAt) {
+    if (entry) _cache.delete(key);
+    return null;
+  }
+  return entry.data as T;
+}
+
+function cacheSet<T>(key: string, data: T): void {
+  _cache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+}
+
 // ── Mapa categoria → valor exato no banco (uppercase conforme DB do site) ─────
 // Padrões aplicados sobre texto NORMALIZADO (sem acento, minúsculo)
 const CATEGORY_MAP: Array<[RegExp, string]> = [
@@ -51,11 +74,13 @@ function buildCategoryFilter(raw: string): string[] {
   return [raw.trim().toUpperCase()];
 }
 
-// ── Query base (somente produtos com estoque) ─────────────────────────────────
+// ── Query base do bot (somente produtos com estoque, sem imagem) ──────────────
+const BOT_SELECT = 'id,sku,name,price,category,subcategory,stock,sizes,featured';
+
 function baseQuery(client: SupabaseClient) {
   return client
     .from('products')
-    .select('id,sku,name,price,category,subcategory,image,stock,sizes,featured')
+    .select(BOT_SELECT)
     .gt('stock', 0)
     .order('featured', { ascending: false })
     .order('name');
@@ -68,6 +93,7 @@ export async function searchProducts(storeId: string, query: string): Promise<Bo
   const client = getSiteClient();
   if (!client) return [];
 
+  qlog('searchProducts', { storeId, query });
   const { data, error } = await baseQuery(client)
     .ilike('name', `%${query}%`)
     .limit(10);
@@ -87,6 +113,7 @@ export async function getProductsByCategory(storeId: string, category: string): 
   if (!client) return [];
 
   const terms = buildCategoryFilter(category);
+  qlog('getProductsByCategory', { storeId, category, terms });
   const { data, error } = await baseQuery(client)
     .in('category', terms)
     .limit(50);
@@ -105,6 +132,7 @@ export async function getProductsBySize(storeId: string, size: string): Promise<
   const client = getSiteClient();
   if (!client) return [];
 
+  qlog('getProductsBySize', { storeId, size });
   const { data, error } = await baseQuery(client).limit(200);
 
   if (error) {
@@ -127,9 +155,10 @@ export async function getProductAvailability(storeId: string, productId: string 
   const client = getSiteClient();
   if (!client) return null;
 
+  qlog('getProductAvailability', { storeId, productId });
   const { data, error } = await client
     .from('products')
-    .select('id,sku,name,price,category,subcategory,image,stock,sizes,featured')
+    .select(BOT_SELECT)
     .eq('id', productId)
     .single();
 
@@ -150,9 +179,17 @@ export async function getProductForBotContext(storeId: string, filters: BotProdu
   const client = getSiteClient();
   if (!client) return [];
 
+  const cacheKey = `bot:${storeId}:cat=${filters.category || ''}:sub=${filters.subcategory || ''}:sz=${filters.size || ''}:cl=${filters.color || ''}:px=${filters.maxPrice || ''}:q=${filters.query || ''}`;
+  const cached = cacheGet<BotProduct[]>(cacheKey);
+  if (cached) {
+    qlog('getProductForBotContext', { storeId, filters, results: cached.length }, true);
+    return cached;
+  }
+
+  qlog('getProductForBotContext', { storeId, filters });
   let q = client
     .from('products')
-    .select('id,sku,name,price,category,subcategory,image,stock,sizes,featured')
+    .select(BOT_SELECT)
     .gt('stock', 0)
     .order('featured', { ascending: false });
 
@@ -202,7 +239,9 @@ export async function getProductForBotContext(storeId: string, filters: BotProdu
     rows = rows.filter(r => normalizeText(r.name).includes(cl));
   }
 
-  return mapMany(rows, storeId).slice(0, 20);
+  const result = mapMany(rows, storeId).slice(0, 20);
+  cacheSet(cacheKey, result);
+  return result;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -380,6 +419,14 @@ export async function fetchProductsForPanel(filters?: {
   const client = getSiteClient();
   if (!client) return [];
 
+  const cacheKey = `panel:cat=${filters?.category || ''}:q=${filters?.q || ''}`;
+  const cached = cacheGet<SiteProductRow[]>(cacheKey);
+  if (cached) {
+    qlog('fetchProductsForPanel', { filters, results: cached.length }, true);
+    return cached;
+  }
+
+  qlog('fetchProductsForPanel', { filters });
   let q = client
     .from('products')
     .select('id,sku,name,price,category,subcategory,image,stock,sizes,featured')
@@ -402,7 +449,9 @@ export async function fetchProductsForPanel(filters?: {
     return [];
   }
 
-  return (data || []) as SiteProductRow[];
+  const result = (data || []) as SiteProductRow[];
+  cacheSet(cacheKey, result);
+  return result;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

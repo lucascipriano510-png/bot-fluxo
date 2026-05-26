@@ -19,6 +19,7 @@ import {
 } from '../catalog/catalogBridge';
 import { detectIntent } from '../services/intentService';
 import { handleIntent } from '../services/chatBrainService';
+import { getRuntimeSettings } from '../services/settingsService';
 
 const VALOR_BASE: Record<string, number> = {
   tenis: 189, camisa: 89, bermuda: 99, promocao: 59,
@@ -41,6 +42,12 @@ export async function processMessage(
   const storeCtx = await getStoreContext();
   const storeId   = session.store_id;   // UUID para queries no banco do bot
   const storeSlug = storeCtx.slug;      // slug para queries no catálogo (InventoryBridge)
+
+  // ── PRÉ-CHECAGEM 0: Bot ativo ─────────────────────────────────────────────
+  const rtSettings = await getRuntimeSettings(storeId);
+  if (!rtSettings.bot_ativo) {
+    return { text: '', nextNode: session.current_node || 'INICIO', context: session.context };
+  }
 
   // ── PRÉ-CHECAGEM 1: Opt-out / LGPD ───────────────────────────────────────
   if (OPTOUT_TRIGGER.test(messageText)) {
@@ -66,7 +73,7 @@ export async function processMessage(
   }
 
   // ── PRÉ-CHECAGEM 3: Fora do horário (abertura de conversa) ───────────────
-  if (session.current_node === 'INICIO' && !isBusinessHours()) {
+  if (session.current_node === 'INICIO' && !rtSettings.ignorar_horario && !isBusinessHours()) {
     await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: 'FORA_HORARIO' });
     const ctx = { _abertura: openingTimeStr(), _storeName: storeCtx.name };
     const msgFn = FLOW_MAP['FORA_HORARIO'].message;

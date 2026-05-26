@@ -6,6 +6,7 @@ import { FLOW_MAP } from '../bot/flowMap';
 import { loadFlowConfig, invalidateFlowCache } from '../services/flowConfigService';
 import { getStoreContext } from '../services/storeService';
 import { fetchProductsForPanel } from '../inventory/inventoryBridge';
+import { loadSettings, saveSettings } from '../services/settingsService';
 
 const router = Router();
 
@@ -153,6 +154,42 @@ router.delete('/flow/config/:nodeId', async (req, res) => {
       .eq('node_id', req.params.nodeId);
     if (error) throw error;
     invalidateFlowCache(storeId);
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+router.get('/settings', async (_req, res) => {
+  try {
+    const { storeId } = await getStoreContext();
+    const data = await loadSettings(storeId);
+    res.json({ ok: true, data });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.post('/settings', async (req, res) => {
+  try {
+    const { storeId } = await getStoreContext();
+    const allowed = [
+      'nome_loja','whatsapp','saudacao',
+      'horario_inicio','horario_fim',
+      'bot_ativo','ignorar_horario','fallback_humano','delay_resposta',
+    ] as const;
+
+    const patch: Record<string, unknown> = {};
+    for (const key of allowed) {
+      if (key in req.body) patch[key] = req.body[key];
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return res.status(400).json({ ok: false, error: 'Nenhum campo válido enviado' });
+    }
+
+    await saveSettings(storeId, patch as Parameters<typeof saveSettings>[1]);
     res.json({ ok: true });
   } catch (err: unknown) {
     res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
