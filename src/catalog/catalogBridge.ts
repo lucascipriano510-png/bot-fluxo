@@ -67,30 +67,134 @@ export function filtersToInventoryFilters(filters: OfferSearchFilters): BotProdu
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// findOffers — ponto único de consulta de catálogo para o motor do bot
-// Garante que TODA consulta carrega businessId (nunca consulta sem contexto)
+// findOffers — query única (uso interno + manter compat.)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function findOffers(filters: OfferSearchFilters): Promise<BusinessOffer[]> {
-  const { businessId } = filters;
-
-  /*
-   * ROTEAMENTO POR SEGMENTO
-   * Hoje: apenas Fluxo Outlet via InventoryBridge.
-   * Futuro: adicionar cases aqui para outros segmentos/adapters.
-   *
-   *   if (businessId === 'lava-jato-x') return saasAdapter.findOffers(filters);
-   *   if (segment === 'barbearia')      return appointmentAdapter.findSlots(filters);
-   */
-
-  // Adapter atual: InventoryBridge → produtos físicos da Fluxo Outlet
   const inventoryFilters = filtersToInventoryFilters(filters);
   const hasFilter = inventoryFilters.category || inventoryFilters.size
-    || inventoryFilters.query || inventoryFilters.color;
+    || inventoryFilters.query || inventoryFilters.color || inventoryFilters.subcategory;
 
   if (!hasFilter) return [];
 
-  const products = await findProductsForBot(businessId, inventoryFilters);
+  const products = await findProductsForBot(filters.businessId, inventoryFilters);
   return manyToOffers(products);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// findOffersWithFallback — busca hierárquica em camadas
+//
+//  Tenta combinações de filtros do mais específico ao mais amplo,
+//  parando na primeira camada que retornar resultados.
+//
+//  Ordem das camadas:
+//   1. categoria + marca + cor + tamanho   (tudo)
+//   2. categoria + marca + tamanho         (sem cor)
+//   3. categoria + marca + cor             (sem tamanho)
+//   4. categoria + marca                   (só marca)
+//   5. categoria + tamanho                 (sem marca e cor)
+//   6. categoria                           (mais amplo)
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface FallbackLevel {
+  f: OfferSearchFilters;
+  dropped: string[];  // o que foi removido vs. query original
+}
+
+function buildFallbackLevels(base: OfferSearchFilters): FallbackLevel[] {
+  const size  = base.attributes?.size  ? String(base.attributes.size)  : undefined;
+  const color = base.attributes?.color ? String(base.attributes.color) : undefined;
+  const sub   = base.subcategory;
+
+  const make = (
+    subcat: string | undefined,
+    sz: string | undefined,
+    cl: string | undefined,
+    dropped: string[],
+  ): FallbackLevel => {
+    const attrs: Record<string, unknown> = {};
+    if (sz) attrs.size  = sz;
+    if (cl) attrs.color = cl;
+    return {
+      f: {
+        ...base,
+        subcategory: subcat,
+        attributes:  Object.keys(attrs).length ? attrs : undefined,
+      },
+      dropped,
+    };
+  };
+
+  const levels: FallbackLevel[] = [];
+
+  // 1. Tudo
+  levels.push(make(sub, size, color, []));
+
+  // 2. Sem cor
+  if (color) {
+    levels.push(make(sub, size, undefined, ['cor']));
+  }
+
+  // 3. Sem tamanho
+  if (size) {
+    levels.push(make(sub, undefined, color, ['tamanho']));
+  }
+
+  // 4. Sem cor e sem tamanho
+  if (color && size) {
+    levels.push(make(sub, undefined, undefined, ['cor', 'tamanho']));
+  }
+
+  // 5. Sem marca (mantém tamanho se tiver)
+  if (sub) {
+    const dropped: string[] = [sub];
+    if (color) dropped.push('cor');
+    levels.push(make(undefined, size, undefined, dropped));
+  }
+
+  // 6. Só categoria
+  if (sub || color || size) {
+    const dropped: string[] = [];
+    if (sub)   dropped.push(sub);
+    if (size)  dropped.push('tamanho');
+    if (color) dropped.push('cor');
+    levels.push({
+      f: { businessId: base.businessId, category: base.category, onlyActive: true },
+      dropped,
+    });
+  }
+
+  // Remove camadas duplicadas (mesmos filtros efetivos)
+  const seen = new Set<string>();
+  return levels.filter(({ f }) => {
+    const key = [
+      f.category ?? '',
+      f.subcategory ?? '',
+      f.attributes?.size ?? '',
+      f.attributes?.color ?? '',
+    ].join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export interface FallbackResult {
+  offers:   BusinessOffer[];
+  matched:  OfferSearchFilters;
+  dropped:  string[];
+}
+
+export async function findOffersWithFallback(filters: OfferSearchFilters): Promise<FallbackResult> {
+  const levels = buildFallbackLevels(filters);
+
+  for (const { f, dropped } of levels) {
+    const offers = await findOffers(f);
+    if (offers.length > 0) {
+      return { offers, matched: f, dropped };
+    }
+  }
+
+  return { offers: [], matched: filters, dropped: [] };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -161,6 +265,58 @@ export function formatOffersResponse(
     `Encontrei ${offers.length} opção(ões) pra você:\n\n` +
     offers.slice(0, 5).map(o => fmtOffer(o)).join('\n\n')
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// formatFallbackResponse — versão inteligente do formatOffersResponse
+// Quando filtros foram relaxados, informa o cliente o que não foi encontrado
+// e mostra o que há disponível
+// ─────────────────────────────────────────────────────────────────────────────
+export function formatFallbackResponse(
+  offers:   BusinessOffer[],
+  original: OfferSearchFilters,
+  matched:  OfferSearchFilters,
+  dropped:  string[],
+): string {
+  // Sem resultado em nenhuma camada
+  if (offers.length === 0) {
+    const catDisplay = original.category
+      ? (CAT_DISPLAY[original.category] || original.category)
+      : 'produto';
+    const sub = original.subcategory;
+    return sub
+      ? `Não encontrei *${sub}* disponível agora. Quer que eu mostre outras opções em *${catDisplay}*?`
+      : `Não encontrei esse produto disponível agora. Quer ver outras opções?`;
+  }
+
+  // Resultado exato — resposta normal
+  if (dropped.length === 0) {
+    return formatOffersResponse(offers, matched);
+  }
+
+  // Resultado com filtros relaxados — informa o que não encontrou
+  const originalSize  = original.attributes?.size  ? String(original.attributes.size)  : undefined;
+  const originalColor = original.attributes?.color ? String(original.attributes.color) : undefined;
+  const originalSub   = original.subcategory;
+
+  const notFound: string[] = [];
+  if (originalSub   && !matched.subcategory)              notFound.push(`*${originalSub}*`);
+  if (originalColor && !matched.attributes?.color)        notFound.push(`cor *${originalColor}*`);
+  if (originalSize  && !matched.attributes?.size)         notFound.push(`tamanho *${originalSize}*`);
+
+  if (notFound.length === 0) {
+    return formatOffersResponse(offers, matched);
+  }
+
+  const notFoundStr = notFound.join(' ');
+
+  // Quando o tamanho não foi encontrado, sugere verificar os tamanhos disponíveis
+  const sizeHint = (originalSize && !matched.attributes?.size)
+    ? ` Veja os tamanhos que ainda estão em estoque:`
+    : ' Mas tenho isso disponível:';
+
+  const prefix = `Não encontrei ${notFoundStr} especificamente.${sizeHint}\n\n`;
+  return prefix + formatOffersResponse(offers, matched);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

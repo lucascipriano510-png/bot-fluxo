@@ -13,8 +13,8 @@ import {
   logInventoryQuery,
 } from '../inventory/inventoryBridge';
 import {
-  findOffers,
-  formatOffersResponse,
+  findOffersWithFallback,
+  formatFallbackResponse,
   buildOfferFilters,
 } from '../catalog/catalogBridge';
 import { detectIntent } from '../services/intentService';
@@ -88,12 +88,12 @@ export async function processMessage(
     _wa_loja:   storeCtx.whatsappNumber,
   };
 
-  // ── PRÉ-CHECAGEM 4: Consulta de catálogo via CatalogBridge ──────────────
+  // ── PRÉ-CHECAGEM 4: Consulta de catálogo via CatalogBridge (busca em camadas) ──
   const rawFilters = detectProductQuery(messageText);
   if (rawFilters) {
-    const offerFilters = buildOfferFilters(storeSlug, rawFilters);
-    const offers  = await findOffers(offerFilters);
-    const reply   = formatOffersResponse(offers, offerFilters);
+    const offerFilters               = buildOfferFilters(storeSlug, rawFilters);
+    const { offers, matched, dropped } = await findOffersWithFallback(offerFilters);
+    const reply                      = formatFallbackResponse(offers, offerFilters, matched, dropped);
     logInventoryQuery(storeSlug, session.phone, messageText, rawFilters, offers.length, reply);
 
     await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
