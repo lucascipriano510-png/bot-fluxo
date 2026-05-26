@@ -75,7 +75,7 @@ export const FLOW_MAP: Record<NodeId, FlowNode> = {
         return `Vi que você veio pelos tênis 👟\nQual numeração você usa?`;
       if (ctx.origem === 'promocao')
         return `Você veio pela promoção da Fluxo 🔥\nMe fala seu tamanho que eu te mostro as peças que ainda estão disponíveis.`;
-      return `Oi! 👋 Sou o assistente da *Fluxo Outlet*.\n\nO que você procura hoje?\n\n👕  Camisa / Polo\n👟  Tênis\n👖  Bermuda\n🔥  Promoção`;
+      return `Oi! 👋 Sou o assistente da *${ctx._storeName || 'nossa loja'}*.\n\nO que você procura hoje?\n\n👕  Camisa / Polo\n👟  Tênis\n👖  Bermuda\n🔥  Promoção`;
     },
     options: [
       { trigger: /camis[ae]t?a?|polo|malha|camisinha/i,             next: 'CAPTURA_TAMANHO', data: { origem: 'camisa',   interesse: 'camisa'  } },
@@ -176,7 +176,7 @@ export const FLOW_MAP: Record<NodeId, FlowNode> = {
     id: 'CAPTURA_NOME_QUENTE',
     message: (ctx) =>
       ctx.proxima_acao === 'chamar_humano'
-        ? `Perfeito. Vou chamar um atendente da Fluxo pra te mandar as melhores opções agora. 🙋\n\nQual é o seu nome?`
+        ? `Perfeito. Vou chamar um atendente da ${ctx._storeName || 'loja'} pra te mandar as melhores opções agora. 🙋\n\nQual é o seu nome?`
         : `Boa! Para te passar o valor e disponibilidade, qual é o seu nome?`,
     action: 'save_nome',
     default: 'ENCAMINHAR_HUMANO',
@@ -209,7 +209,7 @@ export const FLOW_MAP: Record<NodeId, FlowNode> = {
   SUPORTE: {
     id: 'SUPORTE',
     message: (ctx) =>
-      `Claro! Conectando com atendente da *Fluxo Outlet* agora. 🙋\n\n${ctx.wa_link || ''}`,
+      `Claro! Conectando com atendente da *${ctx._storeName || 'nossa loja'}* agora. 🙋\n\n${ctx.wa_link || ''}`,
     action: 'generate_wa_link',
     terminal: true,
   },
@@ -219,7 +219,7 @@ export const FLOW_MAP: Record<NodeId, FlowNode> = {
     id: 'ENCAMINHAR_HUMANO',
     message: (ctx) =>
       `Perfeito${ctx.nome ? `, *${ctx.nome.split(' ')[0]}*` : ''}! 🙌\n\n` +
-      `Vou chamar um atendente da *Fluxo Outlet* para te mandar as melhores opções agora.\n\n` +
+      `Vou chamar um atendente da *${ctx._storeName || 'nossa loja'}* para te mandar as melhores opções agora.\n\n` +
       `Ou fale diretamente:\n${ctx.wa_link || ''}`,
     action: 'register_lead',
     terminal: true,
@@ -245,8 +245,8 @@ export const FLOW_MAP: Record<NodeId, FlowNode> = {
   // ── OPT-OUT (LGPD) ────────────────────────────────────────────────────────
   OPTOUT: {
     id: 'OPTOUT',
-    message:
-      `Tudo certo! ✅ Seus dados foram removidos e você não receberá mais mensagens automáticas da *Fluxo Outlet*.\n\n` +
+    message: (ctx) =>
+      `Tudo certo! ✅ Seus dados foram removidos e você não receberá mais mensagens automáticas da *${ctx._storeName || 'nossa loja'}*.\n\n` +
       `Para voltar a interagir a qualquer momento, basta nos mandar um "oi". 👋`,
     terminal: true,
   },

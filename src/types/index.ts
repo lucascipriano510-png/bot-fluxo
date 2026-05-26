@@ -1,5 +1,6 @@
 export interface BotSession {
   id?: string;
+  store_id: string;
   phone: string;
   nome?: string;
   current_node: string;
@@ -10,6 +11,7 @@ export interface BotSession {
 
 export interface BotMensagem {
   id?: string;
+  store_id: string;
   phone: string;
   direcao: 'entrada' | 'saida';
   conteudo: string;
@@ -19,6 +21,7 @@ export interface BotMensagem {
 
 export interface BotLead {
   id?: string;
+  store_id: string;
   phone: string;
   nome?: string;
   interesse?: string;
@@ -45,6 +48,7 @@ export interface BotResponse {
 
 export interface BotOptOut {
   id?: string;
+  store_id: string;
   phone: string;
   criado_em?: string;
 }

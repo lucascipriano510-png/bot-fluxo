@@ -7,18 +7,16 @@ import { generateWhatsAppLink } from '../providers/messaging';
 import { isOptedOut, registerOptOut, removeOptOut } from '../services/optoutService';
 import { isBusinessHours, openingTimeStr } from '../utils/businessHours';
 import { loadFlowConfig, triggerToRegex } from '../services/flowConfigService';
+import { getStoreContext } from '../services/storeService';
 import {
   detectProductQuery,
   logInventoryQuery,
-  DEFAULT_STORE_ID,
 } from '../inventory/inventoryBridge';
 import {
   findOffers,
   formatOffersResponse,
   buildOfferFilters,
 } from '../catalog/catalogBridge';
-
-const LOJA_WHATSAPP = process.env.LOJA_WHATSAPP || '';
 
 const VALOR_BASE: Record<string, number> = {
   tenis: 189, camisa: 89, bermuda: 99, promocao: 59,
@@ -37,65 +35,71 @@ export async function processMessage(
   messageText: string,
 ): Promise<BotResponse> {
 
+  // Contexto da loja — único ponto de verdade do store_id no runtime
+  const storeCtx = await getStoreContext();
+  const storeId   = session.store_id;   // UUID para queries no banco do bot
+  const storeSlug = storeCtx.slug;      // slug para queries no catálogo (InventoryBridge)
+
   // ── PRÉ-CHECAGEM 1: Opt-out / LGPD ───────────────────────────────────────
   if (OPTOUT_TRIGGER.test(messageText)) {
-    await registerOptOut(session.phone);
-    await saveMensagem({ phone: session.phone, direcao: 'entrada', conteudo: messageText, node: 'OPTOUT' });
-    const reply = FLOW_MAP['OPTOUT'].message as string;
-    await saveMensagem({ phone: session.phone, direcao: 'saida', conteudo: reply, node: 'OPTOUT' });
+    await registerOptOut(storeId, session.phone);
+    await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: 'OPTOUT' });
+    const msgFn = FLOW_MAP['OPTOUT'].message;
+    const reply = typeof msgFn === 'function' ? msgFn({ _storeName: storeCtx.name }) : msgFn as string;
+    await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida', conteudo: reply, node: 'OPTOUT' });
     return { text: reply, nextNode: 'INICIO', context: {} };
   }
 
   // ── PRÉ-CHECAGEM 2: Usuário optado-out ───────────────────────────────────
-  const optedOut = await isOptedOut(session.phone);
+  const optedOut = await isOptedOut(storeId, session.phone);
   if (optedOut) {
     if (REOPT_TRIGGER.test(messageText)) {
-      await removeOptOut(session.phone);
+      await removeOptOut(storeId, session.phone);
     } else {
-      await saveMensagem({ phone: session.phone, direcao: 'entrada', conteudo: messageText, node: 'OPTOUT' });
+      await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: 'OPTOUT' });
       const reply = `Você optou por não receber mensagens automáticas. 🔕\n\nPara voltar a interagir, basta dizer *"oi"* e começamos de novo! 😊`;
-      await saveMensagem({ phone: session.phone, direcao: 'saida', conteudo: reply, node: 'OPTOUT' });
+      await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida', conteudo: reply, node: 'OPTOUT' });
       return { text: reply, nextNode: 'INICIO', context: {} };
     }
   }
 
   // ── PRÉ-CHECAGEM 3: Fora do horário (abertura de conversa) ───────────────
   if (session.current_node === 'INICIO' && !isBusinessHours()) {
-    await saveMensagem({ phone: session.phone, direcao: 'entrada', conteudo: messageText, node: 'FORA_HORARIO' });
-    const ctx = { _abertura: openingTimeStr() };
+    await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: 'FORA_HORARIO' });
+    const ctx = { _abertura: openingTimeStr(), _storeName: storeCtx.name };
     const msgFn = FLOW_MAP['FORA_HORARIO'].message;
-    const reply = typeof msgFn === 'function' ? msgFn(ctx) : msgFn;
-    await saveMensagem({ phone: session.phone, direcao: 'saida', conteudo: reply, node: 'FORA_HORARIO' });
+    const reply = typeof msgFn === 'function' ? msgFn(ctx) : msgFn as string;
+    await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida', conteudo: reply, node: 'FORA_HORARIO' });
     return { text: reply, nextNode: 'INICIO', context: session.context };
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Carrega configuração customizada (DB overrides, com cache de 15s)
-  const flowConfig = await loadFlowConfig();
+  const flowConfig = await loadFlowConfig(storeId);
 
   const currentNodeId = (session.current_node as NodeId) || 'INICIO';
   const currentNode   = FLOW_MAP[currentNodeId] || FLOW_MAP['INICIO'];
-  const ctx: Record<string, string> = { ...session.context };
+
+  // Injeta contexto da loja para uso nos templates de mensagem
+  const ctx: Record<string, string> = {
+    ...session.context,
+    _storeName: storeCtx.name,
+    _wa_loja:   storeCtx.whatsappNumber,
+  };
 
   // ── PRÉ-CHECAGEM 4: Consulta de catálogo via CatalogBridge ──────────────
-  // detectProductQuery analisa a mensagem e extrai filtros (categoria, tamanho, cor, preço).
-  // buildOfferFilters converte para OfferSearchFilters com businessId obrigatório.
-  // findOffers roteia para o adapter correto (hoje: InventoryBridge da Fluxo Outlet;
-  // futuro: SaaSAdapter por segmento — lava-jato, barbearia, assistência técnica etc.).
   const rawFilters = detectProductQuery(messageText);
   if (rawFilters) {
-    const offerFilters = buildOfferFilters(DEFAULT_STORE_ID, rawFilters);
+    const offerFilters = buildOfferFilters(storeSlug, rawFilters);
     const offers  = await findOffers(offerFilters);
     const reply   = formatOffersResponse(offers, offerFilters);
-    logInventoryQuery(DEFAULT_STORE_ID, session.phone, messageText, rawFilters, offers.length, reply);
+    logInventoryQuery(storeSlug, session.phone, messageText, rawFilters, offers.length, reply);
 
-    await saveMensagem({ phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
-    await saveMensagem({ phone: session.phone, direcao: 'saida',   conteudo: reply,       node: 'CATALOG' });
+    await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
+    await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: reply,       node: 'CATALOG' });
 
     return { text: reply, nextNode: currentNodeId, context: ctx };
   }
 
-  // Config override para o nó atual (afeta roteamento e ação de entrada)
   const currentCfg = flowConfig.get(currentNodeId);
   const effectiveOptions = currentCfg?.options
     ? currentCfg.options.map(o => ({
@@ -107,12 +111,7 @@ export async function processMessage(
   const effectiveDefault = (currentCfg?.default_next as NodeId) || currentNode.default || 'INICIO';
 
   // ── 1. Salva mensagem de entrada ──────────────────────────────────────────
-  await saveMensagem({
-    phone: session.phone,
-    direcao: 'entrada',
-    conteudo: messageText,
-    node: currentNodeId,
-  });
+  await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
 
   // ── 2. Aplica ação de captura do nó atual ─────────────────────────────────
   if (currentNode.action === 'save_nome') {
@@ -130,7 +129,7 @@ export async function processMessage(
     ctx.numero_pedido = m ? m[1] : messageText.trim().slice(0, 20);
   }
 
-  // ── 3. Decide próximo nó (usa effective options do config ou padrão) ───────
+  // ── 3. Decide próximo nó ─────────────────────────────────────────────────
   let nextNodeId: NodeId = effectiveDefault;
 
   if (effectiveOptions) {
@@ -150,12 +149,13 @@ export async function processMessage(
     const wamsg = ctx.nome
       ? `Olá! Sou ${ctx.nome}${ctx.interesse ? ` e me interessei por ${ctx.interesse}` : ''}. Vim pelo bot!`
       : `Olá! Vim pelo bot e preciso de ajuda.`;
-    ctx.wa_link = generateWhatsAppLink(LOJA_WHATSAPP, wamsg);
+    ctx.wa_link = generateWhatsAppLink(storeCtx.whatsappNumber, wamsg);
   }
 
   if (nextNode.action === 'register_lead' && (ctx.interesse || ctx.origem)) {
     const statusComercial = (ctx.status_comercial as 'QUENTE' | 'MORNO' | 'FRIO') || 'MORNO';
     await registerLead({
+      store_id:         storeId,
       phone:            session.phone,
       nome:             ctx.nome,
       interesse:        ctx.interesse || ctx.origem,
@@ -171,12 +171,11 @@ export async function processMessage(
     });
   }
 
-  // ── 5. Monta texto da resposta (config override tem prioridade) ───────────
+  // ── 5. Monta texto da resposta ────────────────────────────────────────────
   const nextCfg = flowConfig.get(nextNodeId);
   let text: string;
 
   if (nextCfg?.message) {
-    // Template simples: {nome}, {tamanho}, {cidade}, etc.
     text = nextCfg.message.replace(/\{(\w+)\}/g, (_, k) => ctx[k] || '');
   } else {
     const rawMessage = typeof nextNode.message === 'function'
@@ -189,15 +188,10 @@ export async function processMessage(
   const finalNode: NodeId = nextNode.terminal ? 'INICIO' : nextNodeId;
 
   // ── 7. Persiste sessão ────────────────────────────────────────────────────
-  await updateSession(session.phone, finalNode, ctx);
+  await updateSession(storeId, session.phone, finalNode, ctx);
 
   // ── 8. Salva mensagem de saída ────────────────────────────────────────────
-  await saveMensagem({
-    phone: session.phone,
-    direcao: 'saida',
-    conteudo: text,
-    node: nextNodeId,
-  });
+  await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida', conteudo: text, node: nextNodeId });
 
   return { text, nextNode: finalNode, context: ctx };
 }

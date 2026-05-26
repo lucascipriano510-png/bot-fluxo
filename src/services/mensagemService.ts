@@ -6,10 +6,15 @@ export async function saveMensagem(msg: Omit<BotMensagem, 'id' | 'criado_em'>): 
   if (error) console.warn('[mensagemService] erro ao salvar mensagem:', error.message);
 }
 
-export async function fetchHistorico(phone: string, limit = 20): Promise<BotMensagem[]> {
+export async function fetchHistorico(
+  storeId: string,
+  phone: string,
+  limit = 20,
+): Promise<BotMensagem[]> {
   const { data, error } = await supabase
     .from('bot_mensagens')
     .select('*')
+    .eq('store_id', storeId)
     .eq('phone', phone)
     .order('criado_em', { ascending: false })
     .limit(limit);

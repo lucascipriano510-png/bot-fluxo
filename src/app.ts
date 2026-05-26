@@ -7,6 +7,7 @@ import { parseWebhookPayload, sendMessage } from './providers/messaging';
 import { FLOW_MAP } from './bot/flowMap';
 import { saveMensagem } from './services/mensagemService';
 import { checkRateLimit } from './utils/rateLimiter';
+import { getStoreContext } from './services/storeService';
 import apiRouter from './routes/api';
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
@@ -45,7 +46,8 @@ app.post('/webhook', async (req, res) => {
   }
 
   try {
-    const session = await getOrCreateSession(parsed.phone);
+    const storeCtx = await getStoreContext();
+    const session  = await getOrCreateSession(storeCtx.storeId, parsed.phone);
     const response = await processMessage(session, parsed.text);
     if (TYPING_DELAY_MS > 0) await sleep(TYPING_DELAY_MS + Math.random() * 400);
     await sendMessage(parsed.phone, response.text);
@@ -66,7 +68,8 @@ app.post('/send', async (req, res) => {
   }
 
   try {
-    const session = await getOrCreateSession(phone);
+    const storeCtx = await getStoreContext();
+    const session  = await getOrCreateSession(storeCtx.storeId, phone);
     const response = await processMessage(session, text);
     return res.json({ ok: true, reply: response.text, nextNode: response.nextNode });
   } catch (err) {
@@ -81,10 +84,13 @@ app.post('/start', async (req, res) => {
   if (!phone) return res.status(400).json({ error: 'phone obrigatório' });
 
   try {
-    await resetSession(phone);
+    const storeCtx = await getStoreContext();
+    await resetSession(storeCtx.storeId, phone);
     const node = FLOW_MAP['INICIO'];
-    const text = typeof node.message === 'function' ? node.message({}) : node.message;
-    await saveMensagem({ phone, direcao: 'saida', conteudo: text, node: 'INICIO' });
+    const text = typeof node.message === 'function'
+      ? node.message({ _storeName: storeCtx.name })
+      : node.message;
+    await saveMensagem({ store_id: storeCtx.storeId, phone, direcao: 'saida', conteudo: text, node: 'INICIO' });
     return res.json({ ok: true, text, nextNode: 'INICIO' });
   } catch (err) {
     console.error('[start]', err);
@@ -98,7 +104,8 @@ app.post('/reset', async (req, res) => {
   if (!phone) return res.status(400).json({ error: 'phone obrigatório' });
 
   try {
-    await resetSession(phone);
+    const { storeId } = await getStoreContext();
+    await resetSession(storeId, phone);
     return res.json({ ok: true });
   } catch (err) {
     console.error('[reset]', err);

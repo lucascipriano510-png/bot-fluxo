@@ -6,6 +6,7 @@ export async function registerLead(lead: Omit<BotLead, 'id' | 'qualificado_em'>)
     .from('bot_leads')
     .upsert(
       [{
+        store_id:         lead.store_id,
         phone:            lead.phone,
         nome:             lead.nome,
         interesse:        lead.interesse,
@@ -20,34 +21,49 @@ export async function registerLead(lead: Omit<BotLead, 'id' | 'qualificado_em'>)
         context:          lead.context || {},
         atualizado_em:    new Date().toISOString(),
       }],
-      { onConflict: 'phone' },
+      { onConflict: 'store_id,phone' },
     );
 
   if (error) console.warn('[leadService] erro ao salvar lead:', error.message);
 }
 
-export async function fetchLeads(status?: string): Promise<BotLead[]> {
-  let query = supabase.from('bot_leads').select('*').order('atualizado_em', { ascending: false, nullsFirst: false });
+export async function fetchLeads(storeId: string, status?: string): Promise<BotLead[]> {
+  let query = supabase
+    .from('bot_leads')
+    .select('*')
+    .eq('store_id', storeId)
+    .order('atualizado_em', { ascending: false, nullsFirst: false });
+
   if (status) query = query.eq('status', status);
+
   const { data, error } = await query;
   if (error) throw error;
   return (data || []) as BotLead[];
 }
 
-export async function fetchLeadsPorStatusComercial(statusComercial: string): Promise<BotLead[]> {
+export async function fetchLeadsPorStatusComercial(
+  storeId: string,
+  statusComercial: string,
+): Promise<BotLead[]> {
   const { data, error } = await supabase
     .from('bot_leads')
     .select('*')
+    .eq('store_id', storeId)
     .eq('status_comercial', statusComercial)
     .order('atualizado_em', { ascending: false });
   if (error) throw error;
   return (data || []) as BotLead[];
 }
 
-export async function updateLeadStatus(phone: string, status: BotLead['status']): Promise<void> {
+export async function updateLeadStatus(
+  storeId: string,
+  phone: string,
+  status: BotLead['status'],
+): Promise<void> {
   const { error } = await supabase
     .from('bot_leads')
     .update({ status, atualizado_em: new Date().toISOString() })
+    .eq('store_id', storeId)
     .eq('phone', phone);
   if (error) throw error;
 }

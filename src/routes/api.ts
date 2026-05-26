@@ -4,15 +4,18 @@ import { fetchLeads } from '../services/leadService';
 import { fetchHistorico } from '../services/mensagemService';
 import { FLOW_MAP } from '../bot/flowMap';
 import { loadFlowConfig, invalidateFlowCache } from '../services/flowConfigService';
+import { getStoreContext } from '../services/storeService';
 
 const router = Router();
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
 router.get('/sessions', async (_req, res) => {
   try {
+    const { storeId } = await getStoreContext();
     const { data, error } = await supabase
       .from('bot_sessions')
       .select('*')
+      .eq('store_id', storeId)
       .order('atualizado_em', { ascending: false })
       .limit(100);
     if (error) throw error;
@@ -25,7 +28,8 @@ router.get('/sessions', async (_req, res) => {
 // ── Leads ─────────────────────────────────────────────────────────────────────
 router.get('/leads', async (_req, res) => {
   try {
-    res.json({ ok: true, data: await fetchLeads() });
+    const { storeId } = await getStoreContext();
+    res.json({ ok: true, data: await fetchLeads(storeId) });
   } catch (err: unknown) {
     res.json({ ok: false, data: [], error: err instanceof Error ? err.message : String(err) });
   }
@@ -34,7 +38,8 @@ router.get('/leads', async (_req, res) => {
 // ── Messages ──────────────────────────────────────────────────────────────────
 router.get('/messages/:phone', async (req, res) => {
   try {
-    res.json({ ok: true, data: await fetchHistorico(req.params.phone, 60) });
+    const { storeId } = await getStoreContext();
+    res.json({ ok: true, data: await fetchHistorico(storeId, req.params.phone, 60) });
   } catch (err: unknown) {
     res.json({ ok: false, data: [], error: err instanceof Error ? err.message : String(err) });
   }
@@ -43,9 +48,11 @@ router.get('/messages/:phone', async (req, res) => {
 // ── Recovery ──────────────────────────────────────────────────────────────────
 router.get('/recovery', async (_req, res) => {
   try {
+    const { storeId } = await getStoreContext();
     const { data, error } = await supabase
       .from('bot_leads')
       .select('*')
+      .eq('store_id', storeId)
       .in('status_comercial', ['MORNO', 'FRIO'])
       .order('atualizado_em', { ascending: false, nullsFirst: false })
       .limit(30);
@@ -59,7 +66,8 @@ router.get('/recovery', async (_req, res) => {
 // ── Flow (effective — merges DB config over code defaults) ────────────────────
 router.get('/flow', async (_req, res) => {
   try {
-    const flowConfig = await loadFlowConfig();
+    const { storeId } = await getStoreContext();
+    const flowConfig = await loadFlowConfig(storeId);
     const data = Object.values(FLOW_MAP).map(n => {
       const cfg = flowConfig.get(n.id);
       const opts = cfg?.options
@@ -87,7 +95,11 @@ router.get('/flow', async (_req, res) => {
 // ── Flow config: listar todos os overrides ────────────────────────────────────
 router.get('/flow/config', async (_req, res) => {
   try {
-    const { data, error } = await supabase.from('bot_flow_config').select('*');
+    const { storeId } = await getStoreContext();
+    const { data, error } = await supabase
+      .from('bot_flow_config')
+      .select('*')
+      .eq('store_id', storeId);
     if (error) throw error;
     res.json({ ok: true, data: data || [] });
   } catch (err: unknown) {
@@ -105,23 +117,24 @@ router.post('/flow/config', async (req, res) => {
   };
   if (!nodeId) return res.status(400).json({ ok: false, error: 'nodeId obrigatório' });
 
-  // Validação mínima: nodeId deve existir no FLOW_MAP
   if (!FLOW_MAP[nodeId as keyof typeof FLOW_MAP]) {
     return res.status(400).json({ ok: false, error: `Nó desconhecido: ${nodeId}` });
   }
 
   try {
+    const { storeId } = await getStoreContext();
     const { error } = await supabase.from('bot_flow_config').upsert(
       [{
+        store_id:     storeId,
         node_id:      nodeId,
         message:      message      || null,
         options:      options      || null,
         default_next: default_next || null,
       }],
-      { onConflict: 'node_id' },
+      { onConflict: 'store_id,node_id' },
     );
     if (error) throw error;
-    invalidateFlowCache();
+    invalidateFlowCache(storeId);
     res.json({ ok: true });
   } catch (err: unknown) {
     res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
@@ -131,12 +144,14 @@ router.post('/flow/config', async (req, res) => {
 // ── Flow config: resetar nó para o padrão do código ──────────────────────────
 router.delete('/flow/config/:nodeId', async (req, res) => {
   try {
+    const { storeId } = await getStoreContext();
     const { error } = await supabase
       .from('bot_flow_config')
       .delete()
+      .eq('store_id', storeId)
       .eq('node_id', req.params.nodeId);
     if (error) throw error;
-    invalidateFlowCache();
+    invalidateFlowCache(storeId);
     res.json({ ok: true });
   } catch (err: unknown) {
     res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });

@@ -14,9 +14,6 @@ import { BotProduct, BotProductSearchFilters, SiteProductRow } from './inventory
 import { mapMany, mapSiteProductToBotProduct } from './inventoryMapper';
 import { normalizeText, normalizeSize } from './inventoryUtils';
 
-// ── Loja padrão — usada enquanto o bot atende apenas a Fluxo Outlet ──────────
-export const DEFAULT_STORE_ID = 'fluxo-outlet';
-
 // ── Cliente Supabase do SITE da Fluxo Outlet (anon key — somente leitura) ────
 // Fonte atual de produtos enquanto o catálogo vive no Supabase do site.
 // Quando o cliente migrar para o painel SaaS, isso pode ser removido.

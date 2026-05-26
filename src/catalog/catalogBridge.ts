@@ -43,7 +43,6 @@ import { BusinessOffer, OfferSearchFilters } from './offerTypes';
 import { manyToOffers } from './offerMapper';
 import {
   findProductsForBot,
-  DEFAULT_STORE_ID,
 } from '../inventory/inventoryBridge';
 import { BotProductSearchFilters } from '../inventory/inventoryTypes';
 

@@ -5,6 +5,7 @@ import 'dotenv/config';
 import * as readline from 'readline';
 import { processMessage } from './bot/engine';
 import { getOrCreateSession, resetSession } from './services/sessionService';
+import { getStoreContext } from './services/storeService';
 
 const TEST_PHONE = '5534900000000';
 
@@ -21,11 +22,13 @@ async function main() {
   console.log('   Digite "reset" para reiniciar a sessão');
   console.log('   Digite "sair" para encerrar\n');
 
-  await resetSession(TEST_PHONE);
-  const session = await getOrCreateSession(TEST_PHONE);
+  const storeCtx = await getStoreContext();
+  const storeId  = storeCtx.storeId;
+
+  await resetSession(storeId, TEST_PHONE);
+  const session = await getOrCreateSession(storeId, TEST_PHONE);
   const { processMessage: pm } = await import('./bot/engine');
 
-  // Exibe mensagem inicial
   const intro = await pm(session, 'oi');
   console.log(`\n🤖 Bot: ${intro.text}\n`);
 
@@ -35,14 +38,14 @@ async function main() {
     if (input.toLowerCase() === 'sair') break;
 
     if (input.toLowerCase() === 'reset') {
-      await resetSession(TEST_PHONE);
-      const fresh = await getOrCreateSession(TEST_PHONE);
+      await resetSession(storeId, TEST_PHONE);
+      const fresh = await getOrCreateSession(storeId, TEST_PHONE);
       const res = await pm(fresh, 'oi');
       console.log(`\n🤖 Bot: ${res.text}\n`);
       continue;
     }
 
-    const currentSession = await getOrCreateSession(TEST_PHONE);
+    const currentSession = await getOrCreateSession(storeId, TEST_PHONE);
     const response = await processMessage(currentSession, input);
     console.log(`\n🤖 Bot: ${response.text}`);
     console.log(`   [nó atual: ${response.nextNode}]\n`);

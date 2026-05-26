@@ -8,32 +8,35 @@ export interface NodeConfigRow {
   default_next?: string | null;
 }
 
-let cache: Map<string, NodeConfigRow> | null = null;
-let cacheTime = 0;
-const CACHE_TTL = 15_000; // 15s — rápido o suficiente para edições refletirem logo
+// Cache por store: storeId → { data, timestamp }
+const _cache = new Map<string, { data: Map<string, NodeConfigRow>; time: number }>();
+const CACHE_TTL = 15_000;
 
-export async function loadFlowConfig(): Promise<Map<string, NodeConfigRow>> {
-  if (cache && Date.now() - cacheTime < CACHE_TTL) return cache;
+export async function loadFlowConfig(storeId: string): Promise<Map<string, NodeConfigRow>> {
+  const entry = _cache.get(storeId);
+  if (entry && Date.now() - entry.time < CACHE_TTL) return entry.data;
 
-  const { data, error } = await supabase.from('bot_flow_config').select('*');
+  const { data, error } = await supabase
+    .from('bot_flow_config')
+    .select('*')
+    .eq('store_id', storeId);
+
   if (error) {
-    // Tabela ainda não existe (antes da migration): retorna config vazia
     if (error.code === '42P01') return new Map();
     console.warn('[flowConfig] erro ao carregar:', error.message);
-    return cache ?? new Map();
+    return entry?.data ?? new Map();
   }
 
-  cache = new Map((data || []).map(r => [r.node_id, r as NodeConfigRow]));
-  cacheTime = Date.now();
-  return cache;
+  const map = new Map((data || []).map(r => [r.node_id, r as NodeConfigRow]));
+  _cache.set(storeId, { data: map, time: Date.now() });
+  return map;
 }
 
-export function invalidateFlowCache(): void {
-  cache = null;
+export function invalidateFlowCache(storeId?: string): void {
+  if (storeId) _cache.delete(storeId);
+  else _cache.clear();
 }
 
-// Converte a string de trigger da config em RegExp.
-// Aceita palavras separadas por vírgula OU regex raw.
 export function triggerToRegex(triggerStr: string): RegExp {
   const hasRegexChars = /[[\]{}()*+?^$\\]/.test(triggerStr);
   const pattern = hasRegexChars
