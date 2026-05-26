@@ -55,7 +55,7 @@ function buildCategoryFilter(raw: string): string[] {
 function baseQuery(client: SupabaseClient) {
   return client
     .from('products')
-    .select('id,sku,name,price,category,image,stock,sizes,featured')
+    .select('id,sku,name,price,category,subcategory,image,stock,sizes,featured')
     .gt('stock', 0)
     .order('featured', { ascending: false })
     .order('name');
@@ -129,7 +129,7 @@ export async function getProductAvailability(storeId: string, productId: string 
 
   const { data, error } = await client
     .from('products')
-    .select('id,sku,name,price,category,image,stock,sizes,featured')
+    .select('id,sku,name,price,category,subcategory,image,stock,sizes,featured')
     .eq('id', productId)
     .single();
 
@@ -152,7 +152,7 @@ export async function getProductForBotContext(storeId: string, filters: BotProdu
 
   let q = client
     .from('products')
-    .select('id,sku,name,price,category,image,stock,sizes,featured')
+    .select('id,sku,name,price,category,subcategory,image,stock,sizes,featured')
     .gt('stock', 0)
     .order('featured', { ascending: false });
 
@@ -163,6 +163,12 @@ export async function getProductForBotContext(storeId: string, filters: BotProdu
   if (filters.category) {
     const terms = buildCategoryFilter(filters.category);
     q = q.in('category', terms);
+  }
+
+  // Busca subcategoria (marca/modelo) tanto na coluna quanto no nome
+  if (filters.subcategory) {
+    const sub = filters.subcategory;
+    q = q.or(`subcategory.ilike.%${sub}%,name.ilike.%${sub}%`);
   }
 
   if (filters.maxPrice) {
@@ -293,6 +299,22 @@ const COLOR_PATTERNS = [
 
 const PRICE_PATTERN = /\bate\s*r?\$?\s*(\d+(?:[.,]\d{1,2})?)/;
 
+// Palavras PT que não são marcas nem categorias — usadas para extrair a marca residual
+const PT_STOP = new Set([
+  'tem','ha','voce','vc','eu','quero','preciso','gostaria','poderia',
+  'de','da','do','dos','das','um','uma','uns','umas',
+  'para','pra','por','pelo','pela','pros','pras',
+  'que','com','em','na','no','nas','nos','se',
+  'isso','esse','essa','aquele','aquela','este','esta',
+  'nao','sim','existe','algum','alguma',
+  'tipo','modelo','ver','me','mostra','mostrar',
+  'buscar','achar','ter','disponiveis','disponivel',
+  'opcoes','opcao','ai','la','e','a','o','as','os',
+  'mais','menos','so','tambem','ainda','ja',
+  'como','onde','qual','quais','quanto','quanta',
+  'ate','aqui','ali','bem','muito','pouco','novo','nova',
+]);
+
 export function detectProductQuery(message: string): BotProductSearchFilters | null {
   const norm = normalizeText(message);
   const filters: BotProductSearchFilters = {};
@@ -318,6 +340,21 @@ export function detectProductQuery(message: string): BotProductSearchFilters | n
 
   const hasFilter = filters.category || filters.size || filters.color || filters.maxPrice;
   if (!hasFilter) return null;
+
+  // Extrai marca/subcategoria removendo os padrões já capturados e stop words
+  let residual = norm;
+  for (const [re] of CATEGORY_PATTERNS) residual = residual.replace(re, ' ');
+  for (const re of SIZE_PATTERNS)       residual = residual.replace(re, ' ');
+  for (const re of COLOR_PATTERNS)      residual = residual.replace(re, ' ');
+  residual = residual.replace(PRICE_PATTERN, ' ');
+
+  const brandWords = residual
+    .split(/\W+/)
+    .filter(w => w.length >= 3 && !PT_STOP.has(w));
+
+  if (brandWords.length > 0) {
+    filters.subcategory = brandWords[0];
+  }
 
   return filters;
 }

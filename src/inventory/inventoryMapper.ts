@@ -35,6 +35,7 @@ export function mapSiteProductToBotProduct(row: SiteProductRow, storeId: string)
     storeId,
     name:          row.name,
     category:      mapCategory(row.category),
+    subcategory:   row.subcategory || undefined,
     price:         row.price ?? undefined,
     sizes:         availableSizes,
     allSizes,

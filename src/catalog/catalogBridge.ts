@@ -53,12 +53,12 @@ import { BotProductSearchFilters } from '../inventory/inventoryTypes';
 export function filtersToInventoryFilters(filters: OfferSearchFilters): BotProductSearchFilters {
   const inv: BotProductSearchFilters = {};
 
-  if (filters.query)    inv.query    = filters.query;
-  if (filters.category) inv.category = filters.category;
-  if (filters.maxPrice) inv.maxPrice = filters.maxPrice;
-  if (filters.onlyActive) inv.featuredOnly = false; // onlyActive não tem equivalente direto
+  if (filters.query)       inv.query       = filters.query;
+  if (filters.category)    inv.category    = filters.category;
+  if (filters.subcategory) inv.subcategory = filters.subcategory;
+  if (filters.maxPrice)    inv.maxPrice    = filters.maxPrice;
+  if (filters.onlyActive)  inv.featuredOnly = false;
 
-  // Extrai atributos físicos para os filtros do InventoryBridge
   const attrs = filters.attributes || {};
   if (attrs.size)  inv.size  = String(attrs.size);
   if (attrs.color) inv.color = String(attrs.color);
@@ -111,11 +111,12 @@ export function formatOffersResponse(
     return 'Não encontrei esse modelo disponível agora. Quer que eu veja opções parecidas?';
   }
 
-  const catDisplay = filters.category
+  const catDisplay  = filters.category
     ? (CAT_DISPLAY[filters.category] || filters.category)
     : null;
-  const size  = filters.attributes?.size  ? String(filters.attributes.size)  : undefined;
-  const color = filters.attributes?.color ? String(filters.attributes.color) : undefined;
+  const size        = filters.attributes?.size  ? String(filters.attributes.size)  : undefined;
+  const color       = filters.attributes?.color ? String(filters.attributes.color) : undefined;
+  const subcategory = filters.subcategory;
 
   const fmtPrice = (p?: number | null) =>
     p != null ? `R$${p.toFixed(2).replace('.', ',')}` : null;
@@ -135,17 +136,23 @@ export function formatOffersResponse(
   }
 
   if (catDisplay && size) {
+    const brandPart = subcategory ? ` *${subcategory}*` : '';
     return (
-      `Tenho opções em *${catDisplay}* no tamanho *${size}*. ` +
-      `Quer ver as peças mais básicas ou as de destaque?\n\n` +
+      `Tenho opções em *${catDisplay}*${brandPart} no tamanho *${size}*. ` +
+      `Qual modelo te interessa?\n\n` +
       offers.slice(0, 5).map(o =>
         `• ${o.name}${o.price != null ? ` — ${fmtPrice(o.price)}` : ''}`
       ).join('\n')
     );
   }
 
-  if (catDisplay || color) {
-    const line = catDisplay ? `em *${catDisplay}*` : `na cor *${color}*`;
+  if (catDisplay || color || subcategory) {
+    let line = '';
+    if (catDisplay && subcategory) line = `em *${catDisplay}* da *${subcategory}*`;
+    else if (catDisplay)           line = `em *${catDisplay}*`;
+    else if (subcategory)          line = `da marca *${subcategory}*`;
+    else                           line = `na cor *${color}*`;
+
     return (
       `Tenho algumas opções ${line}. Qual tamanho você usa?\n\n` +
       offers.slice(0, 5).map(o => `• ${o.name}`).join('\n')
@@ -174,10 +181,11 @@ export function buildOfferFilters(
 
   return {
     businessId,
-    query:      raw.query,
-    category:   raw.category,
-    maxPrice:   raw.maxPrice,
-    attributes: Object.keys(attributes).length ? attributes : undefined,
-    onlyActive: true,
+    query:       raw.query,
+    category:    raw.category,
+    subcategory: raw.subcategory,
+    maxPrice:    raw.maxPrice,
+    attributes:  Object.keys(attributes).length ? attributes : undefined,
+    onlyActive:  true,
   };
 }

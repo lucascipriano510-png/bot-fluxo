@@ -33,6 +33,7 @@ export function botProductToOffer(product: BotProduct): BusinessOffer {
     price:             product.price,
     promotionalPrice:  null,
     category:          product.category,
+    subcategory:       product.subcategory,
     attributes,
     availabilityType,
     stockQuantity:     product.stockQuantity,

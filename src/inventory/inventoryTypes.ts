@@ -6,6 +6,7 @@ export interface BotProduct {
   storeId: string;          // loja à qual o produto pertence
   name: string;
   category?: string;
+  subcategory?: string;        // marca/modelo: Lacoste, Nike, Adidas...
   price?: number;              // undefined = não encontrado no banco
   sizes: string[];             // tamanhos COM estoque disponível
   allSizes: string[];          // todos os tamanhos cadastrados
@@ -20,6 +21,7 @@ export interface BotProduct {
 export interface BotProductSearchFilters {
   query?: string;       // busca livre no nome
   category?: string;    // camisa | tenis | bermuda | calça | bone | kit
+  subcategory?: string; // marca/modelo: lacoste | nike | adidas...
   size?: string;        // P | M | G | GG | 38 | 40...
   color?: string;       // preta | branca | azul...
   maxPrice?: number;
@@ -33,6 +35,7 @@ export interface SiteProductRow {
   name: string;
   price: number;
   category: string;
+  subcategory?: string;
   image?: string;
   stock: number;
   sizes: Array<{ size: string; stock: number }>;
