@@ -65,12 +65,12 @@ export function buildCatalogUrl(filters: OfferSearchFilters): string | undefined
   const params = new URLSearchParams();
   params.set('categoria', CAT_TO_URL[filters.category] ?? filters.category.toUpperCase());
 
-  if (filters.subcategory) params.set('sub', filters.subcategory.toUpperCase());
+  // Usa busca= em vez de sub= — busca é tolerante (texto parcial no nome/subcategoria),
+  // enquanto sub= exige match exato com o valor do banco e quebra se a marca não bate.
+  if (filters.subcategory) params.set('busca', filters.subcategory.toUpperCase());
 
-  const size  = filters.attributes?.size  ? String(filters.attributes.size)  : undefined;
-  const color = filters.attributes?.color ? String(filters.attributes.color) : undefined;
-  if (size)  params.set('tamanho', size.toUpperCase());
-  if (color) params.set('cor',     color.toUpperCase());
+  const size = filters.attributes?.size ? String(filters.attributes.size) : undefined;
+  if (size) params.set('tamanho', size.toUpperCase());
 
   return `${SITE_URL}/?${params.toString()}`;
 }
