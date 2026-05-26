@@ -1,7 +1,8 @@
 import { SiteProductRow, BotProduct } from './inventoryTypes';
 import { normalizeText } from './inventoryUtils';
 
-const SITE_URL = process.env.SITE_URL || 'https://fluxooutlet.com.br';
+// URL base do site (SPA). Produto é aberto via deeplink: SITE_URL/?produto=SKU
+const SITE_URL = (process.env.SITE_URL || '').replace(/\/$/, '');
 
 // Mapa de categoria DB (uppercase) → exibição para o cliente
 const DB_CAT_DISPLAY: Record<string, string> = {
@@ -41,7 +42,7 @@ export function mapSiteProductToBotProduct(row: SiteProductRow, storeId: string)
     allSizes,
     colors:        colors.length ? colors : undefined,
     imageUrl:      row.image || undefined,
-    productUrl:    row.sku ? `${SITE_URL}/produto/${row.sku}` : undefined,
+    productUrl:    SITE_URL ? `${SITE_URL}/?produto=${row.sku || row.id}` : undefined,
     isActive:      row.stock > 0,
     stockQuantity: row.stock,
     isFeatured:    row.featured,
