@@ -17,12 +17,8 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 const app = express();
 app.use(express.json());
 
-// ── Painel visual (local dev) ─────────────────────────────────────────────────
-// Na Vercel, public/ é servido pelo CDN antes de chegar no Lambda.
-// Localmente, o Express precisa servir os arquivos estáticos.
-if (!process.env.VERCEL) {
-  app.use(express.static(path.join(__dirname, '..', 'public')));
-}
+// ── Painel visual ─────────────────────────────────────────────────────────────
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // ── API routes (dados para o painel) ─────────────────────────────────────────
 app.use('/api', apiRouter);

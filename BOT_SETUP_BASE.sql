@@ -1,56 +1,54 @@
 -- ============================================================
--- BOT_SETUP_BASE.sql
--- Setup completo para projeto Supabase novo do bot.
--- Roda ANTES de BOT_SUPABASE_MIGRATION_5.sql
--- Idempotente: pode rodar mais de uma vez sem problema.
+-- BOT_SETUP_BASE.sql  (rodar ANTES da Migration 5)
+-- Projeto Supabase novo — cria todas as tabelas do zero
 -- ============================================================
 
 -- ── stores ───────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS stores (
-  id              uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
-  slug            text        UNIQUE NOT NULL,
-  name            text        NOT NULL,
+create table if not exists stores (
+  id              uuid        default gen_random_uuid() primary key,
+  slug            text        unique not null,
+  name            text        not null,
   whatsapp_number text,
   logo_url        text,
-  is_active       boolean     DEFAULT true,
-  created_at      timestamptz DEFAULT now()
+  is_active       boolean     default true,
+  created_at      timestamptz default now()
 );
 
--- ── bot_sessions ─────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS bot_sessions (
-  id            uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
-  phone         text        NOT NULL,
+-- ── bot_sessions ──────────────────────────────────────────────
+create table if not exists bot_sessions (
+  id            uuid        default gen_random_uuid() primary key,
+  phone         text        not null,
   nome          text,
-  current_node  text        NOT NULL DEFAULT 'INICIO',
-  context       jsonb       NOT NULL DEFAULT '{}'::jsonb,
-  criado_em     timestamptz NOT NULL DEFAULT now(),
-  atualizado_em timestamptz NOT NULL DEFAULT now()
+  current_node  text        not null default 'INICIO',
+  context       jsonb       not null default '{}'::jsonb,
+  criado_em     timestamptz not null default now(),
+  atualizado_em timestamptz not null default now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_bot_sessions_phone
-  ON bot_sessions(phone);
-CREATE INDEX IF NOT EXISTS idx_bot_sessions_atualizado_em
-  ON bot_sessions(atualizado_em DESC);
+create index if not exists idx_bot_sessions_phone
+  on bot_sessions(phone);
+create index if not exists idx_bot_sessions_atualizado_em
+  on bot_sessions(atualizado_em desc);
 
 -- ── bot_mensagens ─────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS bot_mensagens (
-  id        uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
-  phone     text        NOT NULL,
-  direcao   text        NOT NULL CHECK (direcao IN ('entrada', 'saida')),
-  conteudo  text        NOT NULL,
+create table if not exists bot_mensagens (
+  id        uuid        default gen_random_uuid() primary key,
+  phone     text        not null,
+  direcao   text        not null check (direcao in ('entrada','saida')),
+  conteudo  text        not null,
   node      text,
-  criado_em timestamptz NOT NULL DEFAULT now()
+  criado_em timestamptz not null default now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_bot_mensagens_phone
-  ON bot_mensagens(phone);
-CREATE INDEX IF NOT EXISTS idx_bot_mensagens_criado_em
-  ON bot_mensagens(criado_em DESC);
+create index if not exists idx_bot_mensagens_phone
+  on bot_mensagens(phone);
+create index if not exists idx_bot_mensagens_criado_em
+  on bot_mensagens(criado_em desc);
 
 -- ── bot_leads ─────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS bot_leads (
-  id               uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
-  phone            text        NOT NULL,
+create table if not exists bot_leads (
+  id               uuid        default gen_random_uuid() primary key,
+  phone            text        not null,
   nome             text,
   interesse        text,
   origem           text,
@@ -59,50 +57,47 @@ CREATE TABLE IF NOT EXISTS bot_leads (
   estilo           text,
   cidade           text,
   intencao_compra  text,
-  status_comercial text        DEFAULT 'FRIO'
-                   CHECK (status_comercial IN ('QUENTE','MORNO','FRIO')),
+  status_comercial text        default 'FRIO'
+                   check (status_comercial in ('QUENTE','MORNO','FRIO')),
   proxima_acao     text,
   valor_potencial  numeric(10,2),
-  status           text        NOT NULL DEFAULT 'novo'
-                   CHECK (status IN ('novo','qualificado','encaminhado','concluido')),
-  context          jsonb       DEFAULT '{}'::jsonb,
-  qualificado_em   timestamptz NOT NULL DEFAULT now(),
-  atualizado_em    timestamptz DEFAULT now()
+  status           text        not null default 'novo'
+                   check (status in ('novo','qualificado','encaminhado','concluido')),
+  context          jsonb       default '{}'::jsonb,
+  qualificado_em   timestamptz not null default now(),
+  atualizado_em    timestamptz default now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_bot_leads_phone
-  ON bot_leads(phone);
-CREATE INDEX IF NOT EXISTS idx_bot_leads_status
-  ON bot_leads(status);
+create index if not exists idx_bot_leads_phone  on bot_leads(phone);
+create index if not exists idx_bot_leads_status on bot_leads(status);
 
 -- ── bot_optouts ───────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS bot_optouts (
-  id        uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
-  phone     text        NOT NULL,
-  criado_em timestamptz NOT NULL DEFAULT now()
+create table if not exists bot_optouts (
+  id        uuid        default gen_random_uuid() primary key,
+  phone     text        not null,
+  criado_em timestamptz not null default now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_bot_optouts_phone
-  ON bot_optouts(phone);
+create index if not exists idx_bot_optouts_phone on bot_optouts(phone);
 
 -- ── bot_flow_config ───────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS bot_flow_config (
-  id            uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
-  node_id       text        NOT NULL,
+create table if not exists bot_flow_config (
+  id            uuid        default gen_random_uuid() primary key,
+  node_id       text        not null,
   message       text,
   options       jsonb,
   default_next  text,
-  atualizado_em timestamptz NOT NULL DEFAULT now()
+  atualizado_em timestamptz not null default now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_bot_flow_config_node_id
-  ON bot_flow_config(node_id);
+create index if not exists idx_bot_flow_config_node_id
+  on bot_flow_config(node_id);
 
--- ── products (catálogo interno — futuro painel SaaS) ──────────
-CREATE TABLE IF NOT EXISTS products (
-  id                bigserial   PRIMARY KEY,
-  store_id          uuid        NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-  name              text        NOT NULL,
+-- ── products ──────────────────────────────────────────────────
+create table if not exists products (
+  id                bigserial    primary key,
+  store_id          uuid         not null references stores(id) on delete cascade,
+  name              text         not null,
   sku               text,
   price             numeric(10,2),
   promotional_price numeric(10,2),
@@ -114,120 +109,128 @@ CREATE TABLE IF NOT EXISTS products (
   material          text,
   search_tags       text[],
   bot_description   text,
-  sizes             jsonb       DEFAULT '[]',
+  sizes             jsonb        default '[]',
   image_url         text,
   extra_images      text[],
-  is_active         boolean     DEFAULT true,
-  is_kit            boolean     DEFAULT false,
-  featured          boolean     DEFAULT false,
-  created_at        timestamptz DEFAULT now(),
-  updated_at        timestamptz DEFAULT now()
+  is_active         boolean      default true,
+  is_kit            boolean      default false,
+  featured          boolean      default false,
+  created_at        timestamptz  default now(),
+  updated_at        timestamptz  default now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_products_store_id       ON products(store_id);
-CREATE INDEX IF NOT EXISTS idx_products_store_active   ON products(store_id, is_active);
-CREATE INDEX IF NOT EXISTS idx_products_store_category ON products(store_id, category);
-CREATE INDEX IF NOT EXISTS idx_products_store_featured ON products(store_id, featured);
+create index if not exists idx_products_store_id       on products(store_id);
+create index if not exists idx_products_store_active   on products(store_id, is_active);
+create index if not exists idx_products_store_category on products(store_id, category);
+create index if not exists idx_products_store_featured on products(store_id, featured);
 
 -- ── store_bot_settings ────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS store_bot_settings (
-  store_id              uuid        PRIMARY KEY REFERENCES stores(id) ON DELETE CASCADE,
-  bot_name              text        DEFAULT 'Assistente',
-  tone                  text        DEFAULT 'amigavel',
+create table if not exists store_bot_settings (
+  store_id              uuid        primary key references stores(id) on delete cascade,
+  bot_name              text        default 'Assistente',
+  tone                  text        default 'amigavel',
   greeting_message      text,
   fallback_message      text,
   human_support_message text,
-  is_active             boolean     DEFAULT true,
-  updated_at            timestamptz DEFAULT now()
+  is_active             boolean     default true,
+  updated_at            timestamptz default now()
 );
 
 -- ── bot_conversations ─────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS bot_conversations (
-  id             bigserial   PRIMARY KEY,
-  store_id       uuid        NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-  customer_phone text        NOT NULL,
+create table if not exists bot_conversations (
+  id             bigserial   primary key,
+  store_id       uuid        not null references stores(id) on delete cascade,
+  customer_phone text        not null,
   state          text,
   last_message   text,
-  updated_at     timestamptz DEFAULT now()
+  updated_at     timestamptz default now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_bot_conversations_store_phone
-  ON bot_conversations(store_id, customer_phone);
+create index if not exists idx_bot_conversations_store_phone
+  on bot_conversations(store_id, customer_phone);
 
 -- ── orders ────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS orders (
-  id             bigserial   PRIMARY KEY,
-  store_id       uuid        NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+create table if not exists orders (
+  id             bigserial    primary key,
+  store_id       uuid         not null references stores(id) on delete cascade,
   customer_name  text,
-  customer_phone text        NOT NULL,
-  status         text        DEFAULT 'pending',
+  customer_phone text         not null,
+  status         text         default 'pending',
   total          numeric(10,2),
-  created_at     timestamptz DEFAULT now()
+  created_at     timestamptz  default now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_orders_store_id ON orders(store_id);
+create index if not exists idx_orders_store_id on orders(store_id);
 
 -- ── Triggers updated_at ───────────────────────────────────────
-CREATE OR REPLACE FUNCTION _bot_set_updated_at()
-RETURNS TRIGGER LANGUAGE plpgsql AS $$
-BEGIN NEW.atualizado_em = now(); RETURN NEW; END; $$;
+create or replace function _bot_set_updated_at()
+returns trigger language plpgsql as $$
+begin new.atualizado_em = now(); return new; end; $$;
 
-CREATE OR REPLACE FUNCTION _bot_products_updated_at()
-RETURNS TRIGGER LANGUAGE plpgsql AS $$
-BEGIN NEW.updated_at = now(); RETURN NEW; END; $$;
+create or replace function _bot_products_updated_at()
+returns trigger language plpgsql as $$
+begin new.updated_at = now(); return new; end; $$;
 
-DROP TRIGGER IF EXISTS trg_bot_sessions_updated_at    ON bot_sessions;
-CREATE TRIGGER trg_bot_sessions_updated_at
-  BEFORE UPDATE ON bot_sessions
-  FOR EACH ROW EXECUTE FUNCTION _bot_set_updated_at();
+drop trigger if exists trg_bot_sessions_updated_at    on bot_sessions;
+create trigger trg_bot_sessions_updated_at
+  before update on bot_sessions
+  for each row execute function _bot_set_updated_at();
 
-DROP TRIGGER IF EXISTS trg_bot_leads_updated_at       ON bot_leads;
-CREATE TRIGGER trg_bot_leads_updated_at
-  BEFORE UPDATE ON bot_leads
-  FOR EACH ROW EXECUTE FUNCTION _bot_set_updated_at();
+drop trigger if exists trg_bot_leads_updated_at       on bot_leads;
+create trigger trg_bot_leads_updated_at
+  before update on bot_leads
+  for each row execute function _bot_set_updated_at();
 
-DROP TRIGGER IF EXISTS trg_bot_flow_config_updated_at ON bot_flow_config;
-CREATE TRIGGER trg_bot_flow_config_updated_at
-  BEFORE UPDATE ON bot_flow_config
-  FOR EACH ROW EXECUTE FUNCTION _bot_set_updated_at();
+drop trigger if exists trg_bot_flow_config_updated_at on bot_flow_config;
+create trigger trg_bot_flow_config_updated_at
+  before update on bot_flow_config
+  for each row execute function _bot_set_updated_at();
 
-DROP TRIGGER IF EXISTS trg_products_updated_at        ON products;
-CREATE TRIGGER trg_products_updated_at
-  BEFORE UPDATE ON products
-  FOR EACH ROW EXECUTE FUNCTION _bot_products_updated_at();
+drop trigger if exists trg_products_updated_at        on products;
+create trigger trg_products_updated_at
+  before update on products
+  for each row execute function _bot_products_updated_at();
 
--- ── RLS (service_role tem acesso total) ───────────────────────
-ALTER TABLE stores             ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bot_sessions       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bot_mensagens      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bot_leads          ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bot_optouts        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bot_flow_config    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE products           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE store_bot_settings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bot_conversations  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE orders             ENABLE ROW LEVEL SECURITY;
+-- ── RLS ───────────────────────────────────────────────────────
+alter table stores             enable row level security;
+alter table bot_sessions       enable row level security;
+alter table bot_mensagens      enable row level security;
+alter table bot_leads          enable row level security;
+alter table bot_optouts        enable row level security;
+alter table bot_flow_config    enable row level security;
+alter table products           enable row level security;
+alter table store_bot_settings enable row level security;
+alter table bot_conversations  enable row level security;
+alter table orders             enable row level security;
 
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='stores'          AND policyname='service_all_stores')          THEN CREATE POLICY "service_all_stores"          ON stores             FOR ALL TO service_role USING (true) WITH CHECK (true); END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='bot_sessions'    AND policyname='service_all_sessions')        THEN CREATE POLICY "service_all_sessions"        ON bot_sessions       FOR ALL TO service_role USING (true) WITH CHECK (true); END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='bot_mensagens'   AND policyname='service_all_mensagens')       THEN CREATE POLICY "service_all_mensagens"       ON bot_mensagens      FOR ALL TO service_role USING (true) WITH CHECK (true); END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='bot_leads'       AND policyname='service_all_leads')           THEN CREATE POLICY "service_all_leads"           ON bot_leads          FOR ALL TO service_role USING (true) WITH CHECK (true); END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='bot_optouts'     AND policyname='service_all_optouts')         THEN CREATE POLICY "service_all_optouts"         ON bot_optouts        FOR ALL TO service_role USING (true) WITH CHECK (true); END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='bot_flow_config' AND policyname='service_all_flow_config')     THEN CREATE POLICY "service_all_flow_config"     ON bot_flow_config    FOR ALL TO service_role USING (true) WITH CHECK (true); END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='products'        AND policyname='service_all_products')        THEN CREATE POLICY "service_all_products"        ON products           FOR ALL TO service_role USING (true) WITH CHECK (true); END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='store_bot_settings' AND policyname='service_all_bot_settings') THEN CREATE POLICY "service_all_bot_settings"    ON store_bot_settings FOR ALL TO service_role USING (true) WITH CHECK (true); END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='bot_conversations'  AND policyname='service_all_conversations') THEN CREATE POLICY "service_all_conversations"   ON bot_conversations  FOR ALL TO service_role USING (true) WITH CHECK (true); END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='orders'          AND policyname='service_all_orders')          THEN CREATE POLICY "service_all_orders"          ON orders             FOR ALL TO service_role USING (true) WITH CHECK (true); END IF;
-END $$;
+drop policy if exists "service_all_stores"          on stores;
+drop policy if exists "service_all_sessions"        on bot_sessions;
+drop policy if exists "service_all_mensagens"       on bot_mensagens;
+drop policy if exists "service_all_leads"           on bot_leads;
+drop policy if exists "service_all_optouts"         on bot_optouts;
+drop policy if exists "service_all_flow_config"     on bot_flow_config;
+drop policy if exists "service_all_products"        on products;
+drop policy if exists "service_all_bot_settings"    on store_bot_settings;
+drop policy if exists "service_all_conversations"   on bot_conversations;
+drop policy if exists "service_all_orders"          on orders;
 
--- ── Verificação ───────────────────────────────────────────────
-SELECT tablename FROM pg_tables
-WHERE schemaname = 'public'
-  AND tablename IN (
+create policy "service_all_stores"        on stores             for all to service_role using (true) with check (true);
+create policy "service_all_sessions"      on bot_sessions       for all to service_role using (true) with check (true);
+create policy "service_all_mensagens"     on bot_mensagens      for all to service_role using (true) with check (true);
+create policy "service_all_leads"         on bot_leads          for all to service_role using (true) with check (true);
+create policy "service_all_optouts"       on bot_optouts        for all to service_role using (true) with check (true);
+create policy "service_all_flow_config"   on bot_flow_config    for all to service_role using (true) with check (true);
+create policy "service_all_products"      on products           for all to service_role using (true) with check (true);
+create policy "service_all_bot_settings"  on store_bot_settings for all to service_role using (true) with check (true);
+create policy "service_all_conversations" on bot_conversations  for all to service_role using (true) with check (true);
+create policy "service_all_orders"        on orders             for all to service_role using (true) with check (true);
+
+-- ── Confirmação ───────────────────────────────────────────────
+select tablename from pg_tables
+where schemaname = 'public'
+  and tablename in (
     'stores','bot_sessions','bot_mensagens','bot_leads',
     'bot_optouts','bot_flow_config','products',
     'store_bot_settings','bot_conversations','orders'
   )
-ORDER BY tablename;
--- Esperado: 10 linhas
+order by tablename;
