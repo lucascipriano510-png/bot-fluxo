@@ -179,14 +179,19 @@ export async function getProductForBotContext(storeId: string, filters: BotProdu
   const client = getSiteClient();
   if (!client) return [];
 
-  const cacheKey = `bot:${storeId}:cat=${filters.category || ''}:sub=${filters.subcategory || ''}:sz=${filters.size || ''}:cl=${filters.color || ''}:px=${filters.maxPrice || ''}:q=${filters.query || ''}`;
+  // Corrige typos de marca contra subcategorias reais do catálogo
+  const correctedSub = filters.subcategory
+    ? await fuzzyCorrectBrand(filters.subcategory)
+    : undefined;
+
+  const cacheKey = `bot:${storeId}:cat=${filters.category || ''}:sub=${correctedSub || ''}:sz=${filters.size || ''}:cl=${filters.color || ''}:px=${filters.maxPrice || ''}:q=${filters.query || ''}`;
   const cached = cacheGet<BotProduct[]>(cacheKey);
   if (cached) {
-    qlog('getProductForBotContext', { storeId, filters, results: cached.length }, true);
+    qlog('getProductForBotContext', { storeId, filters, correctedSub, results: cached.length }, true);
     return cached;
   }
 
-  qlog('getProductForBotContext', { storeId, filters });
+  qlog('getProductForBotContext', { storeId, filters, correctedSub });
   let q = client
     .from('products')
     .select(BOT_SELECT)
@@ -202,10 +207,9 @@ export async function getProductForBotContext(storeId: string, filters: BotProdu
     q = q.in('category', terms);
   }
 
-  // Busca subcategoria (marca/modelo) tanto na coluna quanto no nome
-  if (filters.subcategory) {
-    const sub = filters.subcategory;
-    q = q.or(`subcategory.ilike.%${sub}%,name.ilike.%${sub}%`);
+  // Busca subcategoria corrigida (marca/modelo) tanto na coluna quanto no nome
+  if (correctedSub) {
+    q = q.or(`subcategory.ilike.%${correctedSub}%,name.ilike.%${correctedSub}%`);
   }
 
   if (filters.maxPrice) {
@@ -233,10 +237,13 @@ export async function getProductForBotContext(storeId: string, filters: BotProdu
     );
   }
 
-  // Post-filtro por cor — normaliza nome e filtro
+  // Post-filtro por cor — expande variantes de gênero/idioma (preta↔preto, branca↔branco)
   if (filters.color) {
-    const cl = normalizeText(filters.color);
-    rows = rows.filter(r => normalizeText(r.name).includes(cl));
+    const variants = expandColor(filters.color);
+    rows = rows.filter(r => {
+      const name = normalizeText(r.name);
+      return variants.some(v => name.includes(v));
+    });
   }
 
   const result = mapMany(rows, storeId).slice(0, 20);
@@ -333,8 +340,83 @@ const SIZE_PATTERNS = [
 ];
 
 const COLOR_PATTERNS = [
-  /\b(preta?|branca?|azul|vermelh[ao]|verde|amarela?|cinza|bege|vinho|navy|off.?white|laranja|rosa|roxo|lilas|caramelo|marrom|creme|nude)\b/,
+  /\b(pret[ao]|branc[ao]|azul|vermelh[ao]|verde|amarelo|amarela|cinza|bege|vinho|navy|off.?white|laranja|rosa|roxo|roxo|lilas|caramelo|marrom|creme|nude|black|white|gray|grey)\b/,
 ];
+
+// Variantes de cor: mapeia qualquer forma para as variantes que podem estar no banco
+const COLOR_EXPAND: Record<string, string[]> = {
+  preto:    ['preto','preta','black'],
+  preta:    ['preto','preta','black'],
+  black:    ['preto','preta','black'],
+  branco:   ['branco','branca','white'],
+  branca:   ['branco','branca','white'],
+  white:    ['branco','branca','white'],
+  vermelho: ['vermelho','vermelha','red'],
+  vermelha: ['vermelho','vermelha','red'],
+  amarelo:  ['amarelo','amarela'],
+  amarela:  ['amarelo','amarela'],
+  roxo:     ['roxo','roxa'],
+  roxa:     ['roxo','roxa'],
+  gray:     ['cinza','gray','grey'],
+  grey:     ['cinza','gray','grey'],
+};
+
+function expandColor(color: string): string[] {
+  const c = normalizeText(color);
+  return COLOR_EXPAND[c] ?? [c];
+}
+
+// ── Levenshtein — distância de edição entre duas strings ──────────────────────
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const row = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    let prev = row[0]++;
+    for (let j = 1; j <= n; j++) {
+      const tmp = row[j];
+      row[j] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, row[j], row[j - 1]);
+      prev = tmp;
+    }
+  }
+  return row[n];
+}
+
+// ── Marcas conhecidas — carrega subcategorias únicas do banco (cache 5 min) ───
+async function loadKnownBrands(): Promise<string[]> {
+  const KEY = 'meta:brands';
+  const cached = cacheGet<string[]>(KEY);
+  if (cached) return cached;
+  const client = getSiteClient();
+  if (!client) return [];
+  const { data } = await client.from('products').select('subcategory');
+  const brands = [
+    ...new Set(
+      (data || [])
+        .map((r: Record<string, unknown>) => r.subcategory as string)
+        .filter(Boolean)
+        .map(s => normalizeText(s)),
+    ),
+  ];
+  cacheSet(KEY, brands);
+  return brands;
+}
+
+// ── Fuzzy correction — corrige typos de marca contra o catálogo real ──────────
+// Threshold: 1 para palavras curtas (≤5 chars), 2 para longas
+async function fuzzyCorrectBrand(input: string): Promise<string> {
+  const norm = normalizeText(input);
+  const brands = await loadKnownBrands();
+  const threshold = norm.length <= 5 ? 1 : 2;
+  let best = norm, bestDist = threshold + 1;
+  for (const brand of brands) {
+    const d = levenshtein(norm, brand);
+    if (d < bestDist) { best = brand; bestDist = d; }
+  }
+  if (bestDist <= threshold && best !== norm) {
+    console.log(`[InventoryBridge] fuzzy brand: "${norm}" → "${best}" (dist=${bestDist})`);
+  }
+  return best;
+}
 
 const PRICE_PATTERN = /\bate\s*r?\$?\s*(\d+(?:[.,]\d{1,2})?)/;
 
