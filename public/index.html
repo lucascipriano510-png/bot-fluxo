@@ -3,1681 +3,640 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>BOT FLUXO</title>
+  <title>Fluxo Command</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --g:    #00ff41;
-      --gb:   rgba(0,255,65,.28);
-      --gd:   rgba(0,255,65,.07);
-      --bg:   #000;
-      --c1:   #0c0c0c;
-      --c2:   #131313;
-      --b1:   #181818;
-      --b2:   #242424;
-      --tx:   #e4e4e4;
-      --mu:   #404040;
-      --dim:  #1c1c1c;
-      --red:  #ff3c3c;
-      --yel:  #ffaa00;
-      --blu:  #4da6ff;
-      --font: 'Space Mono','Courier New',monospace;
-      --hh:   52px;
-      --th:   40px;
-    }
-
-    html, body { height: 100%; }
-    body {
-      background: var(--bg); color: var(--tx);
-      font-family: var(--font); font-size: 13px;
-      -webkit-font-smoothing: antialiased;
-      display: flex; flex-direction: column;
-    }
-
-    /* ── HEADER ─────────────────────────────────────────── */
-    .hdr {
-      flex-shrink: 0; height: var(--hh);
-      background: rgba(0,0,0,.97);
-      backdrop-filter: blur(10px);
-      border-bottom: 1px solid var(--b1);
-      padding: 0 16px;
-      display: flex; align-items: center; justify-content: space-between;
-      position: relative; z-index: 100;
-    }
-
-    .brand { display: flex; align-items: center; gap: 9px; }
-    .led {
-      width: 7px; height: 7px; border-radius: 50%;
-      background: var(--g);
-      box-shadow: 0 0 6px var(--g), 0 0 14px rgba(0,255,65,.3);
-      animation: pulse 3.5s ease-in-out infinite;
-    }
-    @keyframes pulse { 0%,85%,100%{opacity:1} 92%{opacity:.1} }
-
-    .brand-name {
-      font-size: 11px; font-weight: 700;
-      letter-spacing: .22em; color: var(--g); text-transform: uppercase;
-    }
-    .brand-sep { color: var(--mu); }
-
-    .hdr-r { display: flex; gap: 20px; }
-    .hstat { text-align: right; line-height: 1.2; }
-    .hstat-v { font-size: 16px; font-weight: 700; color: var(--g); }
-    .hstat-l { font-size: 7px; letter-spacing: .14em; color: var(--mu); text-transform: uppercase; }
-
-    /* ── TABS ───────────────────────────────────────────── */
-    .tabs {
-      flex-shrink: 0; height: var(--th);
-      background: var(--bg); border-bottom: 1px solid var(--b1);
-      display: flex; position: relative; z-index: 90;
-    }
-    .tab {
-      flex: 1; border: none; border-bottom: 2px solid transparent;
-      background: none; font-family: var(--font);
-      font-size: 9px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase;
-      color: var(--mu); cursor: pointer; transition: color .12s, border-color .12s;
-      position: relative;
-    }
-    .tab.on { color: var(--g); border-bottom-color: var(--g); }
-    .tcount {
-      position: absolute; top: 5px; right: calc(50% - 18px);
-      background: var(--g); color: #000;
-      font-size: 7px; font-weight: 700; padding: 1px 4px; border-radius: 2px;
-      min-width: 14px; text-align: center; display: none;
-    }
-
-    /* ── LAYOUT ─────────────────────────────────────────── */
-    .body-area {
-      flex: 1; overflow: hidden;
-      display: flex; flex-direction: column;
-    }
-
-    .pane { display: none; flex: 1; flex-direction: column; overflow: hidden; }
-    .pane.on { display: flex; }
-
-    /* non-chat panes scroll normally */
-    .pane.scroll { overflow-y: auto; padding: 16px 14px 80px; max-width: 640px; width: 100%; margin: 0 auto; }
-
-    /* ── SEC HEADER ─────────────────────────────────────── */
-    .sec {
-      font-size: 8px; letter-spacing: .2em; color: var(--mu); text-transform: uppercase;
-      margin-bottom: 14px; display: flex; align-items: center; gap: 8px; flex-shrink: 0;
-    }
-    .sec::after { content: ''; flex: 1; height: 1px; background: var(--b1); }
-
-    /* ── CARDS ──────────────────────────────────────────── */
-    .card {
-      background: var(--c1); border: 1px solid var(--b1); border-radius: 3px;
-      padding: 13px 15px; margin-bottom: 7px; position: relative; overflow: hidden;
-    }
-    .card::before {
-      content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
-      background: var(--g); opacity: 0; transition: opacity .12s;
-    }
-    .card:hover { background: var(--c2); }
-    .card:hover::before { opacity: 1; }
-
-    .crow  { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 5px; }
-    .cname { font-size: 13px; font-weight: 700; letter-spacing: .02em; }
-    .cnode { font-size: 9px; color: var(--g); letter-spacing: .06em; font-style: italic; margin-bottom: 4px; }
-    .cinfo { font-size: 11px; color: var(--mu); line-height: 1.5; margin-bottom: 7px; }
-    .cfoot { display: flex; justify-content: space-between; align-items: center; }
-    .ctime { font-size: 9px; color: var(--dim); }
-
-    /* ── BADGES ─────────────────────────────────────────── */
-    .badge {
-      font-size: 7px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
-      padding: 3px 7px; border-radius: 2px; flex-shrink: 0; white-space: nowrap;
-    }
-    .b-new    { background: transparent;              color: var(--mu);  border: 1px solid var(--b1); }
-    .b-lead   { background: rgba(255,170,0,.07);     color: var(--yel); border: 1px solid rgba(255,170,0,.2); }
-    .b-enc    { background: rgba(77,166,255,.07);    color: var(--blu); border: 1px solid rgba(77,166,255,.2); }
-    .b-done   { background: rgba(0,255,65,.04);      color: #00cc33;    border: 1px solid rgba(0,255,65,.1); }
-    .b-quente { background: rgba(255,60,60,.08);     color: var(--red); border: 1px solid rgba(255,60,60,.3); }
-    .b-morno  { background: rgba(255,170,0,.07);     color: var(--yel); border: 1px solid rgba(255,170,0,.2); }
-    .b-frio   { background: transparent;             color: var(--mu);  border: 1px solid var(--b1); }
-
-    .card-quente { border-color: rgba(255,60,60,.25); }
-    .card-quente::before { background: var(--red); opacity: 1; }
-    .card-morno  { border-color: rgba(255,170,0,.2); }
-    .card-morno::before  { background: var(--yel); opacity: .6; }
-
-    .recover-msg {
-      background: var(--dim); border: 1px solid var(--b2); border-radius: 3px;
-      padding: 9px 12px; font-size: 11px; color: var(--tx); line-height: 1.5;
-      margin-top: 6px; cursor: pointer; transition: background .1s;
-    }
-    .recover-msg:hover { background: var(--b2); }
-
-    /* ── FUNNEL ─────────────────────────────────────────── */
-    .funnel { display: flex; gap: 5px; margin-bottom: 18px; }
-    .fstep  {
-      flex: 1; background: var(--c1); border: 1px solid var(--b1); border-radius: 3px;
-      padding: 10px 6px; text-align: center;
-    }
-    .fstep:nth-child(1) .fn { color: var(--mu); }
-    .fstep:nth-child(2) .fn { color: var(--yel); }
-    .fstep:nth-child(3) .fn { color: var(--blu); }
-    .fstep:nth-child(4) .fn { color: #00cc33; }
-    .fn { font-size: 20px; font-weight: 700; line-height: 1; margin-bottom: 3px; }
-    .fl { font-size: 7px; letter-spacing: .1em; text-transform: uppercase; color: var(--mu); }
-
-    /* ── INP / BTN ──────────────────────────────────────── */
-    .inp {
-      background: var(--c1); border: 1px solid var(--b2);
-      color: var(--tx); font-family: var(--font); font-size: 13px;
-      padding: 11px 15px; outline: none; transition: border-color .12s;
-      -webkit-appearance: none;
-    }
-    .inp:focus  { border-color: var(--gb); }
-    .inp::placeholder { color: var(--mu); }
-    .inp-round  { border-radius: 22px; }
-
-    .btn {
-      font-family: var(--font); font-size: 9px; font-weight: 700;
-      letter-spacing: .15em; text-transform: uppercase;
-      border: none; cursor: pointer; transition: all .12s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .btn-ghost { background: none; border: 1px solid var(--b2); color: var(--mu); padding: 7px 11px; border-radius: 2px; }
-    .btn-ghost:hover { color: var(--tx); border-color: #333; }
-
-    /* ── EMPTY ──────────────────────────────────────────── */
-    .empty {
-      text-align: center; padding: 56px 20px;
-      color: var(--mu); font-size: 9px; letter-spacing: .14em; text-transform: uppercase; line-height: 2;
-    }
-
-    /* ──────────────────────────────────────────────────── */
-    /*  CHAT — WhatsApp premium                            */
-    /* ──────────────────────────────────────────────────── */
-
-    /* inner chat header */
-    .ch-hdr {
-      flex-shrink: 0; height: 60px;
-      background: var(--c1); border-bottom: 1px solid var(--b1);
-      padding: 0 14px; display: flex; align-items: center; gap: 12px;
-    }
-    .ch-avatar {
-      width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
-      background: #001a0a; border: 1.5px solid var(--g);
-      box-shadow: 0 0 8px rgba(0,255,65,.2);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 12px; font-weight: 700; color: var(--g);
-    }
-    .ch-info { flex: 1; min-width: 0; }
-    .ch-name { font-size: 14px; font-weight: 700; letter-spacing: .02em; margin-bottom: 2px; }
-    .ch-sub  { font-size: 10px; color: var(--g); letter-spacing: .04em; }
-
-    .ch-actions { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
-
-    /* messages area */
-    .chat-win {
-      flex: 1; overflow-y: auto;
-      padding: 14px 14px 8px;
-      display: flex; flex-direction: column; gap: 3px;
-      background: #040404;
-      background-image: radial-gradient(rgba(0,255,65,.018) 1px, transparent 1px);
-      background-size: 22px 22px;
-    }
-
-    /* bot bubble — left */
-    .cb-bot { align-self: flex-start; max-width: 80%; margin-bottom: 1px; }
-    .cb-bot .bub {
-      background: #141414; border: 1px solid rgba(255,255,255,.05);
-      border-radius: 3px 16px 16px 16px;
-      padding: 10px 14px; font-size: 13px; line-height: 1.65;
-      white-space: pre-wrap; word-break: break-word; color: var(--tx);
-    }
-    .cb-bot .bmeta { font-size: 10px; color: rgba(255,255,255,.25); margin-top: 4px; padding-left: 2px; }
-
-    /* user bubble — right */
-    .cb-user { align-self: flex-end; max-width: 80%; margin-bottom: 1px; }
-    .cb-user .bub {
-      background: #00c832; color: #000;
-      border-radius: 16px 3px 16px 16px;
-      padding: 10px 14px; font-size: 13px; font-weight: 700; line-height: 1.65;
-      white-space: pre-wrap; word-break: break-word;
-    }
-    .cb-user .bmeta { font-size: 10px; color: rgba(0,0,0,.35); margin-top: 4px; text-align: right; padding-right: 2px; }
-
-    /* links in bot messages */
-    .msg-link { color: var(--g); text-decoration: underline; word-break: break-all; }
-
-    /* chat divider */
-    .cdiv {
-      align-self: center; font-size: 8px; letter-spacing: .14em; text-transform: uppercase;
-      color: var(--mu); padding: 6px 12px; margin: 6px 0;
-      background: rgba(255,255,255,.03); border-radius: 10px;
-    }
-
-    /* typing indicator */
-    .cb-typing { align-self: flex-start; }
-    .cb-typing .bub {
-      background: #141414; border: 1px solid rgba(255,255,255,.05);
-      border-radius: 3px 16px 16px 16px;
-      padding: 13px 16px; display: flex; gap: 5px; align-items: center;
-    }
-    .tdot {
-      width: 6px; height: 6px; border-radius: 50%; background: var(--mu);
-      animation: tda 1.2s ease-in-out infinite; opacity: .4;
-    }
-    .tdot:nth-child(2) { animation-delay: .2s; }
-    .tdot:nth-child(3) { animation-delay: .4s; }
-    @keyframes tda { 0%,65%,100%{opacity:.4;transform:translateY(0)} 30%{opacity:1;transform:translateY(-4px)} }
-
-    /* quick replies */
-    .chat-qr { flex-shrink: 0; padding: 7px 14px 4px; display: flex; gap: 6px; flex-wrap: wrap; }
-    .qr-btn {
-      font-family: var(--font); font-size: 10px; font-weight: 700; letter-spacing: .06em;
-      color: var(--g); background: #001a0a; border: 1px solid rgba(0,255,65,.22);
-      padding: 6px 14px; border-radius: 16px; cursor: pointer; transition: all .1s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .qr-btn:hover  { background: rgba(0,255,65,.1); border-color: var(--gb); }
-    .qr-btn:active { transform: scale(.95); }
-
-    /* input area */
-    .chat-in {
-      flex-shrink: 0; background: #060606; border-top: 1px solid var(--b1);
-      padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 8px;
-    }
-    .chat-tel-row {
-      display: flex; align-items: center; gap: 8px;
-      font-size: 8px; letter-spacing: .12em; text-transform: uppercase; color: var(--mu);
-    }
-    .chat-tel-row .inp { flex: 1; border-radius: 4px; font-size: 11px; padding: 7px 11px; }
-    .chat-send-row { display: flex; align-items: center; gap: 10px; }
-    .chat-send-row .inp { flex: 1; border-radius: 22px; padding: 12px 18px; }
-
-    .send-btn {
-      flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%;
-      background: var(--g); color: #000; border: none;
-      font-size: 18px; display: flex; align-items: center; justify-content: center;
-      cursor: pointer; transition: all .12s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .send-btn:hover  { background: #00e63a; transform: scale(1.06); }
-    .send-btn:active { transform: scale(.94); }
-    .send-btn:disabled { opacity: .35; cursor: not-allowed; transform: none !important; }
-
-    /* lead toast */
-    .lead-toast {
-      position: fixed; top: calc(var(--hh) + var(--th) + 10px); right: 14px; z-index: 500;
-      background: #001a0a; border: 1px solid var(--gb); border-radius: 8px;
-      padding: 10px 14px; font-size: 11px; font-weight: 700; color: var(--g);
-      letter-spacing: .04em; box-shadow: 0 4px 20px rgba(0,255,65,.15);
-      opacity: 0; transform: translateY(-8px) scale(.97);
-      transition: all .3s cubic-bezier(.34,1.56,.64,1);
-      pointer-events: none; max-width: 240px;
-    }
-    .lead-toast.show { opacity: 1; transform: translateY(0) scale(1); }
-
-    /* ──────────────────────────────────────────────────── */
-    /*  FLOW — Freeform canvas                            */
-    /* ──────────────────────────────────────────────────── */
-
-    /* Stage: viewport, captures events */
-    .flow-stage {
-      flex: 1; overflow: hidden; position: relative;
-      background: #020202;
-      background-image: radial-gradient(circle, rgba(0,255,65,.05) 1px, transparent 1px);
-      background-size: 26px 26px;
-      cursor: grab;
-    }
-    .flow-stage.panning  { cursor: grabbing; }
-    .flow-stage.dragging { cursor: grabbing; }
-
-    /* Canvas: the transformable infinite surface */
-    .flow-canvas {
-      position: absolute; top: 0; left: 0;
-      transform-origin: 0 0;
-      will-change: transform;
-    }
-
-    /* SVG edge layer sits inside canvas (so it scales/pans with nodes) */
-    .flow-svg-layer {
-      position: absolute; top: 0; left: 0;
-      pointer-events: none; overflow: visible;
-      width: 1px; height: 1px;
-    }
-
-    /* Toolbar overlay */
-    .flow-toolbar {
-      position: absolute; bottom: 14px; right: 14px; z-index: 60;
-      display: flex; gap: 5px; align-items: center;
-    }
-    .flow-tb-btn {
-      font-family: var(--font); font-weight: 700; font-size: 13px;
-      width: 30px; height: 30px; flex-shrink: 0;
-      background: rgba(12,12,12,.92); backdrop-filter: blur(8px);
-      border: 1px solid var(--b2); color: var(--tx);
-      border-radius: 4px; cursor: pointer; transition: all .1s;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .flow-tb-btn:hover { border-color: var(--gb); color: var(--g); }
-    .flow-tb-sm { font-size: 8px !important; letter-spacing: .08em; width: auto !important; padding: 0 9px; }
-    .flow-zoom-lbl {
-      font-family: var(--font); font-size: 9px; font-weight: 700; letter-spacing: .06em;
-      color: var(--mu); min-width: 38px; text-align: center;
-    }
-
-    /* ── Node cards ──────────────────────────────────────── */
-    .fnode {
-      position: absolute; width: 210px;
-      background: #0d0d0d;
-      border: 1px solid var(--b1);
-      border-radius: 8px;
-      box-shadow: 0 2px 16px rgba(0,0,0,.6);
-      transition: box-shadow .15s;
-      cursor: default;
-      will-change: transform;
-    }
-    .fnode:hover  { box-shadow: 0 4px 28px rgba(0,0,0,.8); z-index: 10; }
-    .fnode.active { z-index: 20; box-shadow: 0 0 0 1.5px var(--g), 0 6px 32px rgba(0,255,65,.12); }
-
-    /* Header — drag handle */
-    .fnode-hdr {
-      padding: 8px 10px 6px;
-      border-radius: 8px 8px 0 0;
-      cursor: grab; display: flex; align-items: flex-start;
-      justify-content: space-between; gap: 6px;
-      border-bottom: 1px solid var(--b1);
-    }
-    .fnode-hdr:active { cursor: grabbing; }
-    .fnode-id {
-      font-size: 8px; font-weight: 700; letter-spacing: .12em;
-      text-transform: uppercase; line-height: 1.4; flex: 1;
-    }
-    .fnode-tags { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; }
-
-    /* Message preview */
-    .fnode-msg {
-      padding: 7px 10px 6px;
-      font-size: 10px; color: var(--mu); line-height: 1.55;
-    }
-
-    /* ── Cloud / bubble option buttons (WhatsApp Quick Replies) ── */
-    /* Logic: same as Meta's Interactive Message buttons —           */
-    /* each bubble = one branch trigger, color = destination type.  */
-    .fnode-opts {
-      padding: 0 8px 8px;
-      display: flex; flex-direction: column; gap: 4px;
-      border-top: 1px solid var(--b1);
-      padding-top: 7px;
-    }
-    .fopt {
-      font-family: var(--font); font-size: 8px; font-weight: 700;
-      letter-spacing: .03em;
-      background: transparent;
-      border: 1px solid var(--oc, #333);
-      color: var(--oc, var(--mu));
-      padding: 4px 9px; border-radius: 999px;
-      cursor: default; transition: background .1s, opacity .1s;
-      display: flex; align-items: center; gap: 5px;
-      overflow: hidden; white-space: nowrap;
-    }
-    .fopt-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
-    .fopt-arrow { opacity: .45; flex-shrink: 0; }
-    .fopt-dest  { opacity: .4; font-size: 7px; flex-shrink: 0;
-                  max-width: 64px; overflow: hidden; text-overflow: ellipsis; }
-
-    /* Default fallback label */
-    .fnode-default {
-      padding: 5px 10px 8px;
-      font-size: 8px; color: var(--mu); font-style: italic; letter-spacing: .03em;
-      border-top: 1px dashed var(--b1); opacity: .6;
-    }
-
-    /* Badge tags */
-    .fn-tag  { font-size: 7px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; padding: 2px 5px; border-radius: 3px; }
-    .ft-act  { background: rgba(77,166,255,.1);  color: var(--blu); border: 1px solid rgba(77,166,255,.2); }
-    .ft-term { background: rgba(255,60,60,.08);  color: var(--red); border: 1px solid rgba(255,60,60,.2); }
-    .ft-loop { background: rgba(255,170,0,.08);  color: var(--yel); border: 1px solid rgba(255,170,0,.2); }
-    .ft-root { background: var(--gd);            color: var(--g);   border: 1px solid var(--gb); }
-    .ft-sys  { background: rgba(180,0,255,.07);  color: #c06bff;    border: 1px solid rgba(180,0,255,.2); }
-    .ft-custom { background: rgba(255,170,0,.07); color: var(--yel); border: 1px solid rgba(255,170,0,.25); }
-
-    /* Edit button on node */
-    .fnode-edit {
-      background: none; border: none; color: var(--mu); font-size: 11px;
-      cursor: pointer; padding: 1px 5px; border-radius: 3px; flex-shrink: 0;
-      transition: color .1s, background .1s; line-height: 1;
-    }
-    .fnode-edit:hover { color: var(--g); background: rgba(0,255,65,.08); }
-
-    /* ── Flow Editor Drawer ──────────────────────────────── */
-    .flow-editor {
-      position: absolute; top: 0; right: -390px; width: 370px; height: 100%;
-      background: #0a0a0a; border-left: 1px solid var(--b1);
-      z-index: 300; display: flex; flex-direction: column; overflow: hidden;
-      transition: right .24s cubic-bezier(.4,0,.2,1);
-      box-shadow: -8px 0 32px rgba(0,0,0,.6);
-    }
-    .flow-editor.open { right: 0; }
-
-    .fe-hdr {
-      flex-shrink: 0; padding: 14px 16px 11px;
-      border-bottom: 1px solid var(--b1);
-      display: flex; align-items: center; gap: 10px;
-    }
-    .fe-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .fe-title { font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; flex: 1; }
-    .fe-close {
-      background: none; border: none; color: var(--mu); cursor: pointer;
-      font-size: 16px; line-height: 1; padding: 2px 6px; border-radius: 3px;
-      transition: color .1s;
-    }
-    .fe-close:hover { color: var(--tx); }
-
-    .fe-body { flex: 1; overflow-y: auto; padding: 16px; }
-
-    .fe-section { margin-bottom: 18px; }
-    .fe-label {
-      font-size: 8px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
-      color: var(--mu); margin-bottom: 6px; display: block;
-    }
-    .fe-hint {
-      font-size: 9px; color: var(--mu); line-height: 1.55; margin-top: 5px;
-      letter-spacing: .02em;
-    }
-
-    .fe-textarea {
-      width: 100%; background: var(--c1); border: 1px solid var(--b2);
-      color: var(--tx); font-family: var(--font); font-size: 11px; line-height: 1.6;
-      padding: 9px 11px; border-radius: 4px; resize: vertical; min-height: 96px;
-      outline: none; transition: border-color .12s; box-sizing: border-box;
-    }
-    .fe-textarea:focus { border-color: var(--gb); }
-
-    .fe-input {
-      background: var(--c1); border: 1px solid var(--b2);
-      color: var(--tx); font-family: var(--font); font-size: 11px;
-      padding: 7px 11px; border-radius: 4px; outline: none;
-      width: 100%; box-sizing: border-box; transition: border-color .12s;
-    }
-    .fe-input:focus { border-color: var(--gb); }
-
-    .fe-select {
-      background: var(--c1); border: 1px solid var(--b2);
-      color: var(--tx); font-family: var(--font); font-size: 11px;
-      padding: 7px 11px; border-radius: 4px; outline: none;
-      width: 100%; box-sizing: border-box; cursor: pointer;
-      transition: border-color .12s;
-    }
-    .fe-select:focus { border-color: var(--gb); }
-
-    /* Option rows (Quick Reply branches) */
-    .fe-opt-row {
-      background: var(--c1); border: 1px solid var(--b2); border-radius: 5px;
-      padding: 10px 11px; margin-bottom: 7px; position: relative;
-    }
-    .fe-opt-del {
-      position: absolute; top: 7px; right: 9px;
-      background: none; border: none; color: var(--mu); cursor: pointer;
-      font-size: 12px; line-height: 1; padding: 2px 4px; border-radius: 3px;
-      transition: color .1s;
-    }
-    .fe-opt-del:hover { color: var(--red); }
-    .fe-opt-label { font-size: 8px; color: var(--mu); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 4px; margin-top: 8px; display: block; }
-    .fe-opt-label:first-child { margin-top: 0; }
-
-    .fe-add-opt {
-      font-family: var(--font); font-size: 8px; font-weight: 700; letter-spacing: .1em;
-      text-transform: uppercase; background: none; border: 1px dashed var(--b2);
-      color: var(--mu); padding: 8px; border-radius: 4px; cursor: pointer; width: 100%;
-      transition: all .1s;
-    }
-    .fe-add-opt:hover { border-color: var(--g); color: var(--g); }
-
-    .fe-footer {
-      flex-shrink: 0; padding: 11px 16px;
-      border-top: 1px solid var(--b1); display: flex; gap: 8px;
-    }
-    .fe-btn-save {
-      flex: 1; font-family: var(--font); font-size: 9px; font-weight: 700; letter-spacing: .12em;
-      text-transform: uppercase; background: var(--g); color: #000;
-      border: none; padding: 10px; border-radius: 4px; cursor: pointer; transition: all .12s;
-    }
-    .fe-btn-save:hover { background: #00e63a; }
-    .fe-btn-save:disabled { opacity: .4; cursor: not-allowed; }
-    .fe-btn-reset {
-      font-family: var(--font); font-size: 9px; font-weight: 700; letter-spacing: .1em;
-      text-transform: uppercase; background: none; color: var(--mu);
-      border: 1px solid var(--b2); padding: 10px 14px; border-radius: 4px;
-      cursor: pointer; transition: all .12s; white-space: nowrap;
-    }
-    .fe-btn-reset:hover { color: var(--red); border-color: rgba(255,60,60,.35); }
-
-    .fe-status {
-      font-size: 9px; padding: 6px 10px; border-radius: 3px; margin-bottom: 14px;
-    }
-    .fe-status.custom { background: rgba(255,170,0,.06); color: var(--yel); border: 1px solid rgba(255,170,0,.2); }
-    .fe-status.default { background: rgba(0,255,65,.04); color: #00cc33; border: 1px solid rgba(0,255,65,.1); }
-
-    /* ──────────────────────────────────────────────────── */
-    /*  CONFIG                                            */
-    /* ──────────────────────────────────────────────────── */
-    .cfg-item {
-      background: var(--c1); border: 1px solid var(--b1); border-radius: 3px;
-      padding: 16px 15px; margin-bottom: 8px;
-      display: flex; align-items: center; gap: 14px;
-    }
-    .cfg-icon {
-      width: 36px; height: 36px; border-radius: 3px; flex-shrink: 0;
-      background: var(--dim); border: 1px solid var(--b2);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px; color: var(--mu);
-    }
-    .cfg-info { flex: 1; min-width: 0; }
-    .cfg-title { font-size: 12px; font-weight: 700; margin-bottom: 3px; }
-    .cfg-desc  { font-size: 10px; color: var(--mu); line-height: 1.4; }
-    .cfg-badge {
-      flex-shrink: 0; font-size: 7px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
-      color: var(--mu); border: 1px solid var(--b2); padding: 3px 7px; border-radius: 2px;
-    }
-
-    /* ── SCROLLBAR ──────────────────────────────────────── */
-    ::-webkit-scrollbar { width: 3px; height: 3px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--b2); border-radius: 2px; }
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/fluxo.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
 </head>
-<body>
+<body x-data="FluxoCommand()" x-init="init()" x-cloak>
 
-<!-- LEAD TOAST -->
-<div class="lead-toast" id="lead-toast">✓ Lead capturado!</div>
+<!-- Mobile overlay -->
+<div class="overlay" :class="{ visible: sidebarOpen }" @click="sidebarOpen = false"></div>
 
-<!-- HEADER -->
-<header class="hdr">
-  <div class="brand">
-    <div class="led"></div>
-    <div class="brand-name">Bot Fluxo <span class="brand-sep">/</span> CMD</div>
+<!-- ═══════════════════════════════════════════════
+     SIDEBAR
+═══════════════════════════════════════════════ -->
+<aside class="cmd-sidebar" :class="{ open: sidebarOpen }">
+  <div class="sb-logo">
+    <div class="sb-logo-name">⚡ FLUXO COMMAND</div>
+    <div class="sb-logo-sub">Bot &amp; Sales OS</div>
   </div>
-  <div class="hdr-r">
-    <div class="hstat"><div class="hstat-v" id="hl">—</div><div class="hstat-l">Leads</div></div>
+
+  <nav class="sb-nav">
+    <div class="sb-section">Principal</div>
+
+    <div class="sb-item" :class="{ active: page==='dashboard' }" @click="navigate('dashboard')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </div>
+
+    <div class="sb-item" :class="{ active: page==='atendimentos' }" @click="navigate('atendimentos')">
+      <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Atendimentos
+    </div>
+
+    <div class="sb-item" :class="{ active: page==='leads' }" @click="navigate('leads')">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Clientes
+    </div>
+
+    <div class="sb-section">Catálogo</div>
+
+    <div class="sb-item" :class="{ active: page==='produtos' }" @click="navigate('produtos')">
+      <svg viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      Produtos
+    </div>
+
+    <div class="sb-item" :class="{ active: page==='respostas' }" @click="navigate('respostas')">
+      <svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+      Respostas Rápidas
+    </div>
+
+    <div class="sb-section">Comercial</div>
+
+    <div class="sb-item" :class="{ active: page==='kanban' }" @click="navigate('kanban')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="5" height="8" rx="1"/></svg>
+      Kanban
+    </div>
+
+    <div class="sb-item" :class="{ active: page==='relatorios' }" @click="navigate('relatorios')">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Relatórios
+    </div>
+
+    <div class="sb-section">Sistema</div>
+
+    <div class="sb-item" :class="{ active: page==='simulador' }" @click="navigate('simulador')">
+      <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Testar Bot
+    </div>
+
+    <div class="sb-item" :class="{ active: page==='integracoes' }" @click="navigate('integracoes')">
+      <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      Integrações
+    </div>
+
+    <div class="sb-item" :class="{ active: page==='configuracoes' }" @click="navigate('configuracoes')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Configurações
+    </div>
+  </nav>
+
+  <!-- Bot status -->
+  <div class="sb-status">
+    <div class="sb-status-top">
+      <span class="sb-status-label">Status da loja</span>
+      <div class="pulse-dot" :class="{ 'opacity-30': !botOn }"></div>
+    </div>
+    <div class="sb-status-row"><div class="dot-sm"></div> Bot <span x-text="botOn ? 'online' : 'offline'"></span></div>
+    <div class="sb-status-row"><div class="dot-sm yellow"></div> WhatsApp pendente</div>
+    <div class="sb-status-row"><div class="dot-sm"></div> Supabase conectado</div>
   </div>
-</header>
+</aside>
 
-<!-- TABS -->
-<nav class="tabs">
-  <button class="tab on" id="t-chat"   onclick="go('chat')">Chat</button>
-  <button class="tab"    id="t-leads"  onclick="go('leads')">
-    Leads <span class="tcount" id="tc-leads"></span>
-  </button>
-  <button class="tab"    id="t-flow"   onclick="go('flow')">Fluxo</button>
-  <button class="tab"    id="t-config" onclick="go('config')">Config</button>
-</nav>
+<!-- ═══════════════════════════════════════════════
+     MAIN
+═══════════════════════════════════════════════ -->
+<div class="cmd-main">
 
-<!-- BODY -->
-<div class="body-area">
+  <!-- HEADER -->
+  <header class="cmd-header">
+    <button class="mob-menu-btn" @click="sidebarOpen = !sidebarOpen">
+      <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
 
-  <!-- ── CHAT ─────────────────────────────────────────── -->
-  <div class="pane on" id="chat">
+    <div class="hdr-title">
+      <h1 x-text="{
+        dashboard:'Dashboard', atendimentos:'Atendimentos', leads:'Clientes',
+        produtos:'Produtos', respostas:'Respostas Rápidas', kanban:'Kanban Comercial',
+        relatorios:'Relatórios', simulador:'Testar Bot', integracoes:'Integrações',
+        configuracoes:'Configurações'
+      }[page] || 'Dashboard'"></h1>
+      <span x-text="{
+        dashboard:'Visão geral da operação, atendimentos e performance.',
+        atendimentos:'Gerencie conversas e assuma atendimentos.',
+        leads:'Leads qualificados e status comercial.',
+        produtos:'Catálogo de produtos e estoque.',
+        respostas:'Respostas automáticas do bot.',
+        kanban:'Pipeline comercial por estágio.',
+        relatorios:'Métricas e performance.',
+        simulador:'Teste o bot em tempo real.',
+        integracoes:'Conexões externas e APIs.',
+        configuracoes:'Configurações da loja e do bot.',
+      }[page] || ''"></span>
+    </div>
 
-    <!-- inner contact header -->
-    <div class="ch-hdr">
-      <div class="ch-avatar">BF</div>
-      <div class="ch-info">
-        <div class="ch-name">Bot Fluxo</div>
-        <div class="ch-sub">
-          <span class="led" style="width:6px;height:6px;display:inline-block;vertical-align:middle;margin-right:5px;animation:none;box-shadow:none;"></span>online · nó: <span id="cnod">INICIO</span>
+    <div class="hdr-actions">
+      <button class="btn btn-ghost" @click="navigate('simulador')">
+        <svg style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Testar Bot
+      </button>
+      <div class="badge-env">Produção</div>
+      <div class="hdr-avatar" title="Fluxo Outlet">FO</div>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════════════════════
+       PAGES
+  ══════════════════════════════════════════ -->
+  <div class="cmd-content">
+
+    <!-- ── DASHBOARD ───────────────────────── -->
+    <div x-show="page === 'dashboard'">
+
+      <!-- Metrics -->
+      <div class="metrics-row">
+        <div class="metric-card">
+          <div class="metric-top">
+            <div class="metric-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+            <span class="metric-delta">+18%</span>
+          </div>
+          <div class="metric-val">27</div>
+          <div class="metric-label">Atendimentos hoje</div>
+          <div class="metric-sub">vs. 23 ontem</div>
+        </div>
+
+        <div class="metric-card gold">
+          <div class="metric-top">
+            <div class="metric-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+            <span class="metric-delta">+6 novos</span>
+          </div>
+          <div class="metric-val" x-text="leads.length || 14"></div>
+          <div class="metric-label">Leads capturados</div>
+          <div class="metric-sub" x-text="leadsQuentes + ' quentes'"></div>
+        </div>
+
+        <div class="metric-card blue">
+          <div class="metric-top">
+            <div class="metric-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></div>
+            <span class="metric-delta neutral">R$1.840</span>
+          </div>
+          <div class="metric-val">9</div>
+          <div class="metric-label">Pedidos iniciados</div>
+          <div class="metric-sub">intenção de compra</div>
+        </div>
+
+        <div class="metric-card purple">
+          <div class="metric-top">
+            <div class="metric-icon"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+            <span class="metric-delta" :class="botOn ? '' : 'neutral'" x-text="botOn ? 'Online' : 'Offline'"></span>
+          </div>
+          <div class="metric-val">2.3s</div>
+          <div class="metric-label">Tempo médio de resposta</div>
+          <div class="metric-sub">última hora</div>
         </div>
       </div>
-      <div class="ch-actions">
-        <button class="btn btn-ghost" onclick="chatStart()" style="font-size:8px;padding:6px 10px;letter-spacing:.1em;">↺ Reiniciar</button>
+
+      <!-- Bot Control + Recent -->
+      <div class="grid-3-1 mb-6">
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">Controle do Bot</div><div class="card-sub">Configure o comportamento em tempo real</div></div>
+            <span class="badge" :class="botOn ? 'badge-green' : 'badge-gray'" x-text="botOn ? 'Online' : 'Offline'"></span>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info"><h4>Bot ativo</h4><p>Responder mensagens automaticamente</p></div>
+            <button class="toggle" :class="{ on: botOn }" @click="botOn = !botOn"></button>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-info"><h4>Ignorar horário</h4><p>Responder fora do horário comercial</p></div>
+            <button class="toggle" :class="{ on: ignorarHorario }" @click="ignorarHorario = !ignorarHorario"></button>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-info"><h4>Modo teste</h4><p>Logs detalhados no console</p></div>
+            <button class="toggle on"></button>
+          </div>
+
+          <div style="margin-top:20px;padding-top:18px;border-top:1px solid var(--border);">
+            <div style="display:flex;gap:10px;margin-bottom:12px">
+              <div style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">
+                <div style="font-size:10px;color:var(--mu2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">WhatsApp</div>
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--gold)">
+                  <div class="dot-sm yellow"></div> Pendente
+                </div>
+              </div>
+              <div style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">
+                <div style="font-size:10px;color:var(--mu2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Supabase</div>
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--green)">
+                  <div class="dot-sm"></div> Conectado
+                </div>
+              </div>
+              <div style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">
+                <div style="font-size:10px;color:var(--mu2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">API Bot</div>
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--green)">
+                  <div class="dot-sm"></div> Online
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-green" style="flex:1;justify-content:center" @click="navigate('simulador')">Simular conversa</button>
+              <button class="btn" style="flex:1;justify-content:center" @click="navigate('relatorios')">Ver métricas</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent conversations -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Conversas recentes</div>
+            <button class="btn btn-ghost" @click="navigate('atendimentos')" style="font-size:11px;padding:5px 10px">Ver todas</button>
+          </div>
+          <div class="conv-list">
+            <template x-for="c in conversations.slice(0,5)" :key="c.id">
+              <div class="conv-item" @click="navigate('atendimentos'); selectedConv = c.id">
+                <div class="conv-avatar" x-text="c.avatar || c.name?.charAt(0)"></div>
+                <div class="conv-info">
+                  <div class="conv-name" x-text="c.name || c.phone"></div>
+                  <div class="conv-msg" x-text="c.msg || c.node"></div>
+                </div>
+                <div class="conv-meta">
+                  <div class="conv-time" x-text="c.time || fmtTime(c.atualizado_em)"></div>
+                  <div class="conv-unread" x-show="c.unread > 0" x-text="c.unread"></div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom row -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Leads por status</div></div>
+          <div style="display:flex;gap:12px">
+            <div style="flex:1;background:var(--red2);border:1px solid rgba(239,68,68,.15);border-radius:10px;padding:16px;text-align:center">
+              <div style="font-size:26px;font-weight:800;color:var(--red)" x-text="leadsQuentes"></div>
+              <div style="font-size:11px;color:var(--mu);margin-top:4px">Quentes 🔥</div>
+            </div>
+            <div style="flex:1;background:var(--gold2);border:1px solid rgba(250,204,21,.15);border-radius:10px;padding:16px;text-align:center">
+              <div style="font-size:26px;font-weight:800;color:var(--gold)" x-text="leadsMornos"></div>
+              <div style="font-size:11px;color:var(--mu);margin-top:4px">Mornos</div>
+            </div>
+            <div style="flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center">
+              <div style="font-size:26px;font-weight:800;color:var(--mu)" x-text="leadsFrios"></div>
+              <div style="font-size:11px;color:var(--mu);margin-top:4px">Frios</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Produtos mais perguntados</div></div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <template x-for="(p, i) in [
+              {name:'Camisa Polo Lacoste',n:18,pct:72},
+              {name:'Tênis Running',n:12,pct:48},
+              {name:'Bermuda Jeans',n:9,pct:36},
+              {name:'Boné Snapback',n:6,pct:24},
+            ]" :key="i">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="font-size:12px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="p.name"></div>
+                <div style="flex:2;height:6px;background:rgba(255,255,255,.07);border-radius:20px;overflow:hidden">
+                  <div style="height:100%;background:var(--green);border-radius:20px;transition:width .4s" :style="`width:${p.pct}%`"></div>
+                </div>
+                <div style="font-size:11px;color:var(--mu);min-width:24px;text-align:right" x-text="p.n"></div>
+              </div>
+            </template>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- messages -->
-    <div class="chat-win" id="cwin">
-      <div class="empty" id="cwelcome" style="align-self:center;padding:40px 20px;">
-        Iniciando conversa...
-      </div>
-    </div>
-
-    <!-- quick replies -->
-    <div class="chat-qr" id="cqr"></div>
-
-    <!-- input -->
-    <div class="chat-in">
-      <div class="chat-tel-row">
-        <span>Simular tel</span>
-        <input class="inp" id="ctel" type="tel" placeholder="5534900000000" value="5534900000000">
-        <button class="btn btn-ghost" onclick="chatStart()" style="font-size:8px;padding:6px 10px;white-space:nowrap;">Novo</button>
-      </div>
-      <div class="chat-send-row">
-        <input class="inp" id="cmsg" type="text" placeholder="Digite uma mensagem..."
-          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend();}">
-        <button class="send-btn" id="csend" onclick="chatSend()">&#10132;</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── LEADS ─────────────────────────────────────────── -->
-  <div class="pane" id="leads">
-    <div class="scroll" style="width:100%;max-width:640px;margin:0 auto;overflow-y:auto;padding:16px 14px 80px;flex:1;">
-      <div class="funnel">
-        <div class="fstep"><div class="fn" id="fn-frio">0</div><div class="fl">Frio</div></div>
-        <div class="fstep"><div class="fn" id="fn-morno">0</div><div class="fl">Morno</div></div>
-        <div class="fstep"><div class="fn" id="fn-quente">0</div><div class="fl">Quente 🔥</div></div>
-        <div class="fstep"><div class="fn" id="fn-enc">0</div><div class="fl">Encam.</div></div>
-      </div>
-      <div class="sec">Leads capturados</div>
-      <div id="leads-list"><div class="empty">Carregando...</div></div>
-      <div class="sec" style="margin-top:22px;">Recuperação — leads parados</div>
-      <div id="recovery-list"><div class="empty" style="padding:24px 0;">Carregando...</div></div>
-    </div>
-  </div>
-
-  <!-- ── FLUXO ─────────────────────────────────────────── -->
-  <div class="pane" id="flow">
-    <div class="flow-stage" id="flow-stage">
-
-      <!-- Canvas: scale+translate via JS -->
-      <div class="flow-canvas" id="flow-canvas">
-        <svg class="flow-svg-layer" id="flow-svg"></svg>
-      </div>
-
-      <!-- Toolbar overlay -->
-      <div class="flow-toolbar">
-        <button class="flow-tb-btn" onclick="fZoomOut()" title="Zoom out">−</button>
-        <span  class="flow-zoom-lbl" id="fzoom-lbl">100%</span>
-        <button class="flow-tb-btn" onclick="fZoomIn()"  title="Zoom in">+</button>
-        <button class="flow-tb-btn flow-tb-sm" onclick="fFit()"           title="Ajustar tudo na tela">FIT</button>
-        <button class="flow-tb-btn flow-tb-sm" onclick="fResetPositions()" title="Resetar posições">↺</button>
-      </div>
-
-      <!-- Loading placeholder -->
-      <div class="empty" id="flow-loading"
-           style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;">
-        Carregando mapa...
-      </div>
-
-      <!-- Editor drawer (slides in from right) -->
-      <div class="flow-editor" id="flow-editor">
-        <div class="fe-hdr">
-          <div class="fe-dot" id="fe-dot"></div>
-          <span class="fe-title" id="fe-title">—</span>
-          <button class="fe-close" onclick="feClose()">✕</button>
+    <!-- ── SIMULADOR ────────────────────────── -->
+    <div x-show="page === 'simulador'">
+      <div class="sim-wrap">
+        <div class="sim-phone-row">
+          <input type="tel" x-model="simPhone" placeholder="Telefone do cliente (ex: 5534999999999)" :disabled="simStarted">
+          <button class="btn" @click="simStarted = false; simMessages = []" x-show="simStarted">Reiniciar</button>
+          <button class="btn btn-green" @click="simStart()" x-show="!simStarted" :disabled="!simPhone">Iniciar conversa</button>
         </div>
-        <div class="fe-body" id="fe-body"></div>
-        <div class="fe-footer">
-          <button class="fe-btn-reset" onclick="feReset()">↺ Padrão</button>
-          <button class="fe-btn-save" id="fe-save-btn" onclick="feSave()">Salvar</button>
+
+        <div class="chat-window">
+          <div class="chat-header">
+            <div class="chat-avatar"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+            <div>
+              <div class="chat-name">Bot Fluxo Outlet</div>
+              <div class="chat-status" x-text="simLoading ? 'digitando...' : 'online'"></div>
+            </div>
+          </div>
+
+          <div class="chat-messages" id="sim-messages">
+            <div x-show="!simStarted && simMessages.length === 0" class="empty">
+              <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <p>Clique em "Iniciar conversa" para começar o teste.</p>
+            </div>
+
+            <template x-for="(m, i) in simMessages" :key="i">
+              <div :class="m.from === 'bot' ? 'bubble bubble-bot' : 'bubble bubble-user'">
+                <span x-text="m.text"></span>
+                <div class="bubble-time" x-text="m.time"></div>
+              </div>
+            </template>
+
+            <div class="bubble bubble-bot" x-show="simLoading">
+              <div class="bubble-typing">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-input-row">
+            <textarea class="chat-input" x-model="simInput" placeholder="Digite uma mensagem..." rows="1"
+              @keydown="simKeydown($event)" :disabled="!simStarted || simLoading"></textarea>
+            <button class="chat-send" @click="simSend()" :disabled="!simStarted || simLoading || !simInput.trim()">
+              <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;font-size:11px;color:var(--mu2)">
+          Pressione Enter para enviar · Shift+Enter para nova linha · Conectado à API real do bot.
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- ── CONFIG ────────────────────────────────────────── -->
-  <div class="pane" id="config">
-    <div style="overflow-y:auto;flex:1;padding:16px 14px 80px;max-width:640px;width:100%;margin:0 auto;">
-      <div class="sec">Configurações</div>
-
-      <div class="cfg-item">
-        <div class="cfg-icon">[T]</div>
-        <div class="cfg-info">
-          <div class="cfg-title">Mensagens do Bot</div>
-          <div class="cfg-desc">Editar o texto de resposta de cada nó do fluxo de conversa</div>
+    <!-- ── ATENDIMENTOS ─────────────────────── -->
+    <div x-show="page === 'atendimentos'">
+      <div class="atend-shell">
+        <div class="atend-list">
+          <div class="atend-list-header">Conversas — <span x-text="conversations.length"></span></div>
+          <template x-for="c in conversations" :key="c.id">
+            <div class="conv-item" :class="{ selected: selectedConv === c.id }" style="margin:4px 6px;border-radius:8px" @click="selectedConv = c.id">
+              <div class="conv-avatar" x-text="c.avatar || c.name?.charAt(0)"></div>
+              <div class="conv-info">
+                <div class="conv-name" x-text="c.name || c.phone"></div>
+                <div class="conv-msg" x-text="c.msg || c.node"></div>
+                <span class="badge" style="margin-top:4px;font-size:10px" :class="tagColor(c.tag || 'novo')" x-text="c.tag || 'novo'"></span>
+              </div>
+              <div class="conv-meta">
+                <div class="conv-time" x-text="c.time || fmtTime(c.atualizado_em)"></div>
+                <div class="conv-unread" x-show="c.unread > 0" x-text="c.unread"></div>
+              </div>
+            </div>
+          </template>
         </div>
-        <span class="cfg-badge">Em breve</span>
-      </div>
 
-      <div class="cfg-item">
-        <div class="cfg-icon">[#]</div>
-        <div class="cfg-info">
-          <div class="cfg-title">Links e Contatos</div>
-          <div class="cfg-desc">WhatsApp da loja, URL do catálogo, número de atendimento</div>
+        <div class="atend-chat">
+          <div class="atend-chat-header">
+            <div class="conv-avatar" x-text="currentConv?.avatar || '?'"></div>
+            <div>
+              <div style="font-size:13px;font-weight:700" x-text="currentConv?.name || currentConv?.phone"></div>
+              <div style="font-size:11px;color:var(--mu)" x-text="'Nó: ' + (currentConv?.node || 'INICIO')"></div>
+            </div>
+            <div style="margin-left:auto;display:flex;gap:8px">
+              <button class="btn" style="font-size:11px;padding:5px 10px">Assumir</button>
+              <button class="btn btn-green" style="font-size:11px;padding:5px 10px">Devolver ao bot</button>
+            </div>
+          </div>
+
+          <div class="atend-messages" id="atend-messages">
+            <template x-for="(m, i) in currentConvMessages" :key="i">
+              <div :class="m.from === 'bot' ? 'bubble bubble-bot' : 'bubble bubble-user'">
+                <span x-text="m.text"></span>
+                <div class="bubble-time" x-text="m.time"></div>
+              </div>
+            </template>
+            <div x-show="currentConvMessages.length === 0" class="empty" style="padding:40px 20px">
+              <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <p>Nenhuma mensagem registrada.</p>
+            </div>
+          </div>
+
+          <div class="atend-input-row">
+            <input class="atend-input" placeholder="Responder manualmente..." type="text">
+            <button class="btn btn-green" style="padding:8px 14px">Enviar</button>
+          </div>
         </div>
-        <span class="cfg-badge">Em breve</span>
-      </div>
 
-      <div class="cfg-item">
-        <div class="cfg-icon">[>]</div>
-        <div class="cfg-info">
-          <div class="cfg-title">Regras do Fluxo</div>
-          <div class="cfg-desc">Adicionar ramificações, palavras-gatilho e nós personalizados</div>
+        <div class="atend-ficha">
+          <div class="ficha-header">
+            <div class="ficha-avatar" x-text="currentConv?.avatar || '?'"></div>
+            <div class="ficha-name" x-text="currentConv?.name || 'Cliente'"></div>
+            <div class="ficha-phone" x-text="currentConv?.phone"></div>
+            <div style="margin-top:10px"><span class="badge" :class="tagColor(currentConv?.tag || 'novo')" x-text="currentConv?.tag || 'novo'"></span></div>
+          </div>
+          <div class="ficha-field"><div class="ficha-field-label">Nó atual</div><div class="ficha-field-val" x-text="currentConv?.node || 'INICIO'"></div></div>
+          <div class="ficha-field"><div class="ficha-field-label">Telefone</div><div class="ficha-field-val" x-text="currentConv?.phone || '—'"></div></div>
+          <div class="ficha-field"><div class="ficha-field-label">Interesse detectado</div><div class="ficha-field-val">Camisa G</div></div>
+          <div class="ficha-field"><div class="ficha-field-label">Valor estimado</div><div class="ficha-field-val" style="color:var(--gold)">R$189,90</div></div>
+          <div style="margin-top:18px;display:flex;flex-direction:column;gap:8px">
+            <button class="btn btn-green" style="justify-content:center">Criar pedido</button>
+            <button class="btn" style="justify-content:center">Adicionar nota</button>
+          </div>
         </div>
-        <span class="cfg-badge">Em breve</span>
-      </div>
-
-      <div class="cfg-item">
-        <div class="cfg-icon">[S]</div>
-        <div class="cfg-info">
-          <div class="cfg-title">Status dos Leads</div>
-          <div class="cfg-desc">Personalizar etapas do funil e critérios de qualificação</div>
-        </div>
-        <span class="cfg-badge">Em breve</span>
-      </div>
-
-      <div style="margin-top:30px;font-size:9px;color:var(--mu);letter-spacing:.06em;line-height:1.8;padding:0 2px;">
-        Para editar o fluxo agora: abra <strong style="color:var(--tx)">src/bot/flowMap.ts</strong><br>
-        Para editar respostas do servidor: <strong style="color:var(--tx)">npm run dev</strong> e edite os arquivos direto.
       </div>
     </div>
-  </div>
 
-</div><!-- /body-area -->
+    <!-- ── LEADS / CLIENTES ─────────────────── -->
+    <div x-show="page === 'leads'">
+      <div class="metrics-row" style="margin-bottom:20px">
+        <div class="metric-card"><div class="metric-top"><div class="metric-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div></div><div class="metric-val" x-text="leads.length"></div><div class="metric-label">Total de leads</div></div>
+        <div class="metric-card gold"><div class="metric-top"><div class="metric-icon"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div></div><div class="metric-val" x-text="leadsQuentes"></div><div class="metric-label">Leads quentes</div></div>
+        <div class="metric-card blue"><div class="metric-top"><div class="metric-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div></div><div class="metric-val" x-text="leadsMornos"></div><div class="metric-label">Leads mornos</div></div>
+        <div class="metric-card"><div class="metric-top"><div class="metric-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div></div><div class="metric-val" x-text="leadsFrios"></div><div class="metric-label">Leads frios</div></div>
+      </div>
 
-<script>
-'use strict';
-
-// ── state ───────────────────────────────────────────────
-let curTab = 'chat';
-let chatBusy = false;
-let chatCurNode = 'INICIO';
-let chatAutoRestarting = false;
-
-// ── utils ───────────────────────────────────────────────
-const $ = id => document.getElementById(id);
-
-function esc(s) {
-  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function rt(s) {
-  return esc(s)
-    .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
-    .replace(/(https?:\/\/\S+)/g, '<a href="$1" target="_blank" class="msg-link">$1</a>');
-}
-
-function ago(iso) {
-  if (!iso) return '—';
-  const s = Math.floor((Date.now() - new Date(iso)) / 1000);
-  if (s < 60)    return s + 's';
-  if (s < 3600)  return Math.floor(s / 60) + 'min';
-  if (s < 86400) return Math.floor(s / 3600) + 'h';
-  return Math.floor(s / 86400) + 'd';
-}
-
-function hhmm(iso) {
-  if (!iso) return '';
-  return new Date(iso).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
-}
-
-function nowT() {
-  return new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
-}
-
-// ── tabs ────────────────────────────────────────────────
-function go(tab) {
-  ['chat','leads','flow','config'].forEach(t => {
-    $('t-' + t).classList.toggle('on', t === tab);
-    $(t).classList.toggle('on', t === tab);
-  });
-  curTab = tab;
-  if (tab === 'leads') { loadLeads(); loadRecovery(); }
-  if (tab === 'flow')  loadFlow();
-}
-
-// ── leads ───────────────────────────────────────────────
-async function loadLeads() {
-  try {
-    const j = await fetch('/api/leads').then(r => r.json());
-    if (!j.ok) throw new Error(j.error);
-    const all = j.data || [];
-
-    $('hl').textContent = all.length;
-    const tc = $('tc-leads');
-    if (all.length) { tc.textContent = all.length; tc.style.display = 'inline-block'; }
-    else tc.style.display = 'none';
-
-    const counts = { FRIO: 0, MORNO: 0, QUENTE: 0, encaminhado: 0 };
-    all.forEach(l => {
-      const sc = (l.status_comercial || 'FRIO').toUpperCase();
-      if (counts[sc] !== undefined) counts[sc]++;
-      if (l.status === 'encaminhado') counts.encaminhado++;
-    });
-    $('fn-frio').textContent   = counts.FRIO;
-    $('fn-morno').textContent  = counts.MORNO;
-    $('fn-quente').textContent = counts.QUENTE;
-    $('fn-enc').textContent    = counts.encaminhado;
-
-    const list = $('leads-list');
-    if (!all.length) {
-      list.innerHTML = '<div class="empty">Nenhum lead capturado ainda.<br>Converse com o bot na aba Chat.</div>';
-      return;
-    }
-
-    const scBadge = { QUENTE: 'b-quente', MORNO: 'b-morno', FRIO: 'b-frio' };
-    const scCard  = { QUENTE: 'card-quente', MORNO: 'card-morno', FRIO: '' };
-    list.innerHTML = all.map(l => {
-      const sc    = (l.status_comercial || 'FRIO').toUpperCase();
-      const badge = scBadge[sc] || 'b-frio';
-      const card  = scCard[sc]  || '';
-      const details = [
-        l.origem   ? `📦 ${esc(l.origem)}`   : '',
-        l.tamanho  ? `tam ${esc(l.tamanho)}`  : '',
-        l.estilo   ? `· ${esc(l.estilo)}`     : '',
-        l.cidade   ? `📍 ${esc(l.cidade)}`   : '',
-      ].filter(Boolean).join('  ');
-      const ts = ago(l.atualizado_em || l.qualificado_em);
-      return `
-      <div class="card ${card}">
-        <div class="crow">
-          <div class="cname">${esc(l.nome || '—')}</div>
-          <span class="badge ${badge}">${sc}</span>
-        </div>
-        <div class="cnode">${esc(l.phone)}</div>
-        ${details ? `<div class="cinfo" style="margin-top:4px;">${details}</div>` : ''}
-        ${l.proxima_acao ? `<div class="cinfo" style="color:var(--blu);margin-top:2px;">→ ${esc(l.proxima_acao)}</div>` : ''}
-        <div class="cfoot" style="margin-top:6px;">
-          <div class="ctime">Atualizado ${ts} atrás</div>
-          ${l.valor_potencial ? `<div style="font-size:9px;color:var(--g);">R$ ${Number(l.valor_potencial).toFixed(2)}</div>` : ''}
-        </div>
-      </div>`;
-    }).join('');
-  } catch(e) {
-    console.error('[leads]', e);
-    $('leads-list').innerHTML = `<div class="empty" style="color:var(--red)">Erro: ${esc(e.message)}</div>`;
-  }
-}
-
-async function loadRecovery() {
-  const list = $('recovery-list');
-  try {
-    const j = await fetch('/api/recovery').then(r => r.json());
-    if (!j.ok) throw new Error(j.error);
-    const all = j.data || [];
-    if (!all.length) {
-      list.innerHTML = '<div class="empty" style="padding:20px 0;">Nenhum lead parado no momento.</div>';
-      return;
-    }
-    list.innerHTML = all.map(l => {
-      const nome     = l.nome     ? l.nome.split(' ')[0] : null;
-      const produto  = l.interesse || l.origem || 'produto';
-      const tamanho  = l.tamanho  || '';
-      const sugestao = nome
-        ? `${nome}, ainda está procurando ${produto}${tamanho ? ' no tamanho ' + tamanho : ''}? Separei algumas opções aqui.`
-        : `Vi que você estava olhando ${produto}${tamanho ? ' no ' + tamanho : ''}. Quer que eu te mande as opções disponíveis?`;
-      const ts = ago(l.atualizado_em || l.qualificado_em);
-      return `
       <div class="card">
-        <div class="crow">
-          <div class="cname">${esc(l.nome || l.phone)}</div>
-          <span class="badge b-morno">${esc((l.status_comercial || 'FRIO').toUpperCase())}</span>
+        <div class="card-header"><div class="card-title">Todos os leads</div><div style="font-size:11px;color:var(--mu)">Atualizado em tempo real</div></div>
+        <table class="tbl">
+          <thead><tr><th>Cliente</th><th>Interesse</th><th>Status</th><th>Valor est.</th><th>Atualizado</th></tr></thead>
+          <tbody>
+            <template x-for="l in leads" :key="l.id">
+              <tr>
+                <td><div style="font-weight:600" x-text="l.nome || l.phone"></div><div style="font-size:11px;color:var(--mu)" x-text="l.phone"></div></td>
+                <td x-text="l.interesse || '—'"></td>
+                <td><span class="badge" :class="statusColor(l.status_comercial)" x-text="l.status_comercial"></span></td>
+                <td style="color:var(--gold);font-weight:700" x-text="fmtBRL(l.valor_potencial)"></td>
+                <td style="color:var(--mu);font-size:12px" x-text="fmtTime(l.atualizado_em)"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── PRODUTOS ─────────────────────────── -->
+    <div x-show="page === 'produtos'">
+      <div class="card-header" style="margin-bottom:16px">
+        <div style="display:flex;gap:10px;flex:1">
+          <input type="text" placeholder="Buscar produto..." style="background:var(--card);border:1px solid var(--border2);border-radius:8px;color:var(--tx);padding:8px 14px;font-size:13px;font-family:var(--font);outline:none;width:240px">
+          <select style="background:var(--card);border:1px solid var(--border2);border-radius:8px;color:var(--tx);padding:8px 12px;font-size:13px;font-family:var(--font);outline:none">
+            <option>Todas categorias</option><option>CAMISA</option><option>TÊNIS</option><option>BERMUDA</option><option>KITS</option>
+          </select>
         </div>
-        <div class="cnode">${esc(l.phone)} · parado há ${ts}</div>
-        <div class="recover-msg" title="Clique para copiar" onclick="navigator.clipboard&&navigator.clipboard.writeText(${JSON.stringify(sugestao)}).then(()=>this.style.borderColor='var(--g)')">
-          💬 ${esc(sugestao)}
+        <button class="btn btn-green">+ Novo produto</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
+        <template x-for="p in products" :key="p.id">
+          <div class="card" style="padding:0;overflow:hidden;cursor:pointer" @click="">
+            <div style="height:140px;background:var(--card2);display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--border)">
+              <svg style="width:40px;height:40px;stroke:var(--mu2);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;opacity:.4" viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+            </div>
+            <div style="padding:14px">
+              <div style="font-size:12px;font-weight:700;margin-bottom:4px;line-height:1.3" x-text="p.name"></div>
+              <div style="font-size:11px;color:var(--mu);margin-bottom:10px" x-text="p.category + (p.subcategory ? ' · ' + p.subcategory : '')"></div>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-weight:800;color:var(--gold)" x-text="fmtBRL(p.price)"></span>
+                <span class="badge" :class="p.stock > 0 ? 'badge-green' : 'badge-red'" x-text="p.stock > 0 ? 'Em estoque' : 'Sem estoque'"></span>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ── RESPOSTAS RÁPIDAS ─────────────────── -->
+    <div x-show="page === 'respostas'">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+        <button class="btn btn-green">+ Nova resposta</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <template x-for="r in [
+          {titulo:'Horário de funcionamento',gatilho:'horário, abre, fecha',resposta:'A Fluxo Outlet atende de segunda a sábado, das 9h às 18h.',ativo:true},
+          {titulo:'Política de envio',gatilho:'entrega, frete, envio, prazo',resposta:'Enviamos para todo o Brasil via Correios. Prazo de 3 a 7 dias úteis.',ativo:true},
+          {titulo:'Troca e devolução',gatilho:'trocar, troca, devolução',resposta:'Trocas em até 7 dias após o recebimento.',ativo:true},
+          {titulo:'Formas de pagamento',gatilho:'pagamento, pix, cartão',resposta:'Aceitamos Pix, cartão de crédito em até 6x e boleto.',ativo:false},
+        ]" :key="r.titulo">
+          <div class="card" style="padding:18px">
+            <div style="display:flex;align-items:flex-start;gap:14px">
+              <div style="flex:1">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                  <span style="font-size:13px;font-weight:700" x-text="r.titulo"></span>
+                  <span class="badge" :class="r.ativo ? 'badge-green' : 'badge-gray'" x-text="r.ativo ? 'Ativo' : 'Inativo'"></span>
+                </div>
+                <div style="font-size:11px;color:var(--mu2);margin-bottom:8px">Gatilhos: <span style="color:var(--blue)" x-text="r.gatilho"></span></div>
+                <div style="font-size:12px;color:var(--mu);background:var(--card2);border-radius:8px;padding:10px;border:1px solid var(--border)" x-text="r.resposta"></div>
+              </div>
+              <div style="display:flex;gap:8px;flex-shrink:0">
+                <button class="btn btn-ghost" style="padding:6px 10px;font-size:11px">Editar</button>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ── KANBAN ───────────────────────────── -->
+    <div x-show="page === 'kanban'">
+      <div class="kanban-wrap">
+        <template x-for="col in kanban" :key="col.id">
+          <div class="kanban-col">
+            <div class="kanban-col-header">
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="width:8px;height:8px;border-radius:50%" :style="`background:${col.color}`"></div>
+                <span class="kanban-col-title" x-text="col.label"></span>
+              </div>
+              <span class="kanban-count" x-text="col.items.length"></span>
+            </div>
+            <template x-for="(item, i) in col.items" :key="i">
+              <div class="kanban-card">
+                <div class="kanban-card-name" x-text="item.name"></div>
+                <div class="kanban-card-info" x-text="item.phone"></div>
+                <div class="kanban-card-info" style="margin-top:4px" x-text="item.interesse"></div>
+                <div class="kanban-card-val" x-text="item.val"></div>
+              </div>
+            </template>
+            <div x-show="col.items.length === 0" style="text-align:center;padding:20px 0;font-size:12px;color:var(--mu2)">Sem leads aqui</div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ── RELATÓRIOS ───────────────────────── -->
+    <div x-show="page === 'relatorios'">
+      <div class="grid-2 mb-6">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Atendimentos por dia</div><span class="badge badge-green">Últimos 7 dias</span></div>
+          <div style="height:200px"><canvas id="chart-atend"></canvas></div>
         </div>
-      </div>`;
-    }).join('');
-  } catch(e) {
-    console.error('[recovery]', e);
-    list.innerHTML = `<div class="empty" style="color:var(--red)">Erro: ${esc(e.message)}</div>`;
-  }
-}
-
-// ── chat ────────────────────────────────────────────────
-function cphone() { return $('ctel').value.trim() || '5534900000000'; }
-
-function csetNode(n) {
-  chatCurNode = n || 'INICIO';
-  $('cnod').textContent = chatCurNode;
-  buildQR(chatCurNode);
-}
-
-const QR_HINTS = {
-  INICIO:              [['camisa','Camisa/Polo'],['tenis','Tênis'],['bermuda','Bermuda'],['promoção','Promoção 🔥']],
-  APRESENTACAO:        [['camisa polo','Camisa'],['tênis','Tênis'],['bermuda','Bermuda']],
-  CAPTURA_TAMANHO:     [['P','P'],['M','M'],['G','G'],['GG','GG']],
-  CAPTURA_NUMERO:      [['39','39'],['40','40'],['41','41'],['42','42'],['43','43']],
-  CAPTURA_ESTILO:      [['básica','Básica'],['polo','Polo'],['malha premium','Malha premium']],
-  CAPTURA_CIDADE:      [['Uberaba','Uberaba'],['envio para outra cidade','Outra cidade']],
-  RECOMENDACAO:        [['quanto custa?','Quanto custa? 💰'],['quero','Quero esse 💪'],['mais barata','Mais barata'],['foto','Ver foto']],
-  CAPTURA_NOME_QUENTE: [],
-  AGUARDAR_RESPOSTA:   [],
-  NAO_ENTENDI:         [['camisa','Camisa'],['tênis','Tênis'],['bermuda','Bermuda']],
-};
-
-function buildQR(node) {
-  const qr = $('cqr');
-  qr.innerHTML = '';
-  const hints = QR_HINTS[node] || [];
-  hints.forEach(([v, l]) => {
-    const b = document.createElement('button');
-    b.className = 'qr-btn';
-    b.textContent = l;
-    b.onclick = () => { $('cmsg').value = v; chatSend(); };
-    qr.appendChild(b);
-  });
-}
-
-function cappend(text, isUser) {
-  const win = $('cwin');
-  const we  = $('cwelcome');
-  if (we) we.remove();
-
-  const t = nowT();
-  const d = document.createElement('div');
-  if (isUser) {
-    d.className = 'cb-user';
-    d.innerHTML = `<div class="bub">${esc(text)}</div><div class="bmeta">${t} ✓</div>`;
-  } else {
-    d.className = 'cb-bot';
-    d.innerHTML = `<div class="bub">${rt(text)}</div><div class="bmeta">${t}</div>`;
-  }
-  win.appendChild(d);
-  win.scrollTop = win.scrollHeight;
-}
-
-function ctyping() {
-  const win = $('cwin');
-  const d = document.createElement('div');
-  d.className = 'cb-typing'; d.id = 'ctype';
-  d.innerHTML = '<div class="bub"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div></div>';
-  win.appendChild(d);
-  win.scrollTop = win.scrollHeight;
-}
-function crm() { const t = $('ctype'); if (t) t.remove(); }
-
-function cdiv(txt = 'conversa reiniciada') {
-  const win = $('cwin');
-  const d = document.createElement('div');
-  d.className = 'cdiv'; d.textContent = txt;
-  win.appendChild(d);
-  win.scrollTop = win.scrollHeight;
-}
-
-function showLeadToast(type) {
-  const el = $('lead-toast');
-  if (type === 'quente') {
-    el.textContent = '🔥 Lead QUENTE! Ver na aba Leads.';
-    el.style.borderColor = 'rgba(255,60,60,.5)';
-    el.style.color = 'var(--red)';
-  } else {
-    el.textContent = '✓ Lead registrado como morno.';
-    el.style.borderColor = '';
-    el.style.color = '';
-  }
-  el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 4000);
-  fetch('/api/leads').then(r => r.json()).then(j => {
-    if (!j.ok) return;
-    const n = (j.data || []).length;
-    $('hl').textContent = n;
-    const tc = $('tc-leads');
-    if (n) { tc.textContent = n; tc.style.display = 'inline-block'; }
-  }).catch(() => {});
-}
-
-async function chatStart() {
-  chatAutoRestarting = false;
-  const p = cphone();
-  $('cwin').innerHTML = '';
-  csetNode('INICIO');
-  ctyping();
-  try {
-    const j = await fetch('/start', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({phone: p}),
-    }).then(r => r.json());
-    crm();
-    if (j.ok) {
-      csetNode(j.nextNode);
-      cappend(j.text, false);
-      $('cmsg').focus();
-    } else {
-      const d = document.createElement('div');
-      d.className = 'empty'; d.style.color = 'var(--red)';
-      d.textContent = 'Erro: ' + (j.error || '?');
-      $('cwin').appendChild(d);
-    }
-  } catch(e) {
-    crm();
-    const d = document.createElement('div');
-    d.className = 'empty'; d.style.color = 'var(--red)';
-    d.textContent = 'Erro de rede: ' + e.message;
-    $('cwin').appendChild(d);
-  }
-}
-
-async function chatSend() {
-  if (chatBusy) return;
-  const p = cphone(), txt = $('cmsg').value.trim();
-  if (!txt) return;
-
-  chatBusy = true;
-  $('csend').disabled = true;
-  $('cmsg').value = '';
-  $('cqr').innerHTML = '';
-
-  cappend(txt, true);
-  ctyping();
-
-  try {
-    const j = await fetch('/send', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({phone: p, text: txt}),
-    }).then(r => r.json());
-    crm();
-    if (j.ok) {
-      const prev = chatCurNode;
-      csetNode(j.nextNode);
-      cappend(j.reply, false);
-
-      // RECOMENDACAO = lead registrado como MORNO; ENCAMINHAR_HUMANO = QUENTE
-      if (j.nextNode === 'RECOMENDACAO')        showLeadToast('morno');
-      if (j.nextNode === 'ENCAMINHAR_HUMANO')   showLeadToast('quente');
-
-      // auto-restart after terminal node
-      if (j.nextNode === 'INICIO' && prev !== 'INICIO' && !chatAutoRestarting) {
-        chatAutoRestarting = true;
-        setTimeout(() => { cdiv(); chatStart(); }, 1800);
-      }
-    } else {
-      cappend('⚠ ' + (j.error || 'erro'), false);
-    }
-  } catch(e) {
-    crm();
-    cappend('⚠ Erro de rede: ' + e.message, false);
-  } finally {
-    chatBusy = false;
-    $('csend').disabled = false;
-    $('cmsg').focus();
-  }
-}
-
-// ═══════════════════════════════════════════════════════
-//  FLOW CANVAS — Freeform-style infinite board
-//  Logic mirrors WhatsApp Business API Interactive
-//  Messages: each option bubble = one Quick Reply branch.
-// ═══════════════════════════════════════════════════════
-
-const FW = 210; // node width (sync with CSS)
-
-// Node accent colors (maps to WhatsApp message types)
-const F_COL = {
-  INICIO:              '#00ff41',
-  APRESENTACAO:        '#555',
-  CAPTURA_TAMANHO:     '#4da6ff',
-  CAPTURA_NUMERO:      '#4da6ff',
-  CAPTURA_ESTILO:      '#4da6ff',
-  CAPTURA_CIDADE:      '#4da6ff',
-  RECOMENDACAO:        '#ffaa00',
-  CAPTURA_NOME_QUENTE: '#ff5555',
-  AGUARDAR_RESPOSTA:   '#ffaa00',
-  CONSULTA_PEDIDO:     '#4da6ff',
-  SUPORTE:             '#c06bff',
-  ENCAMINHAR_HUMANO:   '#c06bff',
-  FORA_HORARIO:        '#ffaa00',
-  OPTOUT:              '#ff5555',
-  NAO_ENTENDI:         '#555',
-};
-
-// Default positions (editable, saved in localStorage)
-const F_DEFAULTS = {
-  INICIO:              { x: 60,   y: 340 },
-  APRESENTACAO:        { x: 360,  y: 540 },
-  CAPTURA_TAMANHO:     { x: 360,  y: 40  },
-  CAPTURA_NUMERO:      { x: 360,  y: 200 },
-  CONSULTA_PEDIDO:     { x: 360,  y: 400 },
-  SUPORTE:             { x: 360,  y: 660 },
-  FORA_HORARIO:        { x: 360,  y: 820 },
-  OPTOUT:              { x: 360,  y: 980 },
-  NAO_ENTENDI:         { x: 360,  y: 1140},
-  CAPTURA_ESTILO:      { x: 660,  y: 40  },
-  CAPTURA_CIDADE:      { x: 960,  y: 100 },
-  RECOMENDACAO:        { x: 1260, y: 100 },
-  CAPTURA_NOME_QUENTE: { x: 1560, y: 20  },
-  AGUARDAR_RESPOSTA:   { x: 1560, y: 200 },
-  ENCAMINHAR_HUMANO:   { x: 1860, y: 100 },
-};
-
-// Edges from engine that bypass flowMap (engine pre-checks)
-const F_SYS_EDGES = [
-  { from: 'INICIO', to: 'FORA_HORARIO', label: 'fora horário', dashed: true, sys: true },
-  { from: 'INICIO', to: 'OPTOUT',       label: 'parar/stop',   dashed: true, sys: true },
-];
-
-// ── State ────────────────────────────────────────────────
-let fZoom = 1, fPanX = 60, fPanY = 60;
-let fPanning  = false;
-let fPanStart = { mx: 0, my: 0, px: 0, py: 0 };
-let fDragging = null;  // { id, startMx, startMy, origX, origY }
-let fPos      = {};    // { nodeId: { x, y } }
-let fData     = null;  // raw API nodes
-let fInited   = false;
-
-// ── Transform ────────────────────────────────────────────
-function fApply() {
-  const c = $('flow-canvas');
-  if (c) c.style.transform = `translate(${fPanX}px,${fPanY}px) scale(${fZoom})`;
-  const l = $('fzoom-lbl');
-  if (l) l.textContent = Math.round(fZoom * 100) + '%';
-}
-
-function fZoomAt(factor, cx, cy) {
-  const prev = fZoom;
-  fZoom = Math.max(0.12, Math.min(4, fZoom * factor));
-  fPanX = cx - (cx - fPanX) * (fZoom / prev);
-  fPanY = cy - (cy - fPanY) * (fZoom / prev);
-  fApply();
-}
-
-function fZoomIn()  { const s=$('flow-stage'),r=s.getBoundingClientRect(); fZoomAt(1.2, r.width/2, r.height/2); }
-function fZoomOut() { const s=$('flow-stage'),r=s.getBoundingClientRect(); fZoomAt(1/1.2, r.width/2, r.height/2); }
-
-function fFit() {
-  const ids = Object.keys(fPos);
-  if (!ids.length) return;
-  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
-  ids.forEach(id => {
-    const p = fPos[id];
-    const el = document.getElementById('fn-' + id);
-    const h = el ? el.offsetHeight : 130;
-    x0=Math.min(x0,p.x); y0=Math.min(y0,p.y);
-    x1=Math.max(x1,p.x+FW); y1=Math.max(y1,p.y+h);
-  });
-  const s = $('flow-stage');
-  const sw = s.clientWidth - 80, sh = s.clientHeight - 80;
-  fZoom = Math.max(0.12, Math.min(1, Math.min(sw/(x1-x0), sh/(y1-y0))));
-  fPanX = 40 - x0 * fZoom;
-  fPanY = 40 - y0 * fZoom;
-  fApply();
-}
-
-// ── Node drag ────────────────────────────────────────────
-function fStartDrag(e, id) {
-  e.stopPropagation();
-  const p = fPos[id] || { x: 0, y: 0 };
-  fDragging = { id, startMx: e.clientX, startMy: e.clientY, origX: p.x, origY: p.y };
-  document.getElementById('fn-' + id)?.classList.add('active');
-  $('flow-stage').classList.add('dragging');
-}
-
-// ── Edge drawing ─────────────────────────────────────────
-const SVG_NS = 'http://www.w3.org/2000/svg';
-
-function fMkMarker(defs, col) {
-  const id = 'arr-' + col.replace('#','');
-  if (defs.querySelector('#' + id)) return;
-  const m = document.createElementNS(SVG_NS, 'marker');
-  m.setAttribute('id', id);
-  m.setAttribute('markerWidth','6'); m.setAttribute('markerHeight','6');
-  m.setAttribute('refX','5'); m.setAttribute('refY','3'); m.setAttribute('orient','auto');
-  const p = document.createElementNS(SVG_NS, 'path');
-  p.setAttribute('d','M 0 0 L 6 3 L 0 6 z'); p.setAttribute('fill', col);
-  m.appendChild(p); defs.appendChild(m);
-}
-
-function fEdgePath(x1, y1, x2, y2) {
-  const dx = x2 - x1;
-  // Horizontal bezier — control points always extend outward
-  const off = Math.max(Math.abs(dx) * 0.55, 90);
-  return `M ${x1},${y1} C ${x1+off},${y1} ${x2-off},${y2} ${x2},${y2}`;
-}
-
-function fDrawEdges() {
-  const svg = $('flow-svg');
-  if (!svg || !fData) return;
-  svg.innerHTML = '';
-
-  const defs = document.createElementNS(SVG_NS, 'defs');
-  svg.appendChild(defs);
-
-  // Collect all edges from flowMap data
-  const edges = [];
-  fData.forEach(nd => {
-    nd.options.forEach(o => {
-      edges.push({ from: nd.id, to: o.next, label: o.trigger.substring(0,14), dashed: false, sys: false });
-    });
-    if (nd.default && nd.default !== nd.id) {
-      edges.push({ from: nd.id, to: nd.default, label: 'default', dashed: true, sys: false });
-    }
-  });
-  F_SYS_EDGES.forEach(e => edges.push(e));
-
-  edges.forEach(e => {
-    const fp = fPos[e.from], tp = fPos[e.to];
-    if (!fp || !tp) return;
-    const fromEl = document.getElementById('fn-' + e.from);
-    const toEl   = document.getElementById('fn-' + e.to);
-    const fh = fromEl ? fromEl.offsetHeight : 130;
-    const th = toEl   ? toEl.offsetHeight   : 130;
-
-    const col = e.sys ? '#c06bff' : (F_COL[e.to] || '#555');
-    fMkMarker(defs, col);
-
-    const x1 = fp.x + FW, y1 = fp.y + fh / 2;
-    const x2 = tp.x,      y2 = tp.y + th / 2;
-
-    const path = document.createElementNS(SVG_NS, 'path');
-    path.setAttribute('d', fEdgePath(x1, y1, x2, y2));
-    path.setAttribute('stroke', col);
-    path.setAttribute('stroke-width', e.sys ? '1' : (e.dashed ? '1' : '1.5'));
-    path.setAttribute('fill', 'none');
-    path.setAttribute('opacity', e.sys ? '0.3' : (e.dashed ? '0.25' : '0.55'));
-    if (e.dashed || e.sys) path.setAttribute('stroke-dasharray', '5,4');
-    path.setAttribute('marker-end', `url(#arr-${col.replace('#','')})`);
-    svg.appendChild(path);
-  });
-}
-
-// ── Positions persistence ────────────────────────────────
-function fSavePos() {
-  try { localStorage.setItem('fpos_v2', JSON.stringify(fPos)); } catch {}
-}
-function fLoadPos() {
-  try { const s = localStorage.getItem('fpos_v2'); if (s) return JSON.parse(s); } catch {}
-  return {};
-}
-function fResetPositions() {
-  try { localStorage.removeItem('fpos_v2'); } catch {}
-  if (!fData) return;
-  fData.forEach(nd => {
-    fPos[nd.id] = { ...(F_DEFAULTS[nd.id] || { x: 60, y: 60 }) };
-    const el = document.getElementById('fn-' + nd.id);
-    if (el) { el.style.left = fPos[nd.id].x + 'px'; el.style.top = fPos[nd.id].y + 'px'; }
-  });
-  fDrawEdges();
-  setTimeout(fFit, 40);
-}
-
-// ── Build node card ──────────────────────────────────────
-function fBuildNode(nd) {
-  const pos = fPos[nd.id] || F_DEFAULTS[nd.id] || { x: 60, y: 60 };
-  fPos[nd.id] = { ...pos };
-
-  const col = F_COL[nd.id] || '#555';
-
-  // Badges
-  const tags = [];
-  if (nd.id === 'INICIO')          tags.push(`<span class="fn-tag ft-root">ROOT</span>`);
-  if (nd.terminal)                  tags.push(`<span class="fn-tag ft-term">TERMINAL</span>`);
-  if (nd.id === 'FORA_HORARIO' || nd.id === 'OPTOUT')
-                                    tags.push(`<span class="fn-tag ft-sys">ENGINE</span>`);
-  if (nd.action)                    tags.push(`<span class="fn-tag ft-act">${esc(nd.action.replace(/_/g,' '))}</span>`);
-
-  // ── Cloud buttons (WhatsApp Quick Reply logic) ──────────
-  // Each option = one interactive button the user can tap.
-  // Color = destination node's accent, mirroring how platforms
-  // like Blip/Zenvia color-code branches by intent category.
-  const opts = nd.options.map(o => {
-    const nc = F_COL[o.next] || '#555';
-    const dest = o.next.replace(/_/g,' ').toLowerCase();
-    return `<div class="fopt" style="--oc:${nc}" title="${esc(o.trigger)} → ${esc(o.next)}">
-      <span class="fopt-label">${esc(o.trigger.substring(0,24))}</span>
-      <span class="fopt-arrow">→</span>
-      <span class="fopt-dest">${esc(dest)}</span>
-    </div>`;
-  }).join('');
-
-  const el = document.createElement('div');
-  el.className = 'fnode';
-  el.id = 'fn-' + nd.id;
-  el.style.left = pos.x + 'px';
-  el.style.top  = pos.y + 'px';
-  el.style.borderTop = `2px solid ${col}`;
-
-  if (nd.customized) {
-    tags.push(`<span class="fn-tag ft-custom">custom</span>`);
-    el.style.boxShadow = '0 0 0 1px rgba(255,170,0,.25)';
-  }
-
-  el.innerHTML =
-    `<div class="fnode-hdr" onmousedown="fStartDrag(event,'${nd.id}')">
-       <span class="fnode-id" style="color:${col}">${esc(nd.id)}</span>
-       <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-         <div class="fnode-tags">${tags.join('')}</div>
-         <button class="fnode-edit" onclick="event.stopPropagation();feOpen('${nd.id}')" title="Editar nó">✎</button>
-       </div>
-     </div>
-     <div class="fnode-msg">${esc((nd.message||'').substring(0,72))}${(nd.message||'').length>72?'…':''}</div>
-     ${opts ? `<div class="fnode-opts">${opts}</div>` : ''}
-     ${nd.default ? `<div class="fnode-default">↪ ${esc(nd.default.replace(/_/g,' ').toLowerCase())}</div>` : ''}`;
-
-  // Touch drag on header
-  const hdr = el.querySelector('.fnode-hdr');
-  hdr.addEventListener('touchstart', ev => {
-    ev.stopPropagation();
-    const t = ev.touches[0];
-    const p = fPos[nd.id] || { x: 0, y: 0 };
-    fDragging = { id: nd.id, startMx: t.clientX, startMy: t.clientY, origX: p.x, origY: p.y };
-    el.classList.add('active');
-  }, { passive: true });
-
-  return el;
-}
-
-// ── Stage events: pan + zoom ─────────────────────────────
-function fInitEvents() {
-  const stage = $('flow-stage');
-
-  // Mouse wheel zoom
-  stage.addEventListener('wheel', e => {
-    e.preventDefault();
-    const r = stage.getBoundingClientRect();
-    fZoomAt(e.deltaY < 0 ? 1.1 : 1/1.1, e.clientX - r.left, e.clientY - r.top);
-  }, { passive: false });
-
-  // Mouse pan (empty space)
-  stage.addEventListener('mousedown', e => {
-    if (e.button !== 0 || e.target.closest('.fnode')) return;
-    fPanning = true;
-    fPanStart = { mx: e.clientX, my: e.clientY, px: fPanX, py: fPanY };
-    stage.classList.add('panning');
-  });
-
-  window.addEventListener('mousemove', e => {
-    if (fPanning) {
-      fPanX = fPanStart.px + (e.clientX - fPanStart.mx);
-      fPanY = fPanStart.py + (e.clientY - fPanStart.my);
-      fApply();
-    }
-    if (fDragging) {
-      const nx = fDragging.origX + (e.clientX - fDragging.startMx) / fZoom;
-      const ny = fDragging.origY + (e.clientY - fDragging.startMy) / fZoom;
-      fPos[fDragging.id] = { x: nx, y: ny };
-      const el = document.getElementById('fn-' + fDragging.id);
-      if (el) { el.style.left = nx + 'px'; el.style.top = ny + 'px'; }
-      fDrawEdges();
-    }
-  });
-
-  window.addEventListener('mouseup', () => {
-    if (fPanning) { stage.classList.remove('panning'); fPanning = false; }
-    if (fDragging) {
-      document.getElementById('fn-' + fDragging.id)?.classList.remove('active');
-      $('flow-stage').classList.remove('dragging');
-      fSavePos();
-      fDragging = null;
-    }
-  });
-
-  // Touch pan + pinch zoom
-  let tPinchDist = 0, tPinchZoom = 1, tPinchPan = { x: 0, y: 0 };
-
-  stage.addEventListener('touchstart', e => {
-    e.preventDefault();
-    const ts = Array.from(e.touches);
-    if (ts.length === 1 && !e.target.closest('.fnode')) {
-      fPanning = true;
-      fPanStart = { mx: ts[0].clientX, my: ts[0].clientY, px: fPanX, py: fPanY };
-    } else if (ts.length === 2) {
-      fPanning = false;
-      tPinchDist = Math.hypot(ts[1].clientX-ts[0].clientX, ts[1].clientY-ts[0].clientY);
-      tPinchZoom = fZoom;
-      tPinchPan  = { x: fPanX, y: fPanY };
-    }
-  }, { passive: false });
-
-  stage.addEventListener('touchmove', e => {
-    e.preventDefault();
-    const ts = Array.from(e.touches);
-    if (fPanning && ts.length === 1) {
-      fPanX = fPanStart.px + (ts[0].clientX - fPanStart.mx);
-      fPanY = fPanStart.py + (ts[0].clientY - fPanStart.my);
-      fApply();
-    } else if (ts.length === 2) {
-      const dist = Math.hypot(ts[1].clientX-ts[0].clientX, ts[1].clientY-ts[0].clientY);
-      const prev = fZoom;
-      fZoom = Math.max(0.12, Math.min(4, tPinchZoom * (dist / tPinchDist)));
-      const cx = (ts[0].clientX + ts[1].clientX) / 2 - stage.getBoundingClientRect().left;
-      const cy = (ts[0].clientY + ts[1].clientY) / 2 - stage.getBoundingClientRect().top;
-      fPanX = cx - (cx - tPinchPan.x) * (fZoom / tPinchZoom);
-      fPanY = cy - (cy - tPinchPan.y) * (fZoom / tPinchZoom);
-      fApply();
-    }
-    if (fDragging) {
-      const t = ts[0];
-      const nx = fDragging.origX + (t.clientX - fDragging.startMx) / fZoom;
-      const ny = fDragging.origY + (t.clientY - fDragging.startMy) / fZoom;
-      fPos[fDragging.id] = { x: nx, y: ny };
-      const el = document.getElementById('fn-' + fDragging.id);
-      if (el) { el.style.left = nx + 'px'; el.style.top = ny + 'px'; }
-      fDrawEdges();
-    }
-  }, { passive: false });
-
-  stage.addEventListener('touchend', () => {
-    fPanning = false;
-    if (fDragging) {
-      document.getElementById('fn-' + fDragging.id)?.classList.remove('active');
-      fSavePos();
-      fDragging = null;
-    }
-  });
-}
-
-// ── Main loader ──────────────────────────────────────────
-async function loadFlow() {
-  if (fInited) { fFit(); return; }
-  const loading = $('flow-loading');
-  try {
-    const j = await fetch('/api/flow').then(r => r.json());
-    if (!j.ok) throw new Error(j.error);
-    fData = j.data || [];
-
-    // Load saved positions, fall back to defaults
-    const saved = fLoadPos();
-    fData.forEach(nd => {
-      fPos[nd.id] = saved[nd.id] || F_DEFAULTS[nd.id] || { x: 60, y: 60 };
-    });
-
-    const canvas = $('flow-canvas');
-    fData.forEach(nd => canvas.appendChild(fBuildNode(nd)));
-
-    fInitEvents();
-    fApply();
-
-    // Draw edges and fit after first paint (need offsetHeight)
-    requestAnimationFrame(() => {
-      fDrawEdges();
-      fFit();
-      if (loading) loading.style.display = 'none';
-      fInited = true;
-    });
-  } catch(e) {
-    console.error('[flow]', e);
-    if (loading) { loading.style.color = 'var(--red)'; loading.textContent = 'Erro: ' + e.message; }
-  }
-}
-
-// ═══════════════════════════════════════════════════════
-//  FLOW EDITOR — controle de mensagens e gatilhos
-// ═══════════════════════════════════════════════════════
-
-let feNodeId  = null;   // nó aberto no editor
-let feAllIds  = [];     // todos os IDs para os selects
-
-async function feOpen(nodeId) {
-  feNodeId = nodeId;
-  feAllIds = (fData || []).map(n => n.id);
-
-  const nd  = (fData || []).find(n => n.id === nodeId);
-  if (!nd) return;
-
-  // Atualiza cabeçalho
-  const col = F_COL[nodeId] || '#e4e4e4';
-  $('fe-dot').style.background  = col;
-  $('fe-dot').style.boxShadow   = `0 0 6px ${col}`;
-  $('fe-title').textContent     = nodeId;
-  $('fe-title').style.color     = col;
-
-  // Busca config salva
-  let cfg = {};
-  try {
-    const j = await fetch('/api/flow/config').then(r => r.json());
-    const found = (j.data || []).find(c => c.node_id === nodeId);
-    if (found) cfg = found;
-  } catch {}
-
-  feRender(nd, cfg);
-  $('flow-editor').classList.add('open');
-}
-
-function feClose() {
-  $('flow-editor').classList.remove('open');
-  feNodeId = null;
-}
-
-function feRender(nd, cfg) {
-  const isCustom = !!(cfg.message || cfg.options || cfg.default_next);
-  const allIds   = feAllIds;
-
-  // Mensagem efetiva no editor
-  const currentMsg  = cfg.message != null ? cfg.message : (nd.message || '');
-
-  // Opções efetivas
-  const currentOpts = cfg.options
-    ? cfg.options
-    : nd.options.map(o => ({ trigger: o.trigger, next: o.next, data: o.data }));
-
-  const currentDef = cfg.default_next || nd.default || '';
-
-  const statusHtml = isCustom
-    ? `<div class="fe-status custom">⚡ Usando configuração personalizada.</div>`
-    : `<div class="fe-status default">✓ Usando configuração padrão do código.</div>`;
-
-  const optsHtml = currentOpts.map((o, i) => feOptRow(o, i, allIds)).join('');
-
-  const defOptions = ['', ...allIds].map(id =>
-    `<option value="${esc(id)}" ${id===currentDef?'selected':''}>${id || '— sem padrão —'}</option>`
-  ).join('');
-
-  $('fe-body').innerHTML = `
-    ${statusHtml}
-
-    <div class="fe-section">
-      <label class="fe-label">Mensagem do bot</label>
-      <textarea class="fe-textarea" id="fe-msg" rows="5" placeholder="Texto que o bot envia...">${esc(currentMsg)}</textarea>
-      <div class="fe-hint">Variáveis: <strong>{nome}</strong> <strong>{tamanho}</strong> <strong>{estilo}</strong> <strong>{cidade}</strong> <strong>{interesse}</strong> <strong>{wa_link}</strong></div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Leads gerados por dia</div><span class="badge badge-gold">Últimos 7 dias</span></div>
+          <div style="height:200px"><canvas id="chart-leads"></canvas></div>
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="card" style="text-align:center"><div style="font-size:32px;font-weight:800;color:var(--green);margin-bottom:6px">87%</div><div style="font-size:13px;font-weight:600">Taxa de resposta</div><div style="font-size:11px;color:var(--mu);margin-top:4px">mensagens respondidas pelo bot</div></div>
+        <div class="card" style="text-align:center"><div style="font-size:32px;font-weight:800;color:var(--gold);margin-bottom:6px">14h</div><div style="font-size:13px;font-weight:600">Horário de pico</div><div style="font-size:11px;color:var(--mu);margin-top:4px">mais mensagens às 14:00–16:00</div></div>
+        <div class="card" style="text-align:center"><div style="font-size:32px;font-weight:800;color:var(--blue);margin-bottom:6px">23%</div><div style="font-size:13px;font-weight:600">Encaminhados p/ humano</div><div style="font-size:11px;color:var(--mu);margin-top:4px">conversas que saíram do bot</div></div>
+      </div>
     </div>
 
-    <div class="fe-section">
-      <label class="fe-label">Opções / Quick Replies</label>
-      <div id="fe-opts">${optsHtml}</div>
-      <button class="fe-add-opt" onclick="feAddOpt()">+ Adicionar opção</button>
-      <div class="fe-hint" style="margin-top:8px;">Gatilho: palavras separadas por vírgula — ex: <em>camisa, polo, camiseta</em><br>Ou regex direto — ex: <em>camis[ae]t?a?|polo</em></div>
+    <!-- ── INTEGRAÇÕES ──────────────────────── -->
+    <div x-show="page === 'integracoes'">
+      <div class="int-grid">
+        <div class="int-card">
+          <div class="int-logo" style="background:#25D366;font-size:22px">📱</div>
+          <div><div class="int-name">WhatsApp / Evolution API</div><div class="int-desc">Conecte seu número para envio e recebimento de mensagens reais.</div></div>
+          <div style="display:flex;align-items:center;justify-content:space-between"><span class="badge badge-gold">Pendente</span><button class="btn btn-green" style="font-size:11px;padding:6px 12px">Configurar</button></div>
+        </div>
+        <div class="int-card">
+          <div class="int-logo" style="background:#1C1C1E;border:1px solid var(--border);font-size:22px">🗄️</div>
+          <div><div class="int-name">Supabase</div><div class="int-desc">Banco de dados conectado. Sessões, leads e mensagens sendo gravados.</div></div>
+          <div style="display:flex;align-items:center;justify-content:space-between"><span class="badge badge-green">Conectado</span><button class="btn" style="font-size:11px;padding:6px 12px">Testar</button></div>
+        </div>
+        <div class="int-card">
+          <div class="int-logo" style="background:#1a1a2e;font-size:22px">⚡</div>
+          <div><div class="int-name">API do Bot</div><div class="int-desc">Motor de fluxo online. Rotas /api/health e /api/chat respondendo.</div></div>
+          <div style="display:flex;align-items:center;justify-content:space-between"><span class="badge badge-green">Online</span><button class="btn" style="font-size:11px;padding:6px 12px" @click="navigate('simulador')">Testar bot</button></div>
+        </div>
+        <div class="int-card">
+          <div class="int-logo" style="background:#111;font-size:22px">🛍️</div>
+          <div><div class="int-name">Catálogo Fluxo Outlet</div><div class="int-desc">Leitura do catálogo de produtos via Supabase do site (read-only).</div></div>
+          <div style="display:flex;align-items:center;justify-content:space-between"><span class="badge badge-green">Conectado</span><a class="btn" href="https://fluxooutlet.com.br" target="_blank" style="font-size:11px;padding:6px 12px">Abrir site</a></div>
+        </div>
+        <div class="int-card" style="opacity:.5">
+          <div class="int-logo" style="background:#1877F2;font-size:22px">📊</div>
+          <div><div class="int-name">Meta Ads</div><div class="int-desc">Integração com pixel e conversões em breve.</div></div>
+          <div><span class="badge badge-gray">Em breve</span></div>
+        </div>
+        <div class="int-card" style="opacity:.5">
+          <div class="int-logo" style="background:#111;font-size:22px">🤖</div>
+          <div><div class="int-name">IA Generativa</div><div class="int-desc">Respostas inteligentes com Claude ou GPT em breve.</div></div>
+          <div><span class="badge badge-gray">Em breve</span></div>
+        </div>
+      </div>
     </div>
 
-    <div class="fe-section">
-      <label class="fe-label">Destino padrão (sem match)</label>
-      <select class="fe-select" id="fe-default">${defOptions}</select>
+    <!-- ── CONFIGURAÇÕES ────────────────────── -->
+    <div x-show="page === 'configuracoes'">
+      <div class="grid-2">
+        <div>
+          <div class="settings-section">
+            <h3>Informações da loja</h3>
+            <div class="field"><label>Nome da loja</label><input type="text" x-model="cfg.nome"></div>
+            <div class="field"><label>WhatsApp principal</label><input type="text" x-model="cfg.whatsapp"></div>
+            <div class="field"><label>Mensagem de saudação</label><textarea x-model="cfg.saudacao" rows="3"></textarea></div>
+          </div>
+          <div class="settings-section">
+            <h3>Horário de atendimento</h3>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="field"><label>Abertura</label><input type="time" x-model="cfg.horario_inicio"></div>
+              <div class="field"><label>Fechamento</label><input type="time" x-model="cfg.horario_fim"></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="settings-section">
+            <h3>Comportamento do bot</h3>
+            <div class="toggle-row"><div class="toggle-info"><h4>Bot ativo</h4><p>Responder mensagens automaticamente</p></div><button class="toggle" :class="{ on: botOn }" @click="botOn = !botOn"></button></div>
+            <div class="toggle-row"><div class="toggle-info"><h4>Ignorar horário</h4><p>Responder 24/7 (desativar para prod)</p></div><button class="toggle" :class="{ on: ignorarHorario }" @click="ignorarHorario = !ignorarHorario"></button></div>
+            <div class="toggle-row"><div class="toggle-info"><h4>Fallback para humano</h4><p>Encaminhar quando bot não sabe responder</p></div><button class="toggle on"></button></div>
+            <div class="toggle-row"><div class="toggle-info"><h4>Delay de resposta</h4><p>Simular tempo de digitação (~800ms)</p></div><button class="toggle on"></button></div>
+          </div>
+          <div style="margin-top:20px">
+            <button class="btn btn-green" style="width:100%;justify-content:center;padding:12px">Salvar configurações</button>
+          </div>
+        </div>
+      </div>
     </div>
-  `;
-}
 
-function feOptRow(o, i, allIds) {
-  const destOptions = allIds.map(id =>
-    `<option value="${id}" ${id===o.next?'selected':''}>${id}</option>`
-  ).join('');
-  return `
-    <div class="fe-opt-row" id="feopt-${i}">
-      <button class="fe-opt-del" onclick="feDelOpt(${i})" title="Remover">✕</button>
-      <span class="fe-opt-label">Gatilho</span>
-      <input class="fe-input" id="feopt-trig-${i}" value="${esc(o.trigger||'')}" placeholder="ex: camisa, polo, camiseta" style="margin-bottom:7px">
-      <span class="fe-opt-label">Ir para</span>
-      <select class="fe-select" id="feopt-next-${i}">${destOptions}</select>
-    </div>`;
-}
+  </div><!-- /cmd-content -->
+</div><!-- /cmd-main -->
 
-function feAddOpt() {
-  const container = $('fe-opts');
-  const i = container.children.length;
-  const allIds = feAllIds;
-  const div = document.createElement('div');
-  div.innerHTML = feOptRow({ trigger: '', next: allIds[0] || '' }, i, allIds);
-  container.appendChild(div.firstElementChild);
-}
-
-function feDelOpt(i) {
-  const el = $('feopt-' + i);
-  if (el) el.remove();
-}
-
-function feCollectOpts() {
-  const rows = $('fe-opts').children;
-  const opts = [];
-  Array.from(rows).forEach(row => {
-    const idx  = row.id.replace('feopt-','');
-    const trig = document.getElementById('feopt-trig-' + idx);
-    const next = document.getElementById('feopt-next-' + idx);
-    if (trig && next && trig.value.trim()) {
-      opts.push({ trigger: trig.value.trim(), next: next.value });
-    }
-  });
-  return opts;
-}
-
-async function feSave() {
-  const btn = $('fe-save-btn');
-  btn.disabled = true; btn.textContent = 'Salvando...';
-  try {
-    const msg   = $('fe-msg')?.value?.trim() || null;
-    const opts  = feCollectOpts();
-    const def   = $('fe-default')?.value || null;
-
-    const r = await fetch('/api/flow/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        nodeId:       feNodeId,
-        message:      msg,
-        options:      opts.length ? opts : null,
-        default_next: def || null,
-      }),
-    }).then(r => r.json());
-
-    if (!r.ok) throw new Error(r.error);
-
-    feClose();
-    // Recarrega o canvas para refletir as mudanças
-    fInited = false;
-    $('flow-canvas').innerHTML = '<svg class="flow-svg-layer" id="flow-svg"></svg>';
-    fData = null;
-    await loadFlow();
-  } catch(e) {
-    alert('Erro ao salvar: ' + e.message);
-  } finally {
-    btn.disabled = false; btn.textContent = 'Salvar';
-  }
-}
-
-async function feReset() {
-  if (!confirm(`Resetar "${feNodeId}" para o padrão do código?`)) return;
-  try {
-    const r = await fetch('/api/flow/config/' + feNodeId, { method: 'DELETE' }).then(r => r.json());
-    if (!r.ok) throw new Error(r.error);
-    feClose();
-    fInited = false;
-    $('flow-canvas').innerHTML = '<svg class="flow-svg-layer" id="flow-svg"></svg>';
-    fData = null;
-    await loadFlow();
-  } catch(e) {
-    alert('Erro ao resetar: ' + e.message);
-  }
-}
-
-// ── boot ────────────────────────────────────────────────
-// load lead count in header
-fetch('/api/leads').then(r => r.json()).then(j => {
-  if (!j.ok) return;
-  const n = (j.data || []).length;
-  $('hl').textContent = n;
-  if (n) { $('tc-leads').textContent = n; $('tc-leads').style.display = 'inline-block'; }
-}).catch(() => {});
-
-// auto-refresh leads count every 30s
-setInterval(() => {
-  if (curTab === 'leads') loadLeads();
-  else {
-    fetch('/api/leads').then(r => r.json()).then(j => {
-      if (j.ok) $('hl').textContent = (j.data || []).length;
-    }).catch(() => {});
-  }
-}, 30000);
-
-// start chat on load
-chatStart();
-</script>
+<script src="/fluxo.js"></script>
 </body>
 </html>
