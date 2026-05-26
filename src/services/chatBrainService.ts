@@ -52,9 +52,18 @@ export function handleIntent(
 ): BrainResult | null {
   const { intent, confidence, entities } = intentResult;
 
+  // Mensagem não reconhecida no INICIO — responde com menu suave sem escalar para APRESENTACAO
+  if (intent === 'unknown' && currentNodeId === 'INICIO') {
+    const storeName = ctx._storeName || 'nossa loja';
+    const reply = pick([
+      `Não entendi muito bem 😅 Me fala o que você procura: camisa, polo, tênis, bermuda ou boné?`,
+      `Hmm, pode repetir? 😊 Estou aqui pra ajudar com *${storeName}* — é sobre algum produto?`,
+      `Não captei bem! Me conta o que você está buscando que eu te ajudo. 👇`,
+    ], message);
+    return { reply, detectedIntent: 'unknown', confidence: 0 };
+  }
+
   if (intent === 'unknown') return null;
-  // No INICIO, saudações são tratadas pelo flowMap (exibe menu com saudação configurada)
-  if (intent === 'greeting' && currentNodeId === 'INICIO') return null;
 
   const p = pend(currentNodeId);
   let reply: string;
@@ -138,9 +147,9 @@ export function handleIntent(
     // ── RECLAMAÇÃO ───────────────────────────────────────────────────────────
     case 'complaint':
       reply = pick([
-        `Poxa, que chato! Me conta o que aconteceu e o número do pedido. Vou chamar um atendente pra resolver isso agora.`,
-        `Entendo, vou te ajudar. Me passa o número do pedido e me conta o problema que a gente resolve rapidinho.`,
-        `Não era pra ser assim! Me fala o número do pedido e o que aconteceu que eu te conecto com um atendente na hora.`,
+        `Poxa, entendo a frustração! Me conta o que aconteceu que eu te ajudo. Se preferir, posso chamar um atendente.`,
+        `Desculpa o transtorno! O que posso fazer pra te ajudar agora? Me fala o que você precisa.`,
+        `Entendo! Pode me contar melhor o que houve? Tô aqui pra resolver.`,
       ], message);
       break;
 
@@ -208,12 +217,9 @@ export function handleIntent(
           `Oi! Estava te esperando.${p}`,
         ], message);
       } else {
-        // Sem nó pendente — menu de boas-vindas
-        reply = pick([
-          `Fala! Bem-vindo à Fluxo Outlet. Me fala o que você procura hoje: camisa, polo, tênis, boné ou bermuda?`,
-          `Oi! Na Fluxo tem de tudo. Me fala o que você está buscando: camisa, polo, tênis, bermuda ou boné?`,
-          `Olá! Bem-vindo. O que você procura hoje? Camisa, polo, tênis, bermuda ou boné?`,
-        ], message);
+        // Sem nó pendente — usa saudação configurada + menu natural
+        const saudacao = ctx._saudacao || `Oi! 👋 Bem-vindo à *${ctx._storeName || 'nossa loja'}*.`;
+        reply = `${saudacao}\n\nO que você procura hoje? Pode me falar: camisa, polo, tênis, bermuda ou boné 👇`;
       }
       break;
 

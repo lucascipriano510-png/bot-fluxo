@@ -184,6 +184,13 @@ const INTENT_DEFS: IntentDef[] = [
       /\bdefeito\b/,
       /\bruim\b/,
       /\bpessimo\b/,
+      /\bsacanagem\b/,
+      /\bhorr[íi]vel\b/,
+      /\babsurdo\b/,
+      /\bque raiva\b/,
+      /\bque coisa\b/,
+      /\bque chato\b/,
+      /\bfrustrant\b/,
     ],
   },
 
