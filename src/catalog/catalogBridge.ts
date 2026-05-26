@@ -269,8 +269,9 @@ export function formatOffersResponse(
     return fmtOffer(offers[0], true);
   }
 
-  // Múltiplos resultados — entrega link da página filtrada do site
-  const catalogUrl = buildCatalogUrl(filters);
+  // Múltiplos resultados — usa subcategoria real do banco pra montar a URL
+  const actualSub  = offers[0]?.subcategory ?? filters.subcategory;
+  const catalogUrl = buildCatalogUrl({ ...filters, subcategory: actualSub });
   const urlLine    = catalogUrl ? `\n\n🔗 ${catalogUrl}` : '';
 
   if (catDisplay && size) {
@@ -335,7 +336,8 @@ export function formatFallbackResponse(
   }
 
   const notFoundStr = notFound.join(' ');
-  const catalogUrl  = buildCatalogUrl(matched);
+  const actualSub   = offers[0]?.subcategory ?? matched.subcategory;
+  const catalogUrl  = buildCatalogUrl({ ...matched, subcategory: actualSub });
   const urlLine     = catalogUrl ? `\n🔗 ${catalogUrl}` : '';
 
   if (originalSize && !matched.attributes?.size) {
