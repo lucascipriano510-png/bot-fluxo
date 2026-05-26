@@ -197,19 +197,32 @@ function FluxoCommand() {
     },
 
     async login() {
-      if (this.loginLoading || !this._sb) return;
+      if (this.loginLoading) return;
+      if (!this._sb) {
+        this.loginError = 'Autenticação não configurada. Verifique SUPABASE_ANON_KEY no Vercel.';
+        return;
+      }
+      if (!this.loginEmail || !this.loginPassword) {
+        this.loginError = 'Preencha e-mail e senha.';
+        return;
+      }
       this.loginLoading = true;
       this.loginError   = '';
       try {
         const { data, error } = await this._sb.auth.signInWithPassword({
-          email:    this.loginEmail,
+          email:    this.loginEmail.trim(),
           password: this.loginPassword,
         });
-        if (error) { this.loginError = error.message; return; }
+        if (error) {
+          this.loginError = error.message === 'Invalid login credentials'
+            ? 'E-mail ou senha incorretos.'
+            : error.message;
+          return;
+        }
         this.authUser   = data.user;
         this._authToken = data.session?.access_token || null;
         await this._loadPanelData();
-      } catch (e) {
+      } catch {
         this.loginError = 'Erro ao conectar. Tente novamente.';
       } finally {
         this.loginLoading = false;
