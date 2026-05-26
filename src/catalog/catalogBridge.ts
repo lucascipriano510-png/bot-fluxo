@@ -336,8 +336,17 @@ export function formatFallbackResponse(
   }
 
   const notFoundStr = notFound.join(' ');
-  const actualSub   = offers[0]?.subcategory ?? matched.subcategory;
-  const catalogUrl  = buildCatalogUrl({ ...matched, subcategory: actualSub });
+  const actualSub   = offers[0]?.subcategory ?? original.subcategory;
+  // Usa tamanho original mesmo quando o fallback relaxou esse filtro,
+  // para que o link do site respeite a preferência de tamanho do cliente.
+  const catalogUrl  = buildCatalogUrl({
+    ...matched,
+    subcategory: actualSub,
+    attributes: {
+      ...matched.attributes,
+      size: originalSize ?? matched.attributes?.size,
+    },
+  });
   const urlLine     = catalogUrl ? `\n🔗 ${catalogUrl}` : '';
 
   if (originalSize && !matched.attributes?.size) {
