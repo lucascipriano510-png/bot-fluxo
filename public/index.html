@@ -328,15 +328,10 @@
             </div>
 
             <template x-for="(m, i) in simMessages" :key="i">
-              <div x-show="m.from === 'system'"
-                style="text-align:center;font-size:11px;color:var(--mu2);padding:8px 12px;background:rgba(255,255,255,.04);border-radius:6px;margin:4px 20px"
-                x-text="m.text">
-              </div>
-              <div x-show="m.from !== 'system'"
-                :class="m.from === 'bot' ? 'bubble bubble-bot' : 'bubble bubble-user'">
+              <div :class="m.from === 'system' ? 'sim-sys-msg' : (m.from === 'bot' ? 'bubble bubble-bot' : 'bubble bubble-user')">
                 <span x-text="m.text"></span>
                 <div x-show="m.from === 'bot' && m.intent" class="bubble-intent" x-text="`intent: ${m.intent} · ${Math.round((m.confidence||0)*100)}%`"></div>
-                <div class="bubble-time" x-text="m.time"></div>
+                <div x-show="m.from !== 'system'" class="bubble-time" x-text="m.time"></div>
               </div>
             </template>
 
