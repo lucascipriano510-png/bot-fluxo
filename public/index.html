@@ -8,9 +8,49 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/fluxo.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
 </head>
 <body x-data="FluxoCommand()" x-init="init()" x-cloak>
+
+<!-- ── Login overlay ─────────────────────────────────────────────────────── -->
+<div x-show="!authLoading && !authUser"
+     style="position:fixed;inset:0;z-index:9999;background:#0f1117;display:flex;align-items:center;justify-content:center;">
+  <div style="width:100%;max-width:360px;padding:2rem;background:#1a1d27;border-radius:12px;border:1px solid #2a2d3e;">
+    <div style="text-align:center;margin-bottom:2rem;">
+      <div style="font-size:1.5rem;font-weight:700;color:#fff;">Fluxo Command</div>
+      <div style="font-size:.85rem;color:#8b8fa8;margin-top:.25rem;">Entre para acessar o painel</div>
+    </div>
+    <div style="margin-bottom:1rem;">
+      <label style="display:block;font-size:.8rem;color:#8b8fa8;margin-bottom:.4rem;">E-mail</label>
+      <input x-model="loginEmail" type="email" placeholder="seu@email.com"
+             @keydown.enter="login()"
+             style="width:100%;padding:.65rem .85rem;background:#0f1117;border:1px solid #2a2d3e;border-radius:8px;color:#fff;font-size:.9rem;box-sizing:border-box;outline:none;">
+    </div>
+    <div style="margin-bottom:1.5rem;">
+      <label style="display:block;font-size:.8rem;color:#8b8fa8;margin-bottom:.4rem;">Senha</label>
+      <input x-model="loginPassword" type="password" placeholder="••••••••"
+             @keydown.enter="login()"
+             style="width:100%;padding:.65rem .85rem;background:#0f1117;border:1px solid #2a2d3e;border-radius:8px;color:#fff;font-size:.9rem;box-sizing:border-box;outline:none;">
+    </div>
+    <div x-show="loginError" x-text="loginError"
+         style="margin-bottom:1rem;padding:.6rem .85rem;background:#3d1515;border-radius:8px;color:#f87171;font-size:.82rem;"></div>
+    <button @click="login()" :disabled="loginLoading"
+            style="width:100%;padding:.75rem;background:#6366f1;color:#fff;font-weight:600;border:none;border-radius:8px;cursor:pointer;font-size:.95rem;">
+      <span x-show="!loginLoading">Entrar</span>
+      <span x-show="loginLoading">Entrando...</span>
+    </button>
+  </div>
+</div>
+
+<!-- ── Loading inicial ────────────────────────────────────────────────────── -->
+<div x-show="authLoading"
+     style="position:fixed;inset:0;z-index:9998;background:#0f1117;display:flex;align-items:center;justify-content:center;">
+  <div style="color:#8b8fa8;font-size:.9rem;">Carregando...</div>
+</div>
+
+<!-- ── Painel (só aparece autenticado) ───────────────────────────────────── -->
+<div x-show="!authLoading && authUser">
 
 <!-- Mobile overlay -->
 <div class="overlay" :class="{ visible: sidebarOpen }" @click="sidebarOpen = false"></div>
@@ -844,6 +884,8 @@
 
   </div><!-- /cmd-content -->
 </div><!-- /cmd-main -->
+
+</div><!-- /painel autenticado -->
 
 <script src="/fluxo.js"></script>
 </body>

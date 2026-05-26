@@ -84,6 +84,16 @@ const MOCK = {
 ───────────────────────────────────────────────────── */
 function FluxoCommand() {
   return {
+    /* auth */
+    _sb:          null,   // Supabase client instance
+    _authToken:   null,   // JWT do usuário logado
+    authUser:     null,   // objeto user do Supabase
+    authLoading:  true,   // true enquanto verifica sessão
+    loginEmail:   '',
+    loginPassword:'',
+    loginError:   '',
+    loginLoading: false,
+
     /* state */
     page: 'dashboard',
     sidebarOpen: false,
@@ -178,6 +188,40 @@ function FluxoCommand() {
       if (p === 'relatorios') this.$nextTick(() => this.initCharts());
     },
 
+    /* ── Auth ─────────────────────────────────────────────────────────────── */
+    // Wrapper para fetch que injeta o token Bearer automaticamente
+    async authFetch(url, opts = {}) {
+      const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+      if (this._authToken) headers['Authorization'] = `Bearer ${this._authToken}`;
+      return fetch(url, { ...opts, headers });
+    },
+
+    async login() {
+      if (this.loginLoading || !this._sb) return;
+      this.loginLoading = true;
+      this.loginError   = '';
+      try {
+        const { data, error } = await this._sb.auth.signInWithPassword({
+          email:    this.loginEmail,
+          password: this.loginPassword,
+        });
+        if (error) { this.loginError = error.message; return; }
+        this.authUser   = data.user;
+        this._authToken = data.session?.access_token || null;
+        await this._loadPanelData();
+      } catch (e) {
+        this.loginError = 'Erro ao conectar. Tente novamente.';
+      } finally {
+        this.loginLoading = false;
+      }
+    },
+
+    async logout() {
+      if (this._sb) await this._sb.auth.signOut();
+      this.authUser   = null;
+      this._authToken = null;
+    },
+
     /* init */
     async init() {
       const hash = window.location.hash.slice(1);
@@ -188,24 +232,51 @@ function FluxoCommand() {
         if (h) this.page = h;
       });
 
-      // Try to load real API data
-      await Promise.allSettled([
-        this.loadLeads(),
-        this.loadSessions(),
-        this.loadProducts(),
-        this.loadSettings(),
-      ]);
+      // 1. Carrega config pública para inicializar o cliente Supabase
+      try {
+        const cfgRes = await fetch('/api/config');
+        const cfg    = await cfgRes.json();
+        if (cfg.supabaseUrl && cfg.supabaseAnonKey && window.supabase) {
+          this._sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
 
+          // 2. Verifica sessão existente
+          const { data: { session } } = await this._sb.auth.getSession();
+          if (session) {
+            this.authUser   = session.user;
+            this._authToken = session.access_token;
+          }
+
+          // 3. Mantém token atualizado automaticamente
+          this._sb.auth.onAuthStateChange((_event, s) => {
+            this.authUser   = s?.user   || null;
+            this._authToken = s?.access_token || null;
+          });
+        }
+      } catch (_) { /* sem auth configurado, modo dev */ }
+
+      this.authLoading = false;
+      if (!this.authUser) return; // mostra tela de login
+
+      await this._loadPanelData();
       if (this.page === 'relatorios') {
         await this.$nextTick();
         this.initCharts();
       }
     },
 
+    async _loadPanelData() {
+      await Promise.allSettled([
+        this.loadLeads(),
+        this.loadSessions(),
+        this.loadProducts(),
+        this.loadSettings(),
+      ]);
+    },
+
     /* ── Configurações ─────────────────────────────────────────────────── */
     async loadSettings() {
       try {
-        const r = await fetch('/api/settings');
+        const r = await this.authFetch('/api/settings');
         const j = await r.json();
         this.cfgSetupNeeded = j.setup_needed === true;
         if (j.ok && j.data) {
@@ -228,9 +299,8 @@ function FluxoCommand() {
       this.cfgSaving = true;
       this.cfgFeedback = null;
       try {
-        const r = await fetch('/api/settings', {
+        const r = await this.authFetch('/api/settings', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             nome_loja:       this.cfg.nome_loja,
             whatsapp:        this.cfg.whatsapp,
@@ -267,7 +337,7 @@ function FluxoCommand() {
     /* real API calls — fallback to mock on error */
     async loadLeads() {
       try {
-        const r = await fetch('/api/leads');
+        const r = await this.authFetch('/api/leads');
         const j = await r.json();
         if (j.ok && j.data?.length) this.leads = j.data;
       } catch (_) { /* keep mock */ }
@@ -276,7 +346,7 @@ function FluxoCommand() {
     async loadProducts() {
       this.productsLoading = true;
       try {
-        const r = await fetch('/api/products');
+        const r = await this.authFetch('/api/products');
         const j = await r.json();
         if (j.ok && Array.isArray(j.data) && j.data.length) {
           this.products = j.data;
@@ -287,7 +357,7 @@ function FluxoCommand() {
 
     async loadSessions() {
       try {
-        const r = await fetch('/api/sessions');
+        const r = await this.authFetch('/api/sessions');
         const j = await r.json();
         if (j.ok && j.data?.length) {
           this.sessions = j.data;
@@ -316,10 +386,8 @@ function FluxoCommand() {
       this.simStarted = true;
 
       try {
-        // Apenas reseta a sessão — o cliente envia a primeira mensagem
-        await fetch('/reset', {
+        await this.authFetch('/api/sim/reset', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phone: this.simPhone }),
         });
         // Nota de sistema (não é mensagem do bot)
@@ -342,9 +410,8 @@ function FluxoCommand() {
       this.$nextTick(() => this.scrollChat());
 
       try {
-        const r = await fetch('/api/chat', {
+        const r = await this.authFetch('/api/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phone: this.simPhone, message: msg }),
         });
         const j = await r.json();

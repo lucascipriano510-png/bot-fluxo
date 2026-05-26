@@ -1,52 +1,83 @@
 import { supabase } from '../lib/supabase';
 
 export interface StoreContext {
-  storeId: string;       // UUID — chave para tabelas bot_*
-  slug: string;          // slug legível — chave para catálogo/InventoryBridge
-  name: string;          // nome exibido nas mensagens
+  storeId: string;
+  slug: string;
+  name: string;
   whatsappNumber: string;
 }
 
-let _cached: StoreContext | null = null;
+// Cache por chave composta — múltiplas lojas na mesma instância
+const _cache = new Map<string, StoreContext>();
 
-/**
- * Descobre a loja atual pelo número de WhatsApp configurado (LOJA_WHATSAPP).
- * Resultado é cacheado em memória — muda apenas com redeploy.
- *
- * REGRA: nenhuma consulta ao banco ocorre sem store_id.
- * Esta função é a única fonte de verdade do store_id no runtime do bot.
- */
-export async function getStoreContext(): Promise<StoreContext> {
-  if (_cached) return _cached;
+function fromRow(row: { id: string; slug: string; name: string; whatsapp_number: string }): StoreContext {
+  return { storeId: row.id, slug: row.slug, name: row.name, whatsappNumber: row.whatsapp_number };
+}
 
-  const whatsapp = process.env.LOJA_WHATSAPP;
-  if (!whatsapp) throw new Error('[storeService] LOJA_WHATSAPP não definido no ambiente');
+function setCache(ctx: StoreContext) {
+  _cache.set(`wa:${ctx.whatsappNumber}`, ctx);
+  _cache.set(`slug:${ctx.slug}`, ctx);
+  _cache.set(`id:${ctx.storeId}`, ctx);
+}
+
+export async function getStoreBySlug(slug: string): Promise<StoreContext> {
+  const key = `slug:${slug}`;
+  if (_cache.has(key)) return _cache.get(key)!;
 
   const { data, error } = await supabase
     .from('stores')
     .select('id, slug, name, whatsapp_number')
-    .eq('whatsapp_number', whatsapp)
+    .eq('slug', slug)
     .eq('is_active', true)
     .single();
 
-  if (error || !data) {
-    throw new Error(
-      `[storeService] Loja não encontrada para WhatsApp ${whatsapp}. ` +
-      `Execute BOT_SUPABASE_MIGRATION_5.sql e verifique a tabela stores.`
-    );
-  }
-
-  _cached = {
-    storeId:        data.id,
-    slug:           data.slug,
-    name:           data.name,
-    whatsappNumber: data.whatsapp_number,
-  };
-
-  return _cached;
+  if (error || !data) throw new Error(`[storeService] Loja não encontrada para slug "${slug}"`);
+  const ctx = fromRow(data);
+  setCache(ctx);
+  return ctx;
 }
 
-/** Limpa o cache (útil em testes). */
+export async function getStoreById(id: string): Promise<StoreContext> {
+  const key = `id:${id}`;
+  if (_cache.has(key)) return _cache.get(key)!;
+
+  const { data, error } = await supabase
+    .from('stores')
+    .select('id, slug, name, whatsapp_number')
+    .eq('id', id)
+    .eq('is_active', true)
+    .single();
+
+  if (error || !data) throw new Error(`[storeService] Loja não encontrada para id "${id}"`);
+  const ctx = fromRow(data);
+  setCache(ctx);
+  return ctx;
+}
+
+export async function getStoreByWhatsapp(phone: string): Promise<StoreContext> {
+  const key = `wa:${phone}`;
+  if (_cache.has(key)) return _cache.get(key)!;
+
+  const { data, error } = await supabase
+    .from('stores')
+    .select('id, slug, name, whatsapp_number')
+    .eq('whatsapp_number', phone)
+    .eq('is_active', true)
+    .single();
+
+  if (error || !data) throw new Error(`[storeService] Loja não encontrada para WhatsApp ${phone}`);
+  const ctx = fromRow(data);
+  setCache(ctx);
+  return ctx;
+}
+
+// Backward compat — usa LOJA_WHATSAPP do ambiente (instância única)
+export async function getStoreContext(): Promise<StoreContext> {
+  const whatsapp = process.env.LOJA_WHATSAPP;
+  if (!whatsapp) throw new Error('[storeService] LOJA_WHATSAPP não definido no ambiente');
+  return getStoreByWhatsapp(whatsapp);
+}
+
 export function clearStoreCache(): void {
-  _cached = null;
+  _cache.clear();
 }
