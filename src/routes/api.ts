@@ -440,7 +440,7 @@ router.post('/settings', async (req, res) => {
 router.get('/products', async (req, res) => {
   try {
     const { category, q } = req.query as { category?: string; q?: string };
-    const data = await fetchProductsForPanel({
+    const data = await fetchProductsForPanel(req.storeId!, {
       category: category && category !== 'all' ? category : undefined,
       q:        q && q.trim() ? q.trim() : undefined,
     });

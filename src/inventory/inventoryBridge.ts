@@ -9,6 +9,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
 import { BotProduct, BotProductSearchFilters, SiteProductRow } from './inventoryTypes';
 import { mapMany, mapSiteProductToBotProduct } from './inventoryMapper';
 import { normalizeText, normalizeSize } from './inventoryUtils';
@@ -73,6 +74,13 @@ function buildCategoryFilter(raw: string): string[] {
   return [raw.trim().toUpperCase()];
 }
 
+// Identifica se uma loja usa o catálogo externo (ex: Fluxo Outlet via SITE_SUPABASE_URL).
+// Todas as outras lojas buscam produtos no Supabase principal filtrado por store_id.
+function isSiteStore(storeId: string): boolean {
+  const siteStoreId = process.env.SITE_STORE_ID;
+  return !!siteStoreId && storeId === siteStoreId;
+}
+
 // ── Query base do bot (somente produtos com estoque, sem imagem) ──────────────
 const BOT_SELECT = 'id,sku,name,price,category,subcategory,stock,sizes,featured';
 
@@ -85,22 +93,33 @@ function baseQuery(client: SupabaseClient) {
     .order('name');
 }
 
+// Query base para o Supabase principal — filtra por store_id (multi-tenant)
+function baseQueryMain(storeId: string) {
+  return supabase
+    .from('products')
+    .select(BOT_SELECT)
+    .eq('store_id', storeId)
+    .gt('stock', 0)
+    .order('featured', { ascending: false })
+    .order('name');
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. searchProducts — busca livre no nome
 // ─────────────────────────────────────────────────────────────────────────────
 export async function searchProducts(storeId: string, query: string): Promise<BotProduct[]> {
+  qlog('searchProducts', { storeId, query });
+
+  if (!isSiteStore(storeId)) {
+    const { data, error } = await baseQueryMain(storeId).ilike('name', `%${query}%`).limit(10);
+    if (error) { console.error(`[InventoryBridge][${storeId}] searchProducts error:`, error.message); return []; }
+    return mapMany((data || []) as SiteProductRow[], storeId);
+  }
+
   const client = getSiteClient();
   if (!client) return [];
-
-  qlog('searchProducts', { storeId, query });
-  const { data, error } = await baseQuery(client)
-    .ilike('name', `%${query}%`)
-    .limit(10);
-
-  if (error) {
-    console.error(`[InventoryBridge][${storeId}] searchProducts error:`, error.message);
-    return [];
-  }
+  const { data, error } = await baseQuery(client).ilike('name', `%${query}%`).limit(10);
+  if (error) { console.error(`[InventoryBridge][${storeId}] searchProducts error:`, error.message); return []; }
   return mapMany((data || []) as SiteProductRow[], storeId);
 }
 
@@ -108,19 +127,19 @@ export async function searchProducts(storeId: string, query: string): Promise<Bo
 // 2. getProductsByCategory — busca por categoria
 // ─────────────────────────────────────────────────────────────────────────────
 export async function getProductsByCategory(storeId: string, category: string): Promise<BotProduct[]> {
-  const client = getSiteClient();
-  if (!client) return [];
-
   const terms = buildCategoryFilter(category);
   qlog('getProductsByCategory', { storeId, category, terms });
-  const { data, error } = await baseQuery(client)
-    .in('category', terms)
-    .limit(50);
 
-  if (error) {
-    console.error(`[InventoryBridge][${storeId}] getProductsByCategory error:`, error.message);
-    return [];
+  if (!isSiteStore(storeId)) {
+    const { data, error } = await baseQueryMain(storeId).in('category', terms).limit(50);
+    if (error) { console.error(`[InventoryBridge][${storeId}] getProductsByCategory error:`, error.message); return []; }
+    return mapMany((data || []) as SiteProductRow[], storeId);
   }
+
+  const client = getSiteClient();
+  if (!client) return [];
+  const { data, error } = await baseQuery(client).in('category', terms).limit(50);
+  if (error) { console.error(`[InventoryBridge][${storeId}] getProductsByCategory error:`, error.message); return []; }
   return mapMany((data || []) as SiteProductRow[], storeId);
 }
 
@@ -128,22 +147,26 @@ export async function getProductsByCategory(storeId: string, category: string): 
 // 3. getProductsBySize — produtos com tamanho em estoque (filtro em JS, JSONB)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function getProductsBySize(storeId: string, size: string): Promise<BotProduct[]> {
-  const client = getSiteClient();
-  if (!client) return [];
-
   qlog('getProductsBySize', { storeId, size });
-  const { data, error } = await baseQuery(client).limit(200);
 
-  if (error) {
-    console.error(`[InventoryBridge][${storeId}] getProductsBySize error:`, error.message);
-    return [];
+  let rows: SiteProductRow[];
+
+  if (!isSiteStore(storeId)) {
+    const { data, error } = await baseQueryMain(storeId).limit(200);
+    if (error) { console.error(`[InventoryBridge][${storeId}] getProductsBySize error:`, error.message); return []; }
+    rows = (data || []) as SiteProductRow[];
+  } else {
+    const client = getSiteClient();
+    if (!client) return [];
+    const { data, error } = await baseQuery(client).limit(200);
+    if (error) { console.error(`[InventoryBridge][${storeId}] getProductsBySize error:`, error.message); return []; }
+    rows = (data || []) as SiteProductRow[];
   }
 
   const sz = normalizeSize(size);
-  const filtered = ((data || []) as SiteProductRow[]).filter(row =>
+  const filtered = rows.filter(row =>
     (row.sizes || []).some(s => normalizeSize(s.size) === sz && s.stock > 0)
   );
-
   return mapMany(filtered, storeId).slice(0, 20);
 }
 
@@ -151,23 +174,22 @@ export async function getProductsBySize(storeId: string, size: string): Promise<
 // 4. getProductAvailability — verifica disponibilidade de produto específico
 // ─────────────────────────────────────────────────────────────────────────────
 export async function getProductAvailability(storeId: string, productId: string | number): Promise<BotProduct | null> {
-  const client = getSiteClient();
+  qlog('getProductAvailability', { storeId, productId });
+
+  const client = isSiteStore(storeId) ? getSiteClient() : supabase;
   if (!client) return null;
 
-  qlog('getProductAvailability', { storeId, productId });
-  const { data, error } = await client
-    .from('products')
-    .select(BOT_SELECT)
-    .eq('id', productId)
-    .single();
+  const q = isSiteStore(storeId)
+    ? (client as SupabaseClient).from('products').select(BOT_SELECT).eq('id', productId).single()
+    : supabase.from('products').select(BOT_SELECT).eq('store_id', storeId).eq('id', productId).single();
 
+  const { data, error } = await q;
   if (error || !data) {
     if (error?.code !== 'PGRST116') {
       console.error(`[InventoryBridge][${storeId}] getProductAvailability error:`, error?.message);
     }
     return null;
   }
-
   return mapSiteProductToBotProduct(data as SiteProductRow, storeId);
 }
 
@@ -175,12 +197,8 @@ export async function getProductAvailability(storeId: string, productId: string 
 // 5. getProductForBotContext — filtros combinados (função central)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function getProductForBotContext(storeId: string, filters: BotProductSearchFilters): Promise<BotProduct[]> {
-  const client = getSiteClient();
-  if (!client) return [];
-
-  // Corrige typos de marca contra subcategorias reais do catálogo
   const correctedSub = filters.subcategory
-    ? await fuzzyCorrectBrand(filters.subcategory)
+    ? await fuzzyCorrectBrand(storeId, filters.subcategory)
     : undefined;
 
   const cacheKey = `bot:${storeId}:cat=${filters.category || ''}:sub=${correctedSub || ''}:sz=${filters.size || ''}:cl=${filters.color || ''}:px=${filters.maxPrice || ''}:q=${filters.query || ''}`;
@@ -191,58 +209,45 @@ export async function getProductForBotContext(storeId: string, filters: BotProdu
   }
 
   qlog('getProductForBotContext', { storeId, filters, correctedSub });
-  let q = client
-    .from('products')
-    .select(BOT_SELECT)
-    .gt('stock', 0)
-    .order('featured', { ascending: false });
 
-  if (filters.query) {
-    q = q.ilike('name', `%${filters.query}%`);
+  let rows: SiteProductRow[];
+
+  if (isSiteStore(storeId)) {
+    const client = getSiteClient();
+    if (!client) return [];
+
+    let q = client.from('products').select(BOT_SELECT).gt('stock', 0).order('featured', { ascending: false });
+    if (filters.query)        q = q.ilike('name', `%${filters.query}%`);
+    if (filters.category)     q = q.in('category', buildCategoryFilter(filters.category));
+    if (correctedSub)         q = q.or(`subcategory.ilike.%${correctedSub}%,name.ilike.%${correctedSub}%`);
+    if (filters.maxPrice)     q = q.lte('price', filters.maxPrice);
+    if (filters.featuredOnly) q = q.eq('featured', true);
+
+    const { data, error } = await q.limit(100);
+    if (error) { console.error(`[InventoryBridge][${storeId}] getProductForBotContext error:`, error.message); return []; }
+    rows = (data || []) as SiteProductRow[];
+
+  } else {
+    let q = supabase.from('products').select(BOT_SELECT).eq('store_id', storeId).gt('stock', 0).order('featured', { ascending: false });
+    if (filters.query)        q = q.ilike('name', `%${filters.query}%`);
+    if (filters.category)     q = q.in('category', buildCategoryFilter(filters.category));
+    if (correctedSub)         q = q.or(`subcategory.ilike.%${correctedSub}%,name.ilike.%${correctedSub}%`);
+    if (filters.maxPrice)     q = q.lte('price', filters.maxPrice);
+    if (filters.featuredOnly) q = q.eq('featured', true);
+
+    const { data, error } = await q.limit(100);
+    if (error) { console.error(`[InventoryBridge][${storeId}] getProductForBotContext error:`, error.message); return []; }
+    rows = (data || []) as SiteProductRow[];
   }
 
-  if (filters.category) {
-    const terms = buildCategoryFilter(filters.category);
-    q = q.in('category', terms);
-  }
-
-  // Busca subcategoria corrigida (marca/modelo) tanto na coluna quanto no nome
-  if (correctedSub) {
-    q = q.or(`subcategory.ilike.%${correctedSub}%,name.ilike.%${correctedSub}%`);
-  }
-
-  if (filters.maxPrice) {
-    q = q.lte('price', filters.maxPrice);
-  }
-
-  if (filters.featuredOnly) {
-    q = q.eq('featured', true);
-  }
-
-  const { data, error } = await q.limit(100);
-
-  if (error) {
-    console.error(`[InventoryBridge][${storeId}] getProductForBotContext error:`, error.message);
-    return [];
-  }
-
-  let rows = (data || []) as SiteProductRow[];
-
-  // Post-filtro por tamanho — normaliza ambos os lados
   if (filters.size) {
     const sz = normalizeSize(filters.size);
-    rows = rows.filter(r =>
-      (r.sizes || []).some(s => normalizeSize(s.size) === sz && s.stock > 0)
-    );
+    rows = rows.filter(r => (r.sizes || []).some(s => normalizeSize(s.size) === sz && s.stock > 0));
   }
 
-  // Post-filtro por cor — expande variantes de gênero/idioma (preta↔preto, branca↔branco)
   if (filters.color) {
     const variants = expandColor(filters.color);
-    rows = rows.filter(r => {
-      const name = normalizeText(r.name);
-      return variants.some(v => name.includes(v));
-    });
+    rows = rows.filter(r => variants.some(v => normalizeText(r.name).includes(v)));
   }
 
   const result = mapMany(rows, storeId).slice(0, 20);
@@ -381,17 +386,26 @@ function levenshtein(a: string, b: string): number {
 }
 
 // ── Marcas conhecidas — carrega subcategorias únicas do banco (cache 5 min) ───
-async function loadKnownBrands(): Promise<string[]> {
-  const KEY = 'meta:brands';
+async function loadKnownBrands(storeId: string): Promise<string[]> {
+  const KEY = `meta:brands:${storeId}`;
   const cached = cacheGet<string[]>(KEY);
   if (cached) return cached;
-  const client = getSiteClient();
-  if (!client) return [];
-  const { data } = await client.from('products').select('subcategory');
+
+  let data: Array<Record<string, unknown>> | null = null;
+  if (isSiteStore(storeId)) {
+    const client = getSiteClient();
+    if (!client) return [];
+    const res = await client.from('products').select('subcategory');
+    data = res.data;
+  } else {
+    const res = await supabase.from('products').select('subcategory').eq('store_id', storeId);
+    data = res.data;
+  }
+
   const brands = [
     ...new Set(
       (data || [])
-        .map((r: Record<string, unknown>) => r.subcategory as string)
+        .map(r => r.subcategory as string)
         .filter(Boolean)
         .map(s => normalizeText(s)),
     ),
@@ -401,10 +415,9 @@ async function loadKnownBrands(): Promise<string[]> {
 }
 
 // ── Fuzzy correction — corrige typos de marca contra o catálogo real ──────────
-// Threshold: 1 para palavras curtas (≤5 chars), 2 para longas
-async function fuzzyCorrectBrand(input: string): Promise<string> {
+async function fuzzyCorrectBrand(storeId: string, input: string): Promise<string> {
   const norm = normalizeText(input);
-  const brands = await loadKnownBrands();
+  const brands = await loadKnownBrands(storeId);
   const threshold = norm.length <= 5 ? 1 : 2;
   let best = norm, bestDist = threshold + 1;
   for (const brand of brands) {
@@ -493,40 +506,47 @@ export function detectProductQuery(message: string): BotProductSearchFilters | n
 // fetchProductsForPanel — leitura completa para o painel visual
 // Sem filtro de stock>0 para mostrar também produtos sem estoque no painel
 // ─────────────────────────────────────────────────────────────────────────────
-export async function fetchProductsForPanel(filters?: {
+export async function fetchProductsForPanel(storeId: string, filters?: {
   category?: string;
   q?: string;
 }): Promise<SiteProductRow[]> {
-  const client = getSiteClient();
-  if (!client) return [];
-
-  const cacheKey = `panel:cat=${filters?.category || ''}:q=${filters?.q || ''}`;
+  const cacheKey = `panel:${storeId}:cat=${filters?.category || ''}:q=${filters?.q || ''}`;
   const cached = cacheGet<SiteProductRow[]>(cacheKey);
   if (cached) {
-    qlog('fetchProductsForPanel', { filters, results: cached.length }, true);
+    qlog('fetchProductsForPanel', { storeId, filters, results: cached.length }, true);
     return cached;
   }
 
-  qlog('fetchProductsForPanel', { filters });
-  let q = client
-    .from('products')
-    .select('id,sku,name,price,category,subcategory,image,stock,sizes,featured')
-    .order('featured', { ascending: false })
-    .order('category')
-    .order('name')
-    .limit(500);
+  qlog('fetchProductsForPanel', { storeId, filters });
 
-  if (filters?.category) {
-    q = q.eq('category', filters.category);
+  const PANEL_SELECT = 'id,sku,name,price,category,subcategory,image,stock,sizes,featured';
+
+  let data: unknown[] | null = null;
+  let errorMsg: string | null = null;
+
+  if (isSiteStore(storeId)) {
+    const client = getSiteClient();
+    if (!client) return [];
+
+    let q = client.from('products').select(PANEL_SELECT).order('featured', { ascending: false }).order('category').order('name').limit(500);
+    if (filters?.category) q = q.eq('category', filters.category);
+    if (filters?.q)        q = q.or(`name.ilike.%${filters.q}%,subcategory.ilike.%${filters.q}%`);
+
+    const res = await q;
+    data = res.data;
+    errorMsg = res.error?.message ?? null;
+  } else {
+    let q = supabase.from('products').select(PANEL_SELECT).eq('store_id', storeId).order('featured', { ascending: false }).order('category').order('name').limit(500);
+    if (filters?.category) q = q.eq('category', filters.category);
+    if (filters?.q)        q = q.or(`name.ilike.%${filters.q}%,subcategory.ilike.%${filters.q}%`);
+
+    const res = await q;
+    data = res.data;
+    errorMsg = res.error?.message ?? null;
   }
 
-  if (filters?.q) {
-    q = q.or(`name.ilike.%${filters.q}%,subcategory.ilike.%${filters.q}%`);
-  }
-
-  const { data, error } = await q;
-  if (error) {
-    console.error('[InventoryBridge] fetchProductsForPanel error:', error.message);
+  if (errorMsg) {
+    console.error(`[InventoryBridge][${storeId}] fetchProductsForPanel error:`, errorMsg);
     return [];
   }
 
