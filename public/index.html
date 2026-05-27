@@ -721,35 +721,126 @@
       <div x-show="productModal" style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px" @click.self="productModal=false">
         <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto">
           <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-            <div style="font-size:15px;font-weight:700" x-text="productEditId ? 'Editar produto' : 'Novo produto'"></div>
+            <div style="font-size:15px;font-weight:700" x-text="productEditId ? 'Editar item' : 'Novo item do catálogo'"></div>
             <button @click="productModal=false" style="background:none;border:none;color:var(--mu);cursor:pointer;font-size:18px;line-height:1">×</button>
           </div>
           <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-              <div class="field" style="grid-column:span 2"><label>Nome *</label><input type="text" x-model="productForm.name" placeholder="Nome do produto"></div>
-              <div class="field"><label>SKU</label><input type="text" x-model="productForm.sku" placeholder="Código único"></div>
-              <div class="field"><label>Categoria</label><input type="text" x-model="productForm.category" placeholder="Ex: Camisetas"></div>
-              <div class="field"><label>Subcategoria</label><input type="text" x-model="productForm.subcategory" placeholder="Ex: Polo"></div>
-              <div class="field"><label>Tipo</label><input type="text" x-model="productForm.product_type" placeholder="Ex: malha, jeans..."></div>
-              <div class="field"><label>Preço (R$) *</label><input type="number" x-model="productForm.price" placeholder="0.00" step="0.01"></div>
-              <div class="field"><label>Preço promocional (R$)</label><input type="number" x-model="productForm.promotional_price" placeholder="Opcional" step="0.01"></div>
-              <div class="field"><label>Estoque</label><input type="number" x-model="productForm.stock" placeholder="0"></div>
-              <div class="field"><label>Cor</label><input type="text" x-model="productForm.color" placeholder="Ex: Azul marinho"></div>
-              <div class="field" style="grid-column:span 2"><label>URL da imagem</label><input type="text" x-model="productForm.image_url" placeholder="https://..."></div>
+
+            <!-- Tipo de item -->
+            <div class="field">
+              <label>Tipo de item</label>
+              <select x-model="productForm.item_type" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px">
+                <option value="produto_fisico">Produto físico</option>
+                <option value="servico">Serviço</option>
+                <option value="pacote_combo">Pacote / Combo</option>
+                <option value="orcamento">Orçamento</option>
+              </select>
             </div>
-            <div style="display:flex;gap:20px;align-items:center">
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+
+              <!-- Nome -->
+              <div class="field" style="grid-column:span 2">
+                <label>Nome *</label>
+                <input type="text" x-model="productForm.name"
+                  :placeholder="productForm.item_type==='servico'?'Ex: Corte masculino simples':productForm.item_type==='pacote_combo'?'Ex: Combo casal':productForm.item_type==='orcamento'?'Ex: Projeto sob medida':'Ex: Camiseta branca P'">
+              </div>
+
+              <!-- Descrição -->
+              <div class="field" style="grid-column:span 2">
+                <label>Descrição</label>
+                <textarea x-model="productForm.description" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;resize:vertical"
+                  :placeholder="productForm.item_type==='servico'?'O que está incluído?':productForm.item_type==='pacote_combo'?'O que vem no combo?':productForm.item_type==='orcamento'?'Como funciona o orçamento?':'Descrição breve do produto'"></textarea>
+              </div>
+
+              <!-- Categoria e tipo de preço -->
+              <div class="field">
+                <label>Categoria</label>
+                <input type="text" x-model="productForm.category"
+                  :placeholder="productForm.item_type==='servico'?'Ex: Cabelo, Estética':productForm.item_type==='pacote_combo'?'Ex: Combos':'Ex: Camisetas'">
+              </div>
+              <div class="field">
+                <label>Tipo de preço</label>
+                <select x-model="productForm.price_type" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px">
+                  <option value="fixo">Preço fixo</option>
+                  <option value="a_partir_de">A partir de</option>
+                  <option value="sob_consulta">Sob consulta</option>
+                </select>
+              </div>
+
+              <!-- Preço -->
+              <div class="field" x-show="productForm.price_type !== 'sob_consulta'">
+                <label>Preço (R$)</label>
+                <input type="number" x-model="productForm.price" placeholder="0.00" step="0.01">
+              </div>
+
+              <!-- Preço promocional — físico e combo -->
+              <div class="field" x-show="productForm.item_type==='produto_fisico'||productForm.item_type==='pacote_combo'">
+                <label>Preço promocional (R$)</label>
+                <input type="number" x-model="productForm.promotional_price" placeholder="Opcional" step="0.01">
+              </div>
+
+              <!-- Produto físico -->
+              <div class="field" x-show="productForm.item_type==='produto_fisico'"><label>SKU</label><input type="text" x-model="productForm.sku" placeholder="Código único"></div>
+              <div class="field" x-show="productForm.item_type==='produto_fisico'"><label>Subcategoria / Marca</label><input type="text" x-model="productForm.subcategory" placeholder="Ex: Lacoste, Nike"></div>
+              <div class="field" x-show="productForm.item_type==='produto_fisico'"><label>Tipo / Material</label><input type="text" x-model="productForm.product_type" placeholder="Ex: malha, jeans"></div>
+              <div class="field" x-show="productForm.item_type==='produto_fisico'"><label>Cor</label><input type="text" x-model="productForm.color" placeholder="Ex: Azul marinho"></div>
+              <div class="field" x-show="productForm.item_type==='produto_fisico'"><label>Estoque</label><input type="number" x-model="productForm.stock" placeholder="0"></div>
+
+              <!-- Serviço -->
+              <div class="field" x-show="productForm.item_type==='servico'"><label>Duração (minutos)</label><input type="number" x-model="productForm.duration_minutes" placeholder="Ex: 30"></div>
+              <div class="field" x-show="productForm.item_type==='servico'"><label>Local de atendimento</label><input type="text" x-model="productForm.service_location" placeholder="Ex: Na loja, Em domicílio"></div>
+              <div class="field" x-show="productForm.item_type==='servico'" style="grid-column:span 2">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" x-model="productForm.requires_scheduling"> Requer agendamento</label>
+              </div>
+
+              <!-- Combo -->
+              <div class="field" x-show="productForm.item_type==='pacote_combo'" style="grid-column:span 2">
+                <label>Itens inclusos</label>
+                <textarea x-model="productForm.included_items" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;resize:vertical" placeholder="Ex: 1 corte + 1 barba + sobrancelha"></textarea>
+              </div>
+
+              <!-- Orçamento -->
+              <div class="field" x-show="productForm.item_type==='orcamento'" style="grid-column:span 2">
+                <label>Perguntas de qualificação <span style="font-weight:400;color:var(--mu)">(JSON array)</span></label>
+                <textarea x-model="productForm.qualification_questions" rows="3" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;resize:vertical" placeholder='["Qual o tamanho desejado?","Qual o prazo de entrega?"]'></textarea>
+              </div>
+
+              <!-- Instruções para o bot -->
+              <div class="field" style="grid-column:span 2">
+                <label>Instruções para o bot <span style="font-weight:400;color:var(--mu)">(opcional)</span></label>
+                <textarea x-model="productForm.bot_instructions" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;resize:vertical"
+                  :placeholder="productForm.item_type==='orcamento'?'Ex: Pedir WhatsApp e informar que consultor entrará em contato':'Ex: Mencionar disponibilidade de tamanhos, destacar promoção'"></textarea>
+              </div>
+
+              <!-- Tags -->
+              <div class="field" style="grid-column:span 2">
+                <label>Tags <span style="font-weight:400;color:var(--mu)">(separadas por vírgula)</span></label>
+                <input type="text" x-model="productForm.tags"
+                  :placeholder="productForm.item_type==='servico'?'Ex: manicure, unhas, gel':productForm.item_type==='orcamento'?'Ex: personalizado, projeto':'Ex: polo, verão, casual'">
+              </div>
+
+              <!-- URL imagem -->
+              <div class="field" style="grid-column:span 2">
+                <label>URL da imagem</label>
+                <input type="text" x-model="productForm.image_url" placeholder="https://...">
+              </div>
+
+            </div>
+
+            <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-                <input type="checkbox" x-model="productForm.featured"> ★ Produto em destaque
+                <input type="checkbox" x-model="productForm.featured"> ★ Em destaque
               </label>
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-                <input type="checkbox" x-model="productForm.is_active"> ✓ Produto ativo
+                <input type="checkbox" x-model="productForm.is_active"> ✓ Ativo
               </label>
             </div>
           </div>
           <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px">
             <button class="btn btn-ghost" @click="productModal=false">Cancelar</button>
             <button class="btn btn-green" @click="saveProduct()" :disabled="productSaving || !productForm.name.trim()">
-              <span x-text="productSaving ? 'Salvando...' : (productEditId ? 'Salvar alterações' : 'Criar produto')"></span>
+              <span x-text="productSaving ? 'Salvando...' : (productEditId ? 'Salvar alterações' : 'Criar item')"></span>
             </button>
           </div>
         </div>
@@ -771,7 +862,7 @@
         <button class="btn" @click="loadProducts()" :disabled="productsLoading" style="white-space:nowrap">
           <span x-text="productsLoading ? 'Carregando...' : '↺ Atualizar'"></span>
         </button>
-        <button class="btn btn-green" @click="openProductModal(null)" style="white-space:nowrap">+ Adicionar produto</button>
+        <button class="btn btn-green" @click="openProductModal(null)" style="white-space:nowrap">+ Adicionar item</button>
       </div>
 
       <!-- Stats -->

@@ -254,22 +254,35 @@ export function formatOffersResponse(
   const fmtPrice = (p?: number | null) =>
     p != null ? `R$${p.toFixed(2).replace('.', ',')}` : null;
 
-  // Formata um produto individual com link
+  const isPhysical = !offers[0] || offers[0].offerType === 'physical_product';
+
+  // Formata uma oferta individual
   const fmtOffer = (o: BusinessOffer, showSizes = false): string => {
     const priceStr = fmtPrice(o.price);
     const sizes    = (o.attributes?.sizes as string[] | undefined) || [];
     let line = `*${o.name}*`;
-    if (priceStr) line += ` — ${priceStr}`;
-    if (showSizes && sizes.length) line += `\n📏 Tamanhos: ${sizes.join(', ')}`;
-    if (o.productUrl) line += `\n🔗 ${o.productUrl}`;
+    if (o.priceType === 'sob_consulta')         line += ' — sob consulta';
+    else if (o.priceType === 'a_partir_de' && priceStr) line += ` — a partir de ${priceStr}`;
+    else if (priceStr)                           line += ` — ${priceStr}`;
+    if (o.description)                           line += `\n📝 ${o.description}`;
+    if (showSizes && sizes.length)               line += `\n📏 Tamanhos: ${sizes.join(', ')}`;
+    if (o.productUrl)                            line += `\n🔗 ${o.productUrl}`;
     return line;
   };
 
   if (offers.length === 1) {
-    return fmtOffer(offers[0], true);
+    return fmtOffer(offers[0], isPhysical);
   }
 
-  // Múltiplos resultados — usa subcategoria real do banco pra montar a URL
+  // Non-physical types: return a simple list without size prompts
+  if (!isPhysical) {
+    return (
+      `Encontrei ${offers.length} opção(ões) pra você:\n\n` +
+      offers.slice(0, 5).map(o => `• ${fmtOffer(o, false)}`).join('\n')
+    );
+  }
+
+  // Múltiplos resultados físicos — usa subcategoria real do banco pra montar a URL
   const actualSub  = offers[0]?.subcategory ?? filters.subcategory;
   const catalogUrl = buildCatalogUrl({ ...filters, subcategory: actualSub });
   const urlLine    = catalogUrl ? `\n\n🔗 ${catalogUrl}` : '';

@@ -8,35 +8,43 @@ import { BotProduct } from '../inventory/inventoryTypes';
 import { BusinessOffer, OfferType, AvailabilityType } from './offerTypes';
 
 export function botProductToOffer(product: BotProduct): BusinessOffer {
-  const offerType: OfferType = product.isFeatured === undefined && product.isActive
-    ? 'physical_product'
-    : product.stockQuantity === 0
-      ? 'physical_product'  // sem estoque mas existente
-      : 'physical_product';
+  const offerType: OfferType =
+    product.itemType === 'servico'      ? 'service'        :
+    product.itemType === 'pacote_combo' ? 'kit'            :
+    product.itemType === 'orcamento'    ? 'custom_quote'   :
+    'physical_product';
 
-  const availabilityType: AvailabilityType = 'stock';
+  const availabilityType: AvailabilityType =
+    product.itemType === 'servico'      ? 'unlimited' :
+    product.itemType === 'pacote_combo' ? 'unlimited' :
+    product.itemType === 'orcamento'    ? 'manual'    :
+    'stock';
 
-  // Atributos extraídos do produto físico
   const attributes: Record<string, unknown> = {};
-  if (product.sizes?.length)           attributes.sizes  = product.sizes;
-  if (product.colors?.length)          attributes.color  = product.colors[0];
-  if ((product.colors?.length ?? 0) > 1) attributes.colors = product.colors;
+  if (product.sizes?.length)              attributes.sizes  = product.sizes;
+  if (product.colors?.length)             attributes.color  = product.colors[0];
+  if ((product.colors?.length ?? 0) > 1)  attributes.colors = product.colors;
 
   return {
-    id:                String(product.id),
-    businessId:        product.storeId,
+    id:                     String(product.id),
+    businessId:             product.storeId,
     offerType,
-    name:              product.name,
-    price:             product.price,
-    promotionalPrice:  null,
-    category:          product.category,
-    subcategory:       product.subcategory,
+    name:                   product.name,
+    description:            product.description,
+    price:                  product.price,
+    promotionalPrice:       null,
+    category:               product.category,
+    subcategory:            product.subcategory,
     attributes,
     availabilityType,
-    stockQuantity:     product.stockQuantity,
-    imageUrl:          product.imageUrl,
-    productUrl:        product.productUrl,
-    isActive:          product.isActive,
+    stockQuantity:          product.stockQuantity,
+    imageUrl:               product.imageUrl,
+    productUrl:             product.productUrl,
+    isActive:               product.isActive,
+    priceType:              product.priceType,
+    botInstructions:        product.botInstructions,
+    qualificationQuestions: product.qualificationQuestions,
+    tags:                   product.tags,
   };
 }
 

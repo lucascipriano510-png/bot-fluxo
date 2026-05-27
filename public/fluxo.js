@@ -64,7 +64,7 @@ function FluxoCommand() {
     productsLoading: false,
     productModal: false,
     productEditId: null,
-    productForm: { name:'', sku:'', price:'', promotional_price:'', category:'', subcategory:'', product_type:'', color:'', stock:0, image_url:'', featured:false, is_active:true },
+    productForm: { name:'', sku:'', price:'', promotional_price:'', category:'', subcategory:'', product_type:'', color:'', stock:0, image_url:'', featured:false, is_active:true, item_type:'produto_fisico', description:'', price_type:'fixo', bot_instructions:'', tags:'', duration_minutes:'', requires_scheduling:false, service_location:'', included_items:'', qualification_questions:'' },
     productSaving: false,
     productFeedback: null,
     productFeedbackMsg: '',
@@ -464,22 +464,32 @@ function FluxoCommand() {
       if (product) {
         this.productEditId = product.id;
         this.productForm = {
-          name:              product.name || '',
-          sku:               product.sku || '',
-          price:             product.price || '',
-          promotional_price: product.promotional_price || '',
-          category:          product.category || '',
-          subcategory:       product.subcategory || '',
-          product_type:      product.product_type || '',
-          color:             product.color || '',
-          stock:             product.stock || 0,
-          image_url:         product.image_url || product.image || '',
-          featured:          product.featured || false,
-          is_active:         product.is_active !== false,
+          name:                   product.name || '',
+          sku:                    product.sku || '',
+          price:                  product.price || '',
+          promotional_price:      product.promotional_price || '',
+          category:               product.category || '',
+          subcategory:            product.subcategory || '',
+          product_type:           product.product_type || '',
+          color:                  product.color || '',
+          stock:                  product.stock || 0,
+          image_url:              product.image_url || product.image || '',
+          featured:               product.featured || false,
+          is_active:              product.is_active !== false,
+          item_type:              product.item_type || 'produto_fisico',
+          description:            product.description || '',
+          price_type:             product.price_type || 'fixo',
+          bot_instructions:       product.bot_instructions || '',
+          tags:                   Array.isArray(product.tags) ? product.tags.join(', ') : (product.tags || ''),
+          duration_minutes:       product.duration_minutes || '',
+          requires_scheduling:    product.requires_scheduling || false,
+          service_location:       product.service_location || '',
+          included_items:         product.included_items || '',
+          qualification_questions: product.qualification_questions ? JSON.stringify(product.qualification_questions, null, 2) : '',
         };
       } else {
         this.productEditId = null;
-        this.productForm = { name:'', sku:'', price:'', promotional_price:'', category:'', subcategory:'', product_type:'', color:'', stock:0, image_url:'', featured:false, is_active:true };
+        this.productForm = { name:'', sku:'', price:'', promotional_price:'', category:'', subcategory:'', product_type:'', color:'', stock:0, image_url:'', featured:false, is_active:true, item_type:'produto_fisico', description:'', price_type:'fixo', bot_instructions:'', tags:'', duration_minutes:'', requires_scheduling:false, service_location:'', included_items:'', qualification_questions:'' };
       }
       this.productModal = true;
     },
@@ -489,11 +499,21 @@ function FluxoCommand() {
       this.productSaving = true;
       this.productFeedback = null;
       try {
+        const isPhysical = this.productForm.item_type === 'produto_fisico';
+        const tagsRaw = this.productForm.tags || '';
+        const tagsArr = tagsRaw.trim() ? tagsRaw.split(',').map(t => t.trim()).filter(t => t.length > 0) : null;
+        let qualQuestions = null;
+        if (this.productForm.qualification_questions?.trim()) {
+          try { qualQuestions = JSON.parse(this.productForm.qualification_questions); } catch (_) { qualQuestions = this.productForm.qualification_questions; }
+        }
         const body = {
           ...this.productForm,
-          price:             Number(this.productForm.price) || 0,
-          promotional_price: this.productForm.promotional_price ? Number(this.productForm.promotional_price) : null,
-          stock:             Number(this.productForm.stock) || 0,
+          price:                   this.productForm.price_type === 'sob_consulta' ? null : (Number(this.productForm.price) || 0),
+          promotional_price:       this.productForm.promotional_price ? Number(this.productForm.promotional_price) : null,
+          stock:                   isPhysical ? (Number(this.productForm.stock) || 0) : null,
+          tags:                    tagsArr,
+          qualification_questions: qualQuestions,
+          duration_minutes:        this.productForm.duration_minutes ? Number(this.productForm.duration_minutes) : null,
         };
         const url    = this.productEditId ? `/api/products/${this.productEditId}` : '/api/products';
         const method = this.productEditId ? 'PUT' : 'POST';
@@ -503,7 +523,7 @@ function FluxoCommand() {
           await this.loadProducts();
           this.productModal = false;
           this.productFeedback = 'ok';
-          this.productFeedbackMsg = this.productEditId ? 'Produto atualizado!' : 'Produto criado!';
+          this.productFeedbackMsg = this.productEditId ? 'Item atualizado!' : 'Item criado!';
         } else {
           this.productFeedback = 'erro';
           this.productFeedbackMsg = j.error || 'Erro ao salvar.';

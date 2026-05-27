@@ -452,25 +452,41 @@ router.get('/products', async (req, res) => {
 
 router.post('/products', async (req, res) => {
   try {
-    const { name, sku, price, promotional_price, category, subcategory, product_type, color, sizes, image_url, is_active, featured, stock } = req.body as Record<string, unknown>;
+    const {
+      name, sku, price, promotional_price, category, subcategory, product_type, color, sizes, image_url, is_active, featured, stock,
+      item_type, description, price_type, bot_instructions, tags, qualification_questions,
+      duration_minutes, requires_scheduling, service_location, included_items,
+    } = req.body as Record<string, unknown>;
     if (!String(name || '').trim()) return res.status(400).json({ ok: false, error: 'Nome obrigatório' });
+    const resolvedItemType = item_type ? String(item_type) : 'produto_fisico';
+    const isPhysical = resolvedItemType === 'produto_fisico';
     const { data, error } = await supabase
       .from('products')
       .insert({
-        store_id:          req.storeId!,
-        name:              String(name).trim(),
-        sku:               sku ? String(sku).trim() : null,
-        price:             Number(price) || 0,
-        promotional_price: promotional_price ? Number(promotional_price) : null,
-        category:          category ? String(category).trim() : null,
-        subcategory:       subcategory ? String(subcategory).trim() : null,
-        product_type:      product_type ? String(product_type).trim() : null,
-        color:             color ? String(color).trim() : null,
-        sizes:             sizes || null,
-        image_url:         image_url ? String(image_url).trim() : null,
-        is_active:         is_active !== false,
-        featured:          featured === true,
-        stock:             Number(stock) || 0,
+        store_id:               req.storeId!,
+        name:                   String(name).trim(),
+        sku:                    sku ? String(sku).trim() : null,
+        price:                  price != null ? Number(price) : null,
+        promotional_price:      promotional_price ? Number(promotional_price) : null,
+        category:               category ? String(category).trim() : null,
+        subcategory:            subcategory ? String(subcategory).trim() : null,
+        product_type:           product_type ? String(product_type).trim() : null,
+        color:                  color ? String(color).trim() : null,
+        sizes:                  sizes || null,
+        image_url:              image_url ? String(image_url).trim() : null,
+        is_active:              is_active !== false,
+        featured:               featured === true,
+        stock:                  isPhysical ? (Number(stock) || 0) : null,
+        item_type:              resolvedItemType,
+        description:            description ? String(description).trim() : null,
+        price_type:             price_type ? String(price_type) : 'fixo',
+        bot_instructions:       bot_instructions ? String(bot_instructions).trim() : null,
+        tags:                   Array.isArray(tags) ? tags : null,
+        qualification_questions: qualification_questions ?? null,
+        duration_minutes:       duration_minutes ? Number(duration_minutes) : null,
+        requires_scheduling:    requires_scheduling === true,
+        service_location:       service_location ? String(service_location).trim() : null,
+        included_items:         included_items ? String(included_items).trim() : null,
       })
       .select('*')
       .single();
@@ -483,7 +499,11 @@ router.post('/products', async (req, res) => {
 
 router.put('/products/:id', async (req, res) => {
   try {
-    const allowed = ['name','sku','price','promotional_price','category','subcategory','product_type','color','sizes','image_url','is_active','featured','stock'] as const;
+    const allowed = [
+      'name','sku','price','promotional_price','category','subcategory','product_type','color','sizes','image_url','is_active','featured','stock',
+      'item_type','description','price_type','bot_instructions','tags','qualification_questions',
+      'duration_minutes','requires_scheduling','service_location','included_items',
+    ] as const;
     const patch: Record<string, unknown> = {};
     for (const key of allowed) {
       if (key in req.body) patch[key] = req.body[key];

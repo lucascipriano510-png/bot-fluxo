@@ -51,6 +51,12 @@ export interface BusinessOffer {
   imageUrl?: string;
   productUrl?: string;
   isActive: boolean;
+
+  // Universal catalog fields
+  priceType?: string;              // fixo | a_partir_de | sob_consulta
+  botInstructions?: string;
+  qualificationQuestions?: unknown;
+  tags?: string[];
 }
 
 export interface OfferSearchFilters {

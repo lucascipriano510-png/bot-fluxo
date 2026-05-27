@@ -81,8 +81,12 @@ function isSiteStore(storeId: string): boolean {
   return !!siteStoreId && storeId === siteStoreId;
 }
 
-// ── Query base do bot (somente produtos com estoque, sem imagem) ──────────────
+// ── Query select strings ──────────────────────────────────────────────────────
+// Site client (Fluxo Outlet — external, may not have migration 9 columns)
 const BOT_SELECT = 'id,sku,name,price,category,subcategory,stock,sizes,featured';
+
+// Main Supabase (bot's own DB — has all universal catalog fields after migration 9)
+const BOT_SELECT_FULL = 'id,sku,name,price,category,subcategory,stock,sizes,featured,is_active,item_type,description,price_type,bot_instructions,tags,image_url';
 
 function baseQuery(client: SupabaseClient) {
   return client
@@ -93,13 +97,19 @@ function baseQuery(client: SupabaseClient) {
     .order('name');
 }
 
-// Query base para o Supabase principal — filtra por store_id (multi-tenant)
+// Availability per item_type: physical requires stock > 0; others require is_active
+function isAvailable(row: SiteProductRow): boolean {
+  if (!row.item_type || row.item_type === 'produto_fisico') return row.stock > 0;
+  return row.is_active !== false;
+}
+
+// Query base para o Supabase principal — filtra por store_id, sem filtro de estoque no DB
+// (estoque é filtrado em JS via isAvailable para suportar serviços/combos/orçamentos)
 function baseQueryMain(storeId: string) {
   return supabase
     .from('products')
-    .select(BOT_SELECT)
+    .select(BOT_SELECT_FULL)
     .eq('store_id', storeId)
-    .gt('stock', 0)
     .order('featured', { ascending: false })
     .order('name');
 }
@@ -111,9 +121,11 @@ export async function searchProducts(storeId: string, query: string): Promise<Bo
   qlog('searchProducts', { storeId, query });
 
   if (!isSiteStore(storeId)) {
-    const { data, error } = await baseQueryMain(storeId).ilike('name', `%${query}%`).limit(10);
+    const { data, error } = await baseQueryMain(storeId)
+      .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
+      .limit(10);
     if (error) { console.error(`[InventoryBridge][${storeId}] searchProducts error:`, error.message); return []; }
-    return mapMany((data || []) as SiteProductRow[], storeId);
+    return mapMany(((data || []) as SiteProductRow[]).filter(isAvailable), storeId);
   }
 
   const client = getSiteClient();
@@ -133,7 +145,7 @@ export async function getProductsByCategory(storeId: string, category: string): 
   if (!isSiteStore(storeId)) {
     const { data, error } = await baseQueryMain(storeId).in('category', terms).limit(50);
     if (error) { console.error(`[InventoryBridge][${storeId}] getProductsByCategory error:`, error.message); return []; }
-    return mapMany((data || []) as SiteProductRow[], storeId);
+    return mapMany(((data || []) as SiteProductRow[]).filter(isAvailable), storeId);
   }
 
   const client = getSiteClient();
@@ -154,7 +166,7 @@ export async function getProductsBySize(storeId: string, size: string): Promise<
   if (!isSiteStore(storeId)) {
     const { data, error } = await baseQueryMain(storeId).limit(200);
     if (error) { console.error(`[InventoryBridge][${storeId}] getProductsBySize error:`, error.message); return []; }
-    rows = (data || []) as SiteProductRow[];
+    rows = ((data || []) as SiteProductRow[]).filter(isAvailable);
   } else {
     const client = getSiteClient();
     if (!client) return [];
@@ -228,8 +240,8 @@ export async function getProductForBotContext(storeId: string, filters: BotProdu
     rows = (data || []) as SiteProductRow[];
 
   } else {
-    let q = supabase.from('products').select(BOT_SELECT).eq('store_id', storeId).gt('stock', 0).order('featured', { ascending: false });
-    if (filters.query)        q = q.ilike('name', `%${filters.query}%`);
+    let q = supabase.from('products').select(BOT_SELECT_FULL).eq('store_id', storeId).order('featured', { ascending: false });
+    if (filters.query)        q = q.or(`name.ilike.%${filters.query}%,description.ilike.%${filters.query}%`);
     if (filters.category)     q = q.in('category', buildCategoryFilter(filters.category));
     if (correctedSub)         q = q.or(`subcategory.ilike.%${correctedSub}%,name.ilike.%${correctedSub}%`);
     if (filters.maxPrice)     q = q.lte('price', filters.maxPrice);
@@ -237,7 +249,7 @@ export async function getProductForBotContext(storeId: string, filters: BotProdu
 
     const { data, error } = await q.limit(100);
     if (error) { console.error(`[InventoryBridge][${storeId}] getProductForBotContext error:`, error.message); return []; }
-    rows = (data || []) as SiteProductRow[];
+    rows = ((data || []) as SiteProductRow[]).filter(isAvailable);
   }
 
   if (filters.size) {
@@ -481,7 +493,17 @@ export function detectProductQuery(message: string): BotProductSearchFilters | n
   }
 
   const hasFilter = filters.category || filters.size || filters.color || filters.maxPrice;
-  if (!hasFilter) return null;
+  if (!hasFilter) {
+    // Universal catalog fallback: no structural filter found but message has meaningful terms.
+    // Enables bot to search services, combos and quotes by free text.
+    const meaningfulWords = norm
+      .split(/\s+/)
+      .filter(w => w.length >= 4 && !PT_STOP.has(w));
+    if (meaningfulWords.length >= 1) {
+      return { query: message.trim() };
+    }
+    return null;
+  }
 
   // Extrai marca/subcategoria removendo os padrões já capturados e stop words
   let residual = norm;
@@ -519,7 +541,10 @@ export async function fetchProductsForPanel(storeId: string, filters?: {
 
   qlog('fetchProductsForPanel', { storeId, filters });
 
-  const PANEL_SELECT = 'id,sku,name,price,category,subcategory,image,stock,sizes,featured';
+  // Site client uses legacy select (may not have migration 9 columns)
+  const PANEL_SELECT      = 'id,sku,name,price,category,subcategory,image,stock,sizes,featured';
+  // Main Supabase uses full select (after migration 9)
+  const PANEL_SELECT_FULL = 'id,sku,name,price,promotional_price,category,subcategory,image,image_url,stock,sizes,featured,is_active,color,product_type,item_type,description,price_type,bot_instructions,tags,qualification_questions';
 
   let data: unknown[] | null = null;
   let errorMsg: string | null = null;
@@ -536,9 +561,9 @@ export async function fetchProductsForPanel(storeId: string, filters?: {
     data = res.data;
     errorMsg = res.error?.message ?? null;
   } else {
-    let q = supabase.from('products').select(PANEL_SELECT).eq('store_id', storeId).order('featured', { ascending: false }).order('category').order('name').limit(500);
+    let q = supabase.from('products').select(PANEL_SELECT_FULL).eq('store_id', storeId).order('featured', { ascending: false }).order('category').order('name').limit(500);
     if (filters?.category) q = q.eq('category', filters.category);
-    if (filters?.q)        q = q.or(`name.ilike.%${filters.q}%,subcategory.ilike.%${filters.q}%`);
+    if (filters?.q)        q = q.or(`name.ilike.%${filters.q}%,subcategory.ilike.%${filters.q}%,description.ilike.%${filters.q}%`);
 
     const res = await q;
     data = res.data;
