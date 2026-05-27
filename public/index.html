@@ -181,7 +181,10 @@
       <div class="pulse-dot" :class="{ 'opacity-30': !botOn }"></div>
     </div>
     <div class="sb-status-row"><div class="dot-sm"></div> Bot <span x-text="botOn ? 'online' : 'offline'"></span></div>
-    <div class="sb-status-row"><div class="dot-sm yellow"></div> WhatsApp pendente</div>
+    <div class="sb-status-row">
+      <div class="dot-sm" :class="waConfigured ? '' : 'yellow'"></div>
+      <span x-text="waConfigured ? 'WhatsApp ativo' : 'WhatsApp pendente'"></span>
+    </div>
     <div class="sb-status-row"><div class="dot-sm"></div> Supabase conectado</div>
   </div>
 </aside>
@@ -239,7 +242,7 @@
   <div class="cmd-content">
 
     <!-- ── DASHBOARD ───────────────────────── -->
-    <div x-show="page === 'dashboard'">
+    <div x-show="page === 'dashboard'" class="page-section">
 
       <!-- Metrics -->
       <div class="metrics-row">
@@ -291,23 +294,24 @@
 
           <div class="toggle-row">
             <div class="toggle-info"><h4>Bot ativo</h4><p>Responder mensagens automaticamente</p></div>
-            <button class="toggle" :class="{ on: botOn }" @click="botOn = !botOn"></button>
+            <button class="toggle" :class="{ on: botOn }" @click="botOn = !botOn; autoSaveSettings()"></button>
           </div>
           <div class="toggle-row">
             <div class="toggle-info"><h4>Ignorar horário</h4><p>Responder fora do horário comercial</p></div>
-            <button class="toggle" :class="{ on: ignorarHorario }" @click="ignorarHorario = !ignorarHorario"></button>
+            <button class="toggle" :class="{ on: ignorarHorario }" @click="ignorarHorario = !ignorarHorario; autoSaveSettings()"></button>
           </div>
           <div class="toggle-row">
             <div class="toggle-info"><h4>Modo teste</h4><p>Logs detalhados no console</p></div>
-            <button class="toggle on"></button>
+            <button class="toggle" :class="{ on: modoTeste }" @click="modoTeste = !modoTeste"></button>
           </div>
 
           <div style="margin-top:20px;padding-top:18px;border-top:1px solid var(--border);">
             <div style="display:flex;gap:10px;margin-bottom:12px">
               <div style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">
                 <div style="font-size:10px;color:var(--mu2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">WhatsApp</div>
-                <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--gold)">
-                  <div class="dot-sm yellow"></div> Pendente
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600" :style="waConfigured ? 'color:var(--green)' : 'color:var(--gold)'">
+                  <div class="dot-sm" :class="waConfigured ? '' : 'yellow'"></div>
+                  <span x-text="waConfigured ? 'Configurado' : 'Pendente'"></span>
                 </div>
               </div>
               <div style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">
@@ -386,7 +390,7 @@
     </div>
 
     <!-- ── SIMULADOR ────────────────────────── -->
-    <div x-show="page === 'simulador'">
+    <div x-show="page === 'simulador'" class="page-section">
       <div class="sim-wrap">
         <div class="wa-sim-shell">
 
@@ -483,7 +487,7 @@
     </div>
 
     <!-- ── ATENDIMENTOS ─────────────────────── -->
-    <div x-show="page === 'atendimentos'">
+    <div x-show="page === 'atendimentos'" class="page-section">
       <div class="atend-shell">
         <div class="atend-list">
           <div class="atend-list-header">Conversas — <span x-text="conversations.length"></span></div>
@@ -583,7 +587,7 @@
     </div>
 
     <!-- ── CRM ───────────────────────────────── -->
-    <div x-show="page === 'leads'">
+    <div x-show="page === 'leads'" class="page-section">
 
       <!-- CRM feedback toast -->
       <div x-show="crmFeedback !== null" x-transition
@@ -671,8 +675,8 @@
                   <div class="field"><label>Cidade</label><input type="text" x-model="crmLead.cidade" placeholder="Cidade"></div>
                 </div>
                 <div class="crm-row3">
-                  <div class="field"><label>Tamanho</label><input type="text" x-model="crmLead.tamanho" placeholder="P, M, G, GG..."></div>
-                  <div class="field"><label>Estilo/tipo</label><input type="text" x-model="crmLead.estilo" placeholder="Ex: básica, polo..."></div>
+                  <div class="field"><label>Variação</label><input type="text" x-model="crmLead.tamanho" placeholder="Tamanho, plano, nível..."></div>
+                  <div class="field"><label>Tipo/estilo</label><input type="text" x-model="crmLead.estilo" placeholder="Ex: básico, premium, urgente..."></div>
                   <div class="field"><label>Origem</label><input type="text" x-model="crmLead.origem" placeholder="Instagram, WhatsApp..."></div>
                 </div>
                 <div class="field"><label>Próxima ação</label><input type="text" x-model="crmLead.proxima_acao" placeholder="O que fazer com esse lead?"></div>
@@ -710,7 +714,7 @@
     </div>
 
     <!-- ── PRODUTOS ─────────────────────────── -->
-    <div x-show="page === 'produtos'">
+    <div x-show="page === 'produtos'" class="page-section">
 
       <!-- Product feedback toast -->
       <div x-show="productFeedback !== null" x-transition
@@ -719,7 +723,7 @@
 
       <!-- Product modal -->
       <div x-show="productModal" style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px" @click.self="productModal=false">
-        <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto">
+        <div class="modal-panel" style="background:var(--card);border:1px solid var(--border2);border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto">
           <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
             <div style="font-size:15px;font-weight:700" x-text="productEditId ? 'Editar item' : 'Novo item do catálogo'"></div>
             <button @click="productModal=false" style="background:none;border:none;color:var(--mu);cursor:pointer;font-size:18px;line-height:1">×</button>
@@ -910,23 +914,35 @@
                 style="width:100%;height:100%;object-fit:cover" @error="$el.style.display='none'">
               <div x-show="!p.image" class="prod-img-ph" x-text="(p.category||'?').charAt(0)"></div>
               <span x-show="p.featured" class="prod-badge-feat">★ Destaque</span>
-              <span x-show="(p.stock||0) <= 0" class="prod-badge-out">Sem estoque</span>
+              <span x-show="(!p.item_type || p.item_type==='produto_fisico') && (p.stock||0) <= 0" class="prod-badge-out">Sem estoque</span>
             </div>
 
             <!-- Corpo -->
             <div style="padding:12px">
-              <!-- Categoria + SKU -->
-              <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+              <!-- Categoria + SKU + tipo badge -->
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
                 <span style="font-size:10px;color:var(--mu2);text-transform:uppercase;letter-spacing:.04em"
                   x-text="p.category + (p.subcategory ? ' · ' + p.subcategory : '')"></span>
-                <span x-show="p.sku" style="font-size:9px;color:var(--mu2);opacity:.6" x-text="p.sku"></span>
+                <span class="badge-type"
+                  :class="{
+                    'badge-type-fisico':    !p.item_type || p.item_type==='produto_fisico',
+                    'badge-type-servico':   p.item_type==='servico',
+                    'badge-type-combo':     p.item_type==='pacote_combo',
+                    'badge-type-orcamento': p.item_type==='orcamento'
+                  }"
+                  x-text="{produto_fisico:'Produto',servico:'Serviço',pacote_combo:'Combo',orcamento:'Orçamento'}[p.item_type||'produto_fisico']">
+                </span>
               </div>
+
+              <!-- SKU -->
+              <div x-show="p.sku" style="font-size:9px;color:var(--mu2);opacity:.6;margin-bottom:2px" x-text="p.sku"></div>
 
               <!-- Nome -->
               <div style="font-size:12px;font-weight:700;line-height:1.4;margin-bottom:8px;min-height:34px" x-text="p.name"></div>
 
-              <!-- Tamanhos em estoque -->
-              <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:10px;min-height:22px">
+              <!-- Tamanhos (apenas produto físico) -->
+              <div x-show="!p.item_type || p.item_type==='produto_fisico'"
+                style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:10px;min-height:22px">
                 <template x-for="sz in (p.sizes||[]).filter(s=>s.stock>0)" :key="sz.size">
                   <span class="size-chip" x-text="sz.size"></span>
                 </template>
@@ -936,10 +952,15 @@
                   style="font-size:10px;color:#ef4444;padding:2px 0">Sem estoque</span>
               </div>
 
-              <!-- Preço + estoque total -->
+              <!-- Preço + estoque (físico) ou status (outros) -->
               <div style="display:flex;align-items:center;justify-content:space-between">
-                <span style="font-weight:800;font-size:14px;color:var(--gold)" x-text="fmtBRL(p.price)"></span>
-                <span style="font-size:11px;color:var(--mu2)" x-text="'Estoque: ' + (p.stock||0)"></span>
+                <span style="font-weight:800;font-size:14px;color:var(--gold)"
+                  x-text="p.price_type==='sob_consulta' ? 'Sob consulta' : (p.price_type==='a_partir_de' ? 'A partir de ' + fmtBRL(p.price) : fmtBRL(p.price))"></span>
+                <span x-show="!p.item_type || p.item_type==='produto_fisico'"
+                  style="font-size:11px;color:var(--mu2)" x-text="'Estoque: ' + (p.stock||0)"></span>
+                <span x-show="p.item_type && p.item_type!=='produto_fisico'"
+                  class="badge" :class="p.is_active !== false ? 'badge-green' : 'badge-gray'"
+                  x-text="p.is_active !== false ? 'Ativo' : 'Inativo'"></span>
               </div>
 
               <!-- Link site -->
@@ -961,7 +982,7 @@
     </div>
 
     <!-- ── RESPOSTAS RÁPIDAS ─────────────────── -->
-    <div x-show="page === 'respostas'">
+    <div x-show="page === 'respostas'" class="page-section">
       <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
         <button class="btn btn-green">+ Nova resposta</button>
       </div>
@@ -992,7 +1013,7 @@
     </div>
 
     <!-- ── KANBAN ───────────────────────────── -->
-    <div x-show="page === 'kanban'">
+    <div x-show="page === 'kanban'" class="page-section">
       <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
         <button class="btn" @click="loadKanban()" style="font-size:12px">↺ Atualizar</button>
       </div>
@@ -1033,7 +1054,7 @@
     </div>
 
     <!-- ── RELATÓRIOS ───────────────────────── -->
-    <div x-show="page === 'relatorios'">
+    <div x-show="page === 'relatorios'" class="page-section">
       <div x-show="reportsLoading" style="text-align:center;padding:40px;color:var(--mu);font-size:13px">Carregando relatórios...</div>
       <div x-show="!reportsLoading">
         <div class="grid-2 mb-6">
@@ -1070,7 +1091,7 @@
     </div>
 
     <!-- ── INTEGRAÇÕES ──────────────────────── -->
-    <div x-show="page === 'integracoes'">
+    <div x-show="page === 'integracoes'" class="page-section">
       <div class="int-grid">
         <div class="int-card">
           <div class="int-logo" style="background:#25D366;font-size:22px">📱</div>
@@ -1106,7 +1127,7 @@
     </div>
 
     <!-- ── CONFIGURAÇÕES ────────────────────── -->
-    <div x-show="page === 'configuracoes'">
+    <div x-show="page === 'configuracoes'" class="page-section">
 
       <!-- Banner: tabela bot_settings não existe -->
       <div x-show="cfgSetupNeeded" style="

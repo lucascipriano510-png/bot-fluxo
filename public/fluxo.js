@@ -42,7 +42,8 @@ function FluxoCommand() {
     /* state */
     page: 'dashboard',
     sidebarOpen: false,
-    selectedConv: 1,
+    selectedConv: null,
+    modoTeste: false,
 
     /* data — starts empty, populated by real API after login */
     conversations: [],
@@ -141,6 +142,8 @@ function FluxoCommand() {
     get ignorarHorario()  { return this.cfg.ignorar_horario; },
     set ignorarHorario(v) { this.cfg.ignorar_horario = v; },
 
+    get waConfigured() { return !!(this.cfg.whatsapp && this.cfg.whatsapp.trim()); },
+
     get leadsQuentes() { return this.leads.filter(l => l.status_comercial === 'QUENTE').length; },
     get leadsMornos()  { return this.leads.filter(l => l.status_comercial === 'MORNO').length; },
     get leadsFrios()   { return this.leads.filter(l => l.status_comercial === 'FRIO').length; },
@@ -168,6 +171,25 @@ function FluxoCommand() {
 
     get productsInStock()  { return this.products.filter(p => (p.stock || 0) > 0).length; },
     get productsNoStock()  { return this.products.filter(p => (p.stock || 0) <= 0).length; },
+
+    async autoSaveSettings() {
+      try {
+        await this.authFetch('/api/settings', {
+          method: 'POST',
+          body: JSON.stringify({
+            nome_loja:       this.cfg.nome_loja,
+            whatsapp:        this.cfg.whatsapp,
+            saudacao:        this.cfg.saudacao,
+            horario_inicio:  this.cfg.horario_inicio,
+            horario_fim:     this.cfg.horario_fim,
+            bot_ativo:       this.cfg.bot_ativo,
+            ignorar_horario: this.cfg.ignorar_horario,
+            fallback_humano: this.cfg.fallback_humano,
+            delay_resposta:  this.cfg.delay_resposta,
+          }),
+        });
+      } catch (_) {}
+    },
 
     /* navigation */
     navigate(p) {
