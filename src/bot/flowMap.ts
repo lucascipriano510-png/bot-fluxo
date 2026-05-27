@@ -1,25 +1,13 @@
 // =============================================================================
-//  MAPA COMERCIAL DO BOT — Funil de vendas Fluxo Outlet
-// =============================================================================
+//  MAPA BASE DO BOT — Funil genérico multi-tenant
 //
-//  INICIO (detecta origem na 1ª mensagem)
-//  ├── camisa/polo/malha  → CAPTURA_TAMANHO
-//  ├── tenis              → CAPTURA_NUMERO
-//  ├── bermuda            → CAPTURA_TAMANHO
-//  ├── promocao           → CAPTURA_TAMANHO  (urgência)
-//  ├── pedido             → CONSULTA_PEDIDO → ENCAMINHAR_HUMANO
-//  ├── atendente          → SUPORTE  [terminal]
-//  └── *                  → APRESENTACAO → CAPTURA_TAMANHO/NUMERO/NAO_ENTENDI
+//  Este flowMap é neutro e serve como fallback para qualquer tipo de negócio.
+//  Customizações por loja são aplicadas via bot_flow_config (presets de cadastro
+//  ou edições manuais no painel). A engine usa bot_flow_config como camada
+//  acima deste mapa, então qualquer nó aqui pode ser sobrescrito por loja.
 //
-//  CAPTURA_TAMANHO → CAPTURA_ESTILO ──┐
-//                                      ├→ CAPTURA_CIDADE → RECOMENDACAO
-//  CAPTURA_NUMERO  ───────────────────┘
-//
-//  RECOMENDACAO
-//  ├── quanto/foto/quero/atendente → CAPTURA_NOME_QUENTE → ENCAMINHAR_HUMANO [terminal]
-//  └── barata/premium              → AGUARDAR_RESPOSTA   → ENCAMINHAR_HUMANO [terminal]
-//
-//  Para expandir o funil: adicione nós e opções aqui.
+//  INICIO → APRESENTACAO → CAPTURA_TAMANHO → CAPTURA_ESTILO → CAPTURA_CIDADE
+//         → RECOMENDACAO → CAPTURA_NOME_QUENTE → ENCAMINHAR_HUMANO [terminal]
 // =============================================================================
 
 export type NodeId =
@@ -68,132 +56,77 @@ export const FLOW_MAP: Record<NodeId, FlowNode> = {
   // ── ENTRADA ───────────────────────────────────────────────────────────────
   INICIO: {
     id: 'INICIO',
-    message: (ctx) => {
-      if (ctx.origem === 'camisa')
-        return `Vi que você veio pelas camisas da Fluxo 👕\nQual tamanho você usa: P, M, G ou GG?`;
-      if (ctx.origem === 'tenis')
-        return `Vi que você veio pelos tênis 👟\nQual numeração você usa?`;
-      if (ctx.origem === 'promocao')
-        return `Você veio pela promoção da Fluxo 🔥\nMe fala seu tamanho que eu te mostro as peças que ainda estão disponíveis.`;
-      return `${ctx._saudacao || `Oi! 👋 Sou o assistente da *${ctx._storeName || 'nossa loja'}*.`}\n\nO que você procura hoje?\n\n👕  Camisa / Polo\n👟  Tênis\n👖  Bermuda\n🔥  Promoção`;
-    },
+    message: (ctx) => ctx._saudacao || `Oi! 👋 Sou o assistente da *${ctx._storeName || 'nossa loja'}*.\n\nComo posso te ajudar hoje?`,
     options: [
-      { trigger: /camis[ae]t?a?|polo|malha|camisinha/i,             next: 'CAPTURA_TAMANHO', data: { origem: 'camisa',   interesse: 'camisa'  } },
-      { trigger: /t[êe]nis|cal[çc]ado|sapato|sneaker/i,             next: 'CAPTURA_NUMERO',  data: { origem: 'tenis',   interesse: 'tenis'   } },
-      { trigger: /bermuda|short/i,                                    next: 'CAPTURA_TAMANHO', data: { origem: 'bermuda', interesse: 'bermuda' } },
-      { trigger: /promo[çc][ãa]o?|promo\b|oferta|desconto/i,        next: 'CAPTURA_TAMANHO', data: { origem: 'promocao'                       } },
-      { trigger: /pedido|status\b|rastrear|n[úu]mero\b/i,           next: 'CONSULTA_PEDIDO'                                                     },
-      { trigger: /atendente|humano|ajuda|suporte|falar com|pessoa/i, next: 'SUPORTE'                                                              },
+      { trigger: /pedido|status\b|rastrear|n[úu]mero\b/i,           next: 'CONSULTA_PEDIDO' },
+      { trigger: /atendente|humano|ajuda|suporte|falar com|pessoa/i, next: 'SUPORTE'         },
     ],
     default: 'APRESENTACAO',
   },
 
   APRESENTACAO: {
     id: 'APRESENTACAO',
-    message: `Me fala o que você procura hoje:\n\n👕  Camisa, polo ou malha\n👟  Tênis ou calçado\n👖  Bermuda\n\nDigita aí 👇`,
-    options: [
-      { trigger: /camis[ae]t?a?|polo|malha/i, next: 'CAPTURA_TAMANHO', data: { origem: 'camisa',   interesse: 'camisa'  } },
-      { trigger: /t[êe]nis|cal[çc]ado/i,      next: 'CAPTURA_NUMERO',  data: { origem: 'tenis',   interesse: 'tenis'   } },
-      { trigger: /bermuda|short/i,             next: 'CAPTURA_TAMANHO', data: { origem: 'bermuda', interesse: 'bermuda' } },
-    ],
-    default: 'NAO_ENTENDI',
+    message: `Como posso te ajudar hoje?\n\nDescreve o que você precisa e eu te direciono. 👇`,
+    options: [],
+    default: 'CAPTURA_TAMANHO',
   },
 
-  // ── QUALIFICAÇÃO: ROUPA ───────────────────────────────────────────────────
+  // ── QUALIFICAÇÃO ─────────────────────────────────────────────────────────
   CAPTURA_TAMANHO: {
     id: 'CAPTURA_TAMANHO',
-    message: (ctx) =>
-      ctx.origem === 'promocao'
-        ? `Me fala seu tamanho que eu te mostro as peças disponíveis:\n*P  ·  M  ·  G  ·  GG*`
-        : `Boa. Qual tamanho você usa?\n*P  ·  M  ·  G  ·  GG*`,
+    message: `Pode me dar mais detalhes sobre o que você precisa?`,
     action: 'save_tamanho',
     default: 'CAPTURA_ESTILO',
   },
 
   CAPTURA_ESTILO: {
     id: 'CAPTURA_ESTILO',
-    message: (ctx) =>
-      ctx.interesse === 'bermuda'
-        ? `Certo! Você prefere bermuda *jeans*, *tactel* ou *moletom*?`
-        : `Fechado. Você prefere *camiseta básica*, *polo* ou *malha premium*?`,
+    message: `Tem algum detalhe adicional que devo saber?`,
     action: 'save_estilo',
     default: 'CAPTURA_CIDADE',
   },
 
-  // ── QUALIFICAÇÃO: TÊNIS ───────────────────────────────────────────────────
   CAPTURA_NUMERO: {
     id: 'CAPTURA_NUMERO',
-    message: `Qual numeração você usa? _(ex: 39, 40, 41, 42...)_`,
+    message: `Pode me informar mais detalhes?`,
     action: 'save_tamanho',
     default: 'CAPTURA_CIDADE',
   },
 
-  // ── QUALIFICAÇÃO: LOCALIZAÇÃO ─────────────────────────────────────────────
   CAPTURA_CIDADE: {
     id: 'CAPTURA_CIDADE',
-    message: `Perfeito. Você está em *Uberaba* ou é envio para outra cidade?`,
+    message: `Qual o seu nome para eu já deixar registrado?`,
     action: 'save_cidade',
     default: 'RECOMENDACAO',
   },
 
-  // ── RECOMENDAÇÃO DE PRODUTOS ──────────────────────────────────────────────
+  // ── LEAD CAPTURE ─────────────────────────────────────────────────────────
   RECOMENDACAO: {
     id: 'RECOMENDACAO',
-    message: (ctx) => {
-      const tam = ctx.tamanho || 'M';
-      if (ctx.interesse === 'tenis') {
-        return (
-          `Tenho 3 opções no número *${tam}*:\n\n` +
-          `1. Tênis casual ${tam} — visual limpo e versátil\n` +
-          `2. Tênis esportivo ${tam} — ideal pro dia a dia\n` +
-          `3. Lifestyle premium ${tam} — o favorito do momento 🔥\n\n` +
-          `Quer o *mais barato* ou o *mais premium*?\nOu já decidiu? Só falar *"quero"* 💪`
-        );
-      }
-      const p1 = ctx.estilo?.includes('polo') ? `Polo preta ${tam}` : ctx.estilo?.includes('malha') ? `Malha premium branca ${tam}` : `Básica premium preta ${tam}`;
-      return (
-        `Tenho 3 opções no tamanho *${tam}*:\n\n` +
-        `1. ${p1} — visual mais arrumado\n` +
-        `2. Malha premium branca ${tam} — leve e versátil\n` +
-        `3. Básica premium ${tam} — melhor custo-benefício\n\n` +
-        `Quer a *mais barata* ou a *mais premium*?\nOu já foi convencido? Só falar *"quero"* 💪`
-      );
-    },
+    message: `Obrigado pelas informações! Vou chamar um atendente para te ajudar da melhor forma. 🙋\n\nQual é o seu nome?`,
     action: 'register_lead',
     options: [
-      { trigger: /quanto|pre[çc]o|custa|valor|paga/i,                     next: 'CAPTURA_NOME_QUENTE', data: { status_comercial: 'QUENTE', proxima_acao: 'recomendar_produto' } },
-      { trigger: /foto|ver|mostra|manda|envia/i,                           next: 'CAPTURA_NOME_QUENTE', data: { status_comercial: 'QUENTE', proxima_acao: 'recomendar_produto' } },
+      { trigger: /quanto|pre[çc]o|custa|valor|paga/i,                      next: 'CAPTURA_NOME_QUENTE', data: { status_comercial: 'QUENTE', proxima_acao: 'recomendar_produto' } },
+      { trigger: /foto|ver|mostra|manda|envia/i,                            next: 'CAPTURA_NOME_QUENTE', data: { status_comercial: 'QUENTE', proxima_acao: 'recomendar_produto' } },
       { trigger: /quero\b|vou pegar|vou levar|fechado|quero esse|comprar/i, next: 'CAPTURA_NOME_QUENTE', data: { status_comercial: 'QUENTE', proxima_acao: 'chamar_humano'      } },
-      { trigger: /atendente|humano|falar|chamar|pessoa/i,                  next: 'CAPTURA_NOME_QUENTE', data: { status_comercial: 'QUENTE', proxima_acao: 'chamar_humano'      } },
-      { trigger: /mais barata|barato|econom|em conta/i,                    next: 'AGUARDAR_RESPOSTA',   data: { status_comercial: 'QUENTE', proxima_acao: 'recomendar_produto', preferencia: 'barata'  } },
-      { trigger: /mais premium|cara\b|top\b|melhor\b|luxo/i,              next: 'AGUARDAR_RESPOSTA',   data: { status_comercial: 'QUENTE', proxima_acao: 'recomendar_produto', preferencia: 'premium' } },
+      { trigger: /atendente|humano|falar|chamar|pessoa/i,                   next: 'CAPTURA_NOME_QUENTE', data: { status_comercial: 'QUENTE', proxima_acao: 'chamar_humano'      } },
     ],
-    default: 'AGUARDAR_RESPOSTA',
+    default: 'CAPTURA_NOME_QUENTE',
   },
 
-  // ── LEADS QUENTES: CAPTURA DO NOME ────────────────────────────────────────
   CAPTURA_NOME_QUENTE: {
     id: 'CAPTURA_NOME_QUENTE',
     message: (ctx) =>
       ctx.proxima_acao === 'chamar_humano'
-        ? `Perfeito. Vou chamar um atendente da ${ctx._storeName || 'loja'} pra te mandar as melhores opções agora. 🙋\n\nQual é o seu nome?`
-        : `Boa! Para te passar o valor e disponibilidade, qual é o seu nome?`,
+        ? `Perfeito. Vou chamar um atendente da ${ctx._storeName || 'loja'} agora. 🙋\n\nQual é o seu nome?`
+        : `Boa! Para te passar mais informações, qual é o seu nome?`,
     action: 'save_nome',
     default: 'ENCAMINHAR_HUMANO',
   },
 
   AGUARDAR_RESPOSTA: {
     id: 'AGUARDAR_RESPOSTA',
-    message: (ctx) => {
-      const tam = ctx.tamanho || 'M';
-      const pref = ctx.preferencia;
-      if (ctx.interesse === 'tenis') {
-        const prod = pref === 'premium' ? `Lifestyle premium ${tam}` : `Tênis casual ${tam}`;
-        return `Boa escolha! Tenho o *${prod}* disponível.\n\nPara te enviar foto e valor, qual é o seu nome?`;
-      }
-      const prod = pref === 'premium' ? `Malha premium branca ${tam}` : `Básica premium ${tam}`;
-      return `Perfeito! Tenho a *${prod}* aqui.\n\nPara te enviar foto e valor, qual é o seu nome?`;
-    },
+    message: `Perfeito! Para te enviar as informações, qual é o seu nome?`,
     action: 'save_nome',
     default: 'ENCAMINHAR_HUMANO',
   },
@@ -228,8 +161,8 @@ export const FLOW_MAP: Record<NodeId, FlowNode> = {
   // ── FALLBACK ──────────────────────────────────────────────────────────────
   NAO_ENTENDI: {
     id: 'NAO_ENTENDI',
-    message: `Hmm, não entendi 😅\n\nMe fala o que você procura:\n\n👕  Camisa, polo ou malha\n👟  Tênis\n👖  Bermuda`,
-    default: 'INICIO',
+    message: `Hmm, não entendi muito bem 😅\n\nPode repetir ou me falar de outra forma?`,
+    default: 'APRESENTACAO',
   },
 
   // ── FORA DO HORÁRIO DE ATENDIMENTO ────────────────────────────────────────

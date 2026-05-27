@@ -123,6 +123,18 @@
     </div>
 
     <div class="field">
+      <label>Tipo de negócio</label>
+      <select x-model="form.business_type"
+              style="width:100%;padding:.65rem .85rem;background:#0f1117;border:1px solid #2a2d3e;border-radius:8px;color:#fff;font-size:.9rem;outline:none;">
+        <option value="generico">Genérico (qualquer negócio)</option>
+        <option value="varejo">Varejo — roupas, calçados, acessórios</option>
+        <option value="servicos">Serviços — orçamento por demanda</option>
+        <option value="agendamento">Agendamento — barbearia, clínica, salão</option>
+      </select>
+      <div class="field-hint">O bot vai usar um roteiro de conversa adaptado ao seu tipo de negócio.</div>
+    </div>
+
+    <div class="field">
       <label>WhatsApp do bot (com DDI e DDD)</label>
       <input x-model="form.whatsapp" type="tel" placeholder="5534999999999">
       <div class="field-hint">Número que receberá as mensagens. Sem espaços ou símbolos.</div>
@@ -161,7 +173,7 @@
 <script>
 function Signup() {
   return {
-    form: { nome: '', email: '', senha: '', nome_loja: '', whatsapp: '' },
+    form: { nome: '', email: '', senha: '', nome_loja: '', whatsapp: '', business_type: 'generico' },
     slug:       '',
     showPwd:    false,
     loading:    false,
@@ -184,7 +196,7 @@ function Signup() {
       if (this.loading) return;
       this.error = '';
 
-      const { nome, email, senha, nome_loja, whatsapp } = this.form;
+      const { nome, email, senha, nome_loja, whatsapp, business_type } = this.form;
       if (!nome.trim() || !email.trim() || !senha || !nome_loja.trim() || !whatsapp.trim()) {
         this.error = 'Preencha todos os campos.'; return;
       }
@@ -197,7 +209,7 @@ function Signup() {
         const r = await fetch('/api/signup', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ nome, email, senha, nome_loja, whatsapp }),
+          body:    JSON.stringify({ nome, email, senha, nome_loja, whatsapp, business_type }),
         });
         const j = await r.json();
         if (!j.ok) { this.error = j.error || 'Erro ao criar conta.'; return; }

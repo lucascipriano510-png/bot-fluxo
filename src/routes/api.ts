@@ -4,6 +4,7 @@ import { fetchLeads } from '../services/leadService';
 import { fetchHistorico } from '../services/mensagemService';
 import { FLOW_MAP } from '../bot/flowMap';
 import { loadFlowConfig, invalidateFlowCache } from '../services/flowConfigService';
+import { getPreset, BusinessType } from '../bot/flowPresets';
 import { getStoreContext, getStoreById } from '../services/storeService';
 import { fetchProductsForPanel } from '../inventory/inventoryBridge';
 import { loadSettings, saveSettings, getRuntimeSettings } from '../services/settingsService';
@@ -34,9 +35,9 @@ function slugify(text: string): string {
 }
 
 router.post('/signup', async (req, res) => {
-  const { nome, email, senha, nome_loja, whatsapp } = req.body as {
+  const { nome, email, senha, nome_loja, whatsapp, business_type } = req.body as {
     nome?: string; email?: string; senha?: string;
-    nome_loja?: string; whatsapp?: string;
+    nome_loja?: string; whatsapp?: string; business_type?: string;
   };
 
   if (!nome?.trim() || !email?.trim() || !senha || !nome_loja?.trim() || !whatsapp?.trim()) {
@@ -106,6 +107,24 @@ router.post('/signup', async (req, res) => {
       fallback_humano: true,
       delay_resposta:  true,
     }], { onConflict: 'store_id' });
+
+    // 6. Aplica preset de fluxo para o tipo de negócio escolhido
+    const validTypes: BusinessType[] = ['varejo', 'servicos', 'agendamento', 'generico'];
+    const bType: BusinessType = validTypes.includes(business_type as BusinessType)
+      ? (business_type as BusinessType)
+      : 'generico';
+    const presetNodes = getPreset(bType);
+    if (presetNodes.length > 0) {
+      await supabase.from('bot_flow_config').insert(
+        presetNodes.map(n => ({
+          store_id:     store.id,
+          node_id:      n.node_id,
+          message:      n.message,
+          options:      n.options,
+          default_next: n.default_next,
+        }))
+      );
+    }
 
     const protocol   = req.headers['x-forwarded-proto'] || 'https';
     const host       = req.headers['x-forwarded-host'] || req.get('host');

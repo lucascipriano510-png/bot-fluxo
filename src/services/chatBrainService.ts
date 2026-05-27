@@ -25,9 +25,9 @@ export interface BrainResult {
 const PENDING_QUESTION: Record<string, string> = {
   CAPTURA_TAMANHO:    '\n\nE qual tamanho você usa? *P  ·  M  ·  G  ·  GG*',
   CAPTURA_NUMERO:     '\n\nE qual numeração você usa? _(ex: 39, 40, 41, 42)_',
-  CAPTURA_ESTILO:     '\n\nE qual estilo você prefere? Básica, polo ou malha premium?',
-  CAPTURA_CIDADE:     '\n\nVocê está em *Uberaba* ou é envio pra outra cidade?',
-  RECOMENDACAO:       '\n\nVoltando às opções: quer a *mais em conta* ou a *mais premium?*',
+  CAPTURA_ESTILO:     '\n\nTem algum detalhe adicional que devo saber?',
+  CAPTURA_CIDADE:     '\n\nVocê prefere retirar na loja ou receber por entrega?',
+  RECOMENDACAO:       '\n\nQual é o seu nome para eu registrar?',
   AGUARDAR_RESPOSTA:  '\n\nPra eu finalizar, qual é o seu nome?',
   CAPTURA_NOME_QUENTE:'\n\nPra eu te atender, qual é o seu nome?',
 };
@@ -56,8 +56,8 @@ export function handleIntent(
   if (intent === 'unknown' && currentNodeId === 'INICIO') {
     const storeName = ctx._storeName || 'nossa loja';
     const reply = pick([
-      `Não entendi muito bem 😅 Me fala o que você procura: camisa, polo, tênis, bermuda ou boné?`,
-      `Hmm, pode repetir? 😊 Estou aqui pra ajudar com *${storeName}* — é sobre algum produto?`,
+      `Não entendi muito bem 😅 Me fala o que você precisa que eu te direciono.`,
+      `Hmm, pode repetir? 😊 Estou aqui pra ajudar com *${storeName}*. O que você precisa?`,
       `Não captei bem! Me conta o que você está buscando que eu te ajudo. 👇`,
     ], message);
     return { reply, detectedIntent: 'unknown', confidence: 0 };
