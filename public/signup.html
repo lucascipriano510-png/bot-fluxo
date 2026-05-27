@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Criar conta — Fluxo Command</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0f1117;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .card {
+      width: 100%;
+      max-width: 420px;
+      background: #1a1d27;
+      border: 1px solid #2a2d3e;
+      border-radius: 14px;
+      padding: 2rem;
+    }
+    .logo { text-align: center; margin-bottom: 1.75rem; }
+    .logo-title { font-size: 1.4rem; font-weight: 700; }
+    .logo-sub   { font-size: .83rem; color: #8b8fa8; margin-top: .25rem; }
+    .field { margin-bottom: 1rem; }
+    .field label { display: block; font-size: .78rem; color: #8b8fa8; margin-bottom: .35rem; }
+    .field input {
+      width: 100%; padding: .65rem .85rem;
+      background: #0f1117; border: 1px solid #2a2d3e;
+      border-radius: 8px; color: #fff; font-size: .9rem;
+      outline: none; transition: border-color .15s;
+      -webkit-text-fill-color: #fff;
+      caret-color: #fff;
+    }
+    .field input:-webkit-autofill {
+      -webkit-box-shadow: 0 0 0 100px #0f1117 inset !important;
+      -webkit-text-fill-color: #fff !important;
+    }
+    .field input::placeholder { color: #4b5270; }
+    .field input:focus { border-color: #6366f1; }
+    .field-hint { font-size: .75rem; color: #6b7280; margin-top: .3rem; }
+    .pw-wrap { position: relative; }
+    .pw-toggle {
+      position: absolute; right: .7rem; top: 50%;
+      transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      color: #8b8fa8; font-size: .85rem; padding: 0; line-height: 1;
+    }
+    .alert {
+      padding: .65rem .85rem; border-radius: 8px;
+      font-size: .83rem; margin-bottom: 1rem;
+    }
+    .alert-err { background: #3d1515; color: #f87171; }
+    .alert-ok  { background: #0f2e1a; color: #4ade80; }
+    .btn {
+      width: 100%; padding: .78rem;
+      background: #6366f1; color: #fff;
+      font-weight: 600; border: none; border-radius: 8px;
+      cursor: pointer; font-size: .95rem; transition: opacity .15s;
+    }
+    .btn:disabled { opacity: .6; cursor: not-allowed; }
+    .login-link {
+      text-align: center; margin-top: 1.25rem;
+      font-size: .83rem; color: #8b8fa8;
+    }
+    .login-link a { color: #818cf8; text-decoration: none; }
+    .webhook-box {
+      background: #0f1117; border: 1px solid #2a2d3e;
+      border-radius: 8px; padding: .75rem 1rem;
+      font-family: monospace; font-size: .82rem;
+      color: #a5b4fc; word-break: break-all;
+      margin: .75rem 0 1.25rem;
+    }
+    .divider { border: none; border-top: 1px solid #2a2d3e; margin: 1.25rem 0; }
+  </style>
+</head>
+<body>
+<div x-data="Signup()" x-init="init()" class="card">
+
+  <!-- ── Formulário ── -->
+  <div x-show="!success">
+    <div class="logo">
+      <div class="logo-title">Fluxo Command</div>
+      <div class="logo-sub">Crie sua conta e configure seu bot</div>
+    </div>
+
+    <div class="field">
+      <label>Seu nome</label>
+      <input x-model="form.nome" type="text" placeholder="João Silva" autocomplete="name">
+    </div>
+
+    <div class="field">
+      <label>E-mail</label>
+      <input x-model="form.email" type="email" placeholder="joao@email.com" autocomplete="email">
+    </div>
+
+    <div class="field">
+      <label>Senha</label>
+      <div class="pw-wrap">
+        <input x-model="form.senha" :type="showPwd ? 'text' : 'password'"
+               placeholder="Mínimo 6 caracteres" autocomplete="new-password"
+               style="padding-right:2.8rem;">
+        <button class="pw-toggle" type="button" @click="showPwd = !showPwd">
+          <span x-text="showPwd ? '🙈' : '👁️'"></span>
+        </button>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="field">
+      <label>Nome da loja</label>
+      <input x-model="form.nome_loja" type="text" placeholder="Ex: Lava Jato Premium"
+             @input="updateSlug()">
+      <div class="field-hint" x-show="slug">Slug: <strong x-text="slug" style="color:#a5b4fc"></strong></div>
+    </div>
+
+    <div class="field">
+      <label>WhatsApp do bot (com DDI e DDD)</label>
+      <input x-model="form.whatsapp" type="tel" placeholder="5534999999999">
+      <div class="field-hint">Número que receberá as mensagens. Sem espaços ou símbolos.</div>
+    </div>
+
+    <div x-show="error" class="alert alert-err" x-text="error"></div>
+
+    <button class="btn" @click="submit()" :disabled="loading">
+      <span x-text="loading ? 'Criando conta...' : 'Criar conta e gerar webhook'"></span>
+    </button>
+
+    <div class="login-link">Já tem conta? <a href="/">Entrar</a></div>
+  </div>
+
+  <!-- ── Sucesso ── -->
+  <div x-show="success">
+    <div class="logo">
+      <div style="font-size:2rem;">✅</div>
+      <div class="logo-title" style="margin-top:.5rem;">Conta criada!</div>
+      <div class="logo-sub">Configure o Evolution API com a URL abaixo</div>
+    </div>
+
+    <div style="font-size:.85rem;color:#8b8fa8;margin-bottom:.4rem;">URL do seu webhook:</div>
+    <div class="webhook-box" x-text="webhookUrl"></div>
+
+    <div style="font-size:.82rem;color:#8b8fa8;line-height:1.6;margin-bottom:1.5rem;">
+      Cole essa URL nas configurações do seu Evolution API (ou provider de WhatsApp) como o endpoint de webhook.
+      Após configurar, acesse o painel para personalizar o bot.
+    </div>
+
+    <button class="btn" @click="window.location.href='/'">Ir para o painel →</button>
+  </div>
+
+</div>
+
+<script>
+function Signup() {
+  return {
+    form: { nome: '', email: '', senha: '', nome_loja: '', whatsapp: '' },
+    slug:       '',
+    showPwd:    false,
+    loading:    false,
+    error:      '',
+    success:    false,
+    webhookUrl: '',
+
+    init() {},
+
+    updateSlug() {
+      this.slug = this.form.nome_loja
+        .toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 50);
+    },
+
+    async submit() {
+      if (this.loading) return;
+      this.error = '';
+
+      const { nome, email, senha, nome_loja, whatsapp } = this.form;
+      if (!nome.trim() || !email.trim() || !senha || !nome_loja.trim() || !whatsapp.trim()) {
+        this.error = 'Preencha todos os campos.'; return;
+      }
+      if (senha.length < 6) {
+        this.error = 'Senha deve ter pelo menos 6 caracteres.'; return;
+      }
+
+      this.loading = true;
+      try {
+        const r = await fetch('/api/signup', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ nome, email, senha, nome_loja, whatsapp }),
+        });
+        const j = await r.json();
+        if (!j.ok) { this.error = j.error || 'Erro ao criar conta.'; return; }
+        this.webhookUrl = j.webhookUrl;
+        this.success    = true;
+      } catch {
+        this.error = 'Erro de conexão. Tente novamente.';
+      } finally {
+        this.loading = false;
+      }
+    },
+  };
+}
+</script>
+</body>
+</html>

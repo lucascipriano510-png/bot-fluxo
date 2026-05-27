@@ -23,6 +23,102 @@ router.get('/config', (_req, res) => {
   });
 });
 
+// ── Signup — cria loja + usuário sem autenticação prévia ─────────────────────
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 50);
+}
+
+router.post('/signup', async (req, res) => {
+  const { nome, email, senha, nome_loja, whatsapp } = req.body as {
+    nome?: string; email?: string; senha?: string;
+    nome_loja?: string; whatsapp?: string;
+  };
+
+  if (!nome?.trim() || !email?.trim() || !senha || !nome_loja?.trim() || !whatsapp?.trim()) {
+    return res.status(400).json({ ok: false, error: 'Todos os campos são obrigatórios.' });
+  }
+  if (senha.length < 6) {
+    return res.status(400).json({ ok: false, error: 'Senha deve ter pelo menos 6 caracteres.' });
+  }
+
+  const cleanPhone = whatsapp.replace(/\D/g, '');
+  if (cleanPhone.length < 10) {
+    return res.status(400).json({ ok: false, error: 'WhatsApp inválido. Use o formato com DDD e DDI (ex: 5534999999999).' });
+  }
+
+  const slug = slugify(nome_loja);
+
+  try {
+    // 1. Verifica duplicatas
+    const { data: existing } = await supabase
+      .from('stores')
+      .select('id')
+      .or(`slug.eq.${slug},whatsapp_number.eq.${cleanPhone}`)
+      .maybeSingle();
+
+    if (existing) {
+      return res.status(409).json({ ok: false, error: 'Já existe uma loja com esse nome ou WhatsApp.' });
+    }
+
+    // 2. Cria usuário no Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email:           email.trim(),
+      password:        senha,
+      email_confirm:   true,
+      user_metadata:   { nome: nome.trim() },
+    });
+    if (authError) {
+      const msg = authError.message.includes('already registered')
+        ? 'Esse e-mail já está cadastrado.'
+        : authError.message;
+      return res.status(400).json({ ok: false, error: msg });
+    }
+
+    // 3. Cria loja
+    const { data: store, error: storeError } = await supabase
+      .from('stores')
+      .insert({ slug, name: nome_loja.trim(), whatsapp_number: cleanPhone, is_active: true })
+      .select('id')
+      .single();
+    if (storeError) throw storeError;
+
+    // 4. Vincula usuário à loja
+    const { error: linkError } = await supabase
+      .from('store_users')
+      .insert({ user_id: authData.user.id, store_id: store.id, role: 'owner' });
+    if (linkError) throw linkError;
+
+    // 5. Cria settings padrão para a loja
+    await supabase.from('bot_settings').upsert([{
+      store_id:        store.id,
+      nome_loja:       nome_loja.trim(),
+      whatsapp:        cleanPhone,
+      saudacao:        `Olá! 👋 Bem-vindo à *${nome_loja.trim()}*.`,
+      horario_inicio:  '09:00',
+      horario_fim:     '18:00',
+      bot_ativo:       true,
+      ignorar_horario: false,
+      fallback_humano: true,
+      delay_resposta:  true,
+    }], { onConflict: 'store_id' });
+
+    const protocol   = req.headers['x-forwarded-proto'] || 'https';
+    const host       = req.headers['x-forwarded-host'] || req.get('host');
+    const webhookUrl = `${protocol}://${host}/webhook/${slug}`;
+
+    return res.json({ ok: true, slug, webhookUrl });
+
+  } catch (err: unknown) {
+    console.error('[/api/signup]', err);
+    return res.status(500).json({ ok: false, error: 'Erro interno ao criar a loja. Tente novamente.' });
+  }
+});
+
 // ── Health check (sem auth) ───────────────────────────────────────────────────
 router.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'bot-api', env: process.env.NODE_ENV || 'production' });
