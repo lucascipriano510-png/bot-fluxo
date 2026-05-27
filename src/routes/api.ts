@@ -450,4 +450,242 @@ router.get('/products', async (req, res) => {
   }
 });
 
+router.post('/products', async (req, res) => {
+  try {
+    const { name, sku, price, promotional_price, category, subcategory, product_type, color, sizes, image_url, is_active, featured, stock } = req.body as Record<string, unknown>;
+    if (!String(name || '').trim()) return res.status(400).json({ ok: false, error: 'Nome obrigatório' });
+    const { data, error } = await supabase
+      .from('products')
+      .insert({
+        store_id:          req.storeId!,
+        name:              String(name).trim(),
+        sku:               sku ? String(sku).trim() : null,
+        price:             Number(price) || 0,
+        promotional_price: promotional_price ? Number(promotional_price) : null,
+        category:          category ? String(category).trim() : null,
+        subcategory:       subcategory ? String(subcategory).trim() : null,
+        product_type:      product_type ? String(product_type).trim() : null,
+        color:             color ? String(color).trim() : null,
+        sizes:             sizes || null,
+        image_url:         image_url ? String(image_url).trim() : null,
+        is_active:         is_active !== false,
+        featured:          featured === true,
+        stock:             Number(stock) || 0,
+      })
+      .select('*')
+      .single();
+    if (error) throw error;
+    res.json({ ok: true, data });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.put('/products/:id', async (req, res) => {
+  try {
+    const allowed = ['name','sku','price','promotional_price','category','subcategory','product_type','color','sizes','image_url','is_active','featured','stock'] as const;
+    const patch: Record<string, unknown> = {};
+    for (const key of allowed) {
+      if (key in req.body) patch[key] = req.body[key];
+    }
+    if (Object.keys(patch).length === 0) return res.status(400).json({ ok: false, error: 'Nenhum campo enviado' });
+    const { data, error } = await supabase
+      .from('products')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .eq('store_id', req.storeId!)
+      .select('*')
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ ok: false, error: 'Produto não encontrado' });
+    res.json({ ok: true, data });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.delete('/products/:id', async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('store_id', req.storeId!);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ── Leads CRM ─────────────────────────────────────────────────────────────────
+router.get('/leads/:id', async (req, res) => {
+  try {
+    const { data: lead, error } = await supabase
+      .from('bot_leads')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('store_id', req.storeId!)
+      .single();
+    if (error || !lead) return res.status(404).json({ ok: false, error: 'Lead não encontrado' });
+    const { data: messages } = await supabase
+      .from('bot_mensagens')
+      .select('*')
+      .eq('store_id', req.storeId!)
+      .eq('phone', lead.phone)
+      .order('criado_em', { ascending: true })
+      .limit(100);
+    res.json({ ok: true, data: { ...lead, messages: messages || [] } });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.put('/leads/:id', async (req, res) => {
+  try {
+    const allowed = ['nome','interesse','status_comercial','proxima_acao','valor_potencial','cidade','tamanho','estilo','origem','status','notes','kanban_stage'] as const;
+    const patch: Record<string, unknown> = {};
+    for (const key of allowed) {
+      if (key in req.body) patch[key] = req.body[key];
+    }
+    const { data, error } = await supabase
+      .from('bot_leads')
+      .update({ ...patch, atualizado_em: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .eq('store_id', req.storeId!)
+      .select('*')
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ ok: false, error: 'Lead não encontrado' });
+    res.json({ ok: true, data });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.patch('/leads/:id/stage', async (req, res) => {
+  const { stage } = req.body as { stage?: string };
+  const validStages = ['novo','interessado','escolhendo','carrinho','pagamento','finalizado'];
+  if (!stage || !validStages.includes(stage)) {
+    return res.status(400).json({ ok: false, error: 'Stage inválido' });
+  }
+  try {
+    const { data, error } = await supabase
+      .from('bot_leads')
+      .update({ kanban_stage: stage, atualizado_em: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .eq('store_id', req.storeId!)
+      .select('id')
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ ok: false, error: 'Lead não encontrado' });
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+router.get('/reports', async (req, res) => {
+  try {
+    const storeId = req.storeId!;
+    const since7  = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const [{ data: msgs7 }, { data: leads7 }, { data: allLeads }] = await Promise.all([
+      supabase.from('bot_mensagens').select('criado_em,direcao').eq('store_id', storeId).gte('criado_em', since7),
+      supabase.from('bot_leads').select('criado_em').eq('store_id', storeId).gte('criado_em', since7),
+      supabase.from('bot_leads').select('status').eq('store_id', storeId),
+    ]);
+
+    const labels: string[]  = [];
+    const atendArr: number[] = [];
+    const leadsArr: number[] = [];
+    const daysOfWeek = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+      labels.push(daysOfWeek[d.getDay()]);
+      const day = d.toISOString().slice(0, 10);
+      atendArr.push((msgs7 || []).filter(m => m.direcao === 'entrada' && m.criado_em?.startsWith(day)).length);
+      leadsArr.push((leads7 || []).filter(l => l.criado_em?.startsWith(day)).length);
+    }
+
+    const inbound  = (msgs7 || []).filter(m => m.direcao === 'entrada').length;
+    const outbound = (msgs7 || []).filter(m => m.direcao === 'saida').length;
+    const taxaResposta = inbound > 0 ? Math.round((outbound / inbound) * 100) : 0;
+
+    const hourCount: Record<number, number> = {};
+    (msgs7 || []).filter(m => m.direcao === 'entrada').forEach(m => {
+      if (!m.criado_em) return;
+      const h = new Date(m.criado_em).getHours();
+      hourCount[h] = (hourCount[h] || 0) + 1;
+    });
+    const peakHour = Object.entries(hourCount).sort((a, b) => Number(b[1]) - Number(a[1]))[0]?.[0] ?? null;
+
+    const totalLeads   = (allLeads || []).length;
+    const encaminhados = (allLeads || []).filter(l => l.status === 'encaminhado').length;
+    const pctEncam     = totalLeads > 0 ? Math.round((encaminhados / totalLeads) * 100) : 0;
+
+    res.json({
+      ok: true,
+      data: {
+        labels,
+        atendimentos: atendArr,
+        leads: leadsArr,
+        taxaResposta,
+        peakHour: peakHour !== null ? `${peakHour}h` : '—',
+        pctEncaminhados: pctEncam,
+        totalMensagens: inbound,
+      },
+    });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ── Session takeover ──────────────────────────────────────────────────────────
+router.post('/sessions/:phone/assume', async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('bot_sessions')
+      .update({ humano_ativo: true })
+      .eq('store_id', req.storeId!)
+      .eq('phone', req.params.phone);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.post('/sessions/:phone/release', async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('bot_sessions')
+      .update({ humano_ativo: false })
+      .eq('store_id', req.storeId!)
+      .eq('phone', req.params.phone);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.post('/sessions/:phone/message', async (req, res) => {
+  const { text } = req.body as { text?: string };
+  if (!text?.trim()) return res.status(400).json({ ok: false, error: 'Mensagem obrigatória' });
+  try {
+    await saveMensagem({
+      store_id: req.storeId!,
+      phone:    req.params.phone,
+      direcao:  'saida',
+      conteudo: text.trim(),
+      node:     'HUMANO',
+    });
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 export default router;

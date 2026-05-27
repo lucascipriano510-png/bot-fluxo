@@ -62,6 +62,46 @@ function FluxoCommand() {
     productSearch: '',
     productCategory: '',
     productsLoading: false,
+    productModal: false,
+    productEditId: null,
+    productForm: { name:'', sku:'', price:'', promotional_price:'', category:'', subcategory:'', product_type:'', color:'', stock:0, image_url:'', featured:false, is_active:true },
+    productSaving: false,
+    productFeedback: null,
+    productFeedbackMsg: '',
+
+    /* crm */
+    crmSearch: '',
+    crmFilter: '',
+    crmLead: null,
+    crmMessages: [],
+    crmSaving: false,
+    crmFeedback: null,
+    crmFeedbackMsg: '',
+
+    /* kanban */
+    kanban: [
+      { id: 'novo',        label: 'Novo Lead',        color: '#38BDF8', items: [] },
+      { id: 'interessado', label: 'Interessado',       color: '#A855F7', items: [] },
+      { id: 'escolhendo',  label: 'Escolhendo',        color: '#FACC15', items: [] },
+      { id: 'carrinho',    label: 'Carrinho Montado',  color: '#F97316', items: [] },
+      { id: 'pagamento',   label: 'Aguardando Pgto.',  color: '#22C55E', items: [] },
+      { id: 'finalizado',  label: 'Finalizado',        color: '#6B7280', items: [] },
+    ],
+    kanbanDragId: null,
+    kanbanDragStage: null,
+    kanbanDragOver: null,
+
+    /* reports */
+    reports: null,
+    reportsLoading: false,
+
+    /* atendimentos */
+    atendMessages: [],
+    atendPhone: null,
+    atendReply: '',
+    atendSending: false,
+    atendLead: null,
+    atendHumano: false,
 
     /* settings */
     cfg: {
@@ -81,12 +121,18 @@ function FluxoCommand() {
     cfgSetupNeeded: false,
 
     /* computed */
-    get currentConvMessages() {
-      return this.convMessages[this.selectedConv] || [];
-    },
+    get currentConvMessages() { return this.atendMessages; },
 
     get currentConv() {
       return this.conversations.find(c => c.id === this.selectedConv) || this.conversations[0];
+    },
+
+    get crmFilteredLeads() {
+      let list = this.leads;
+      const q = this.crmSearch.trim().toLowerCase();
+      if (q) list = list.filter(l => (l.nome||'').toLowerCase().includes(q) || (l.phone||'').includes(q) || (l.interesse||'').toLowerCase().includes(q));
+      if (this.crmFilter) list = list.filter(l => l.status_comercial === this.crmFilter);
+      return list;
     },
 
     // botOn e ignorarHorario são aliases para os campos de cfg (única fonte de verdade)
@@ -123,14 +169,13 @@ function FluxoCommand() {
     get productsInStock()  { return this.products.filter(p => (p.stock || 0) > 0).length; },
     get productsNoStock()  { return this.products.filter(p => (p.stock || 0) <= 0).length; },
 
-    get kanban() { return MOCK.kanban; },
-
     /* navigation */
     navigate(p) {
       this.page = p;
       this.sidebarOpen = false;
       window.location.hash = p;
-      if (p === 'relatorios') this.$nextTick(() => this.initCharts());
+      if (p === 'relatorios') this.$nextTick(() => this.loadReports());
+      if (p === 'kanban')     this.loadKanban();
     },
 
     /* ── Auth ─────────────────────────────────────────────────────────────── */
@@ -223,16 +268,16 @@ function FluxoCommand() {
     },
 
     async _loadPanelData() {
-      // Verifica status da loja antes de carregar dados sensíveis
       const blocked = await this._checkStoreStatus();
       if (blocked) return;
-
       await Promise.allSettled([
         this.loadLeads(),
         this.loadSessions(),
         this.loadProducts(),
         this.loadSettings(),
       ]);
+      if (this.page === 'kanban')     this.loadKanban();
+      if (this.page === 'relatorios') this.loadReports();
     },
 
     async _checkStoreStatus() {
@@ -414,9 +459,258 @@ function FluxoCommand() {
       if (el2) el2.scrollTop = el2.scrollHeight;
     },
 
+    /* ── Produtos CRUD ──────────────────────────────────────────────────── */
+    openProductModal(product) {
+      if (product) {
+        this.productEditId = product.id;
+        this.productForm = {
+          name:              product.name || '',
+          sku:               product.sku || '',
+          price:             product.price || '',
+          promotional_price: product.promotional_price || '',
+          category:          product.category || '',
+          subcategory:       product.subcategory || '',
+          product_type:      product.product_type || '',
+          color:             product.color || '',
+          stock:             product.stock || 0,
+          image_url:         product.image_url || product.image || '',
+          featured:          product.featured || false,
+          is_active:         product.is_active !== false,
+        };
+      } else {
+        this.productEditId = null;
+        this.productForm = { name:'', sku:'', price:'', promotional_price:'', category:'', subcategory:'', product_type:'', color:'', stock:0, image_url:'', featured:false, is_active:true };
+      }
+      this.productModal = true;
+    },
+
+    async saveProduct() {
+      if (this.productSaving) return;
+      this.productSaving = true;
+      this.productFeedback = null;
+      try {
+        const body = {
+          ...this.productForm,
+          price:             Number(this.productForm.price) || 0,
+          promotional_price: this.productForm.promotional_price ? Number(this.productForm.promotional_price) : null,
+          stock:             Number(this.productForm.stock) || 0,
+        };
+        const url    = this.productEditId ? `/api/products/${this.productEditId}` : '/api/products';
+        const method = this.productEditId ? 'PUT' : 'POST';
+        const r = await this.authFetch(url, { method, body: JSON.stringify(body) });
+        const j = await r.json();
+        if (j.ok) {
+          await this.loadProducts();
+          this.productModal = false;
+          this.productFeedback = 'ok';
+          this.productFeedbackMsg = this.productEditId ? 'Produto atualizado!' : 'Produto criado!';
+        } else {
+          this.productFeedback = 'erro';
+          this.productFeedbackMsg = j.error || 'Erro ao salvar.';
+        }
+      } catch (_) {
+        this.productFeedback = 'erro';
+        this.productFeedbackMsg = 'Erro de conexão.';
+      } finally {
+        this.productSaving = false;
+        setTimeout(() => { this.productFeedback = null; }, 3500);
+      }
+    },
+
+    async deleteProduct(id) {
+      if (!confirm('Excluir este produto?')) return;
+      const r = await this.authFetch(`/api/products/${id}`, { method: 'DELETE' });
+      const j = await r.json();
+      if (j.ok) await this.loadProducts();
+    },
+
+    /* ── CRM ─────────────────────────────────────────────────────────── */
+    async selectCrmLead(lead) {
+      this.crmLead     = { ...lead };
+      this.crmMessages = [];
+      try {
+        const r = await this.authFetch(`/api/leads/${lead.id}`);
+        const j = await r.json();
+        if (j.ok && j.data) {
+          this.crmLead     = { ...j.data };
+          this.crmMessages = (j.data.messages || []).map(m => ({
+            from: m.direcao === 'saida' ? 'bot' : 'user',
+            text: m.conteudo,
+            time: this.fmtTime(m.criado_em),
+          }));
+        }
+      } catch (_) {}
+    },
+
+    async saveCrmLead() {
+      if (!this.crmLead || this.crmSaving) return;
+      this.crmSaving = true;
+      this.crmFeedback = null;
+      try {
+        const r = await this.authFetch(`/api/leads/${this.crmLead.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            nome:             this.crmLead.nome,
+            interesse:        this.crmLead.interesse,
+            status_comercial: this.crmLead.status_comercial,
+            proxima_acao:     this.crmLead.proxima_acao,
+            valor_potencial:  Number(this.crmLead.valor_potencial) || 0,
+            cidade:           this.crmLead.cidade,
+            tamanho:          this.crmLead.tamanho,
+            estilo:           this.crmLead.estilo,
+            notes:            this.crmLead.notes,
+          }),
+        });
+        const j = await r.json();
+        if (j.ok) {
+          const idx = this.leads.findIndex(l => l.id === this.crmLead.id);
+          if (idx !== -1) this.leads[idx] = { ...this.leads[idx], ...j.data };
+          this.crmFeedback = 'ok';
+          this.crmFeedbackMsg = 'Lead salvo!';
+        } else {
+          this.crmFeedback = 'erro';
+          this.crmFeedbackMsg = j.error || 'Erro ao salvar.';
+        }
+      } catch (_) {
+        this.crmFeedback = 'erro';
+        this.crmFeedbackMsg = 'Erro de conexão.';
+      } finally {
+        this.crmSaving = false;
+        setTimeout(() => { this.crmFeedback = null; }, 3000);
+      }
+    },
+
+    crmWhatsApp(phone) {
+      const n = (phone || '').replace(/\D/g, '');
+      return `https://wa.me/${n}`;
+    },
+
+    /* ── Kanban ──────────────────────────────────────────────────────── */
+    async loadKanban() {
+      try {
+        const r = await this.authFetch('/api/leads');
+        const j = await r.json();
+        if (!j.ok) return;
+        const cols = [
+          { id: 'novo',        label: 'Novo Lead',        color: '#38BDF8', items: [] },
+          { id: 'interessado', label: 'Interessado',       color: '#A855F7', items: [] },
+          { id: 'escolhendo',  label: 'Escolhendo',        color: '#FACC15', items: [] },
+          { id: 'carrinho',    label: 'Carrinho Montado',  color: '#F97316', items: [] },
+          { id: 'pagamento',   label: 'Aguardando Pgto.',  color: '#22C55E', items: [] },
+          { id: 'finalizado',  label: 'Finalizado',        color: '#6B7280', items: [] },
+        ];
+        for (const lead of j.data) {
+          const stage = lead.kanban_stage || 'novo';
+          const col   = cols.find(c => c.id === stage) || cols[0];
+          col.items.push({ id: lead.id, name: lead.nome || lead.phone, phone: lead.phone, interesse: lead.interesse || '—', val: this.fmtBRL(lead.valor_potencial), status: lead.status_comercial });
+        }
+        this.kanban = cols;
+      } catch (_) {}
+    },
+
+    kanbanDragStart(id, stage) {
+      this.kanbanDragId    = id;
+      this.kanbanDragStage = stage;
+    },
+
+    async kanbanDrop(targetStage) {
+      const id = this.kanbanDragId;
+      this.kanbanDragOver = null;
+      if (!id || this.kanbanDragStage === targetStage) { this.kanbanDragId = null; return; }
+      const src = this.kanban.find(c => c.id === this.kanbanDragStage);
+      const tgt = this.kanban.find(c => c.id === targetStage);
+      if (!src || !tgt) return;
+      const item = src.items.find(i => i.id === id);
+      if (!item) return;
+      src.items = src.items.filter(i => i.id !== id);
+      tgt.items.push(item);
+      this.kanbanDragId = null;
+      this.kanbanDragStage = null;
+      await this.authFetch(`/api/leads/${id}/stage`, { method: 'PATCH', body: JSON.stringify({ stage: targetStage }) });
+    },
+
+    /* ── Reports ─────────────────────────────────────────────────────── */
+    async loadReports() {
+      if (this.reportsLoading) return;
+      this.reportsLoading = true;
+      try {
+        const r = await this.authFetch('/api/reports');
+        const j = await r.json();
+        if (j.ok && j.data) {
+          this.reports = j.data;
+          this.$nextTick(() => this.initCharts(j.data));
+        }
+      } catch (_) {
+        this.$nextTick(() => this.initCharts(null));
+      } finally {
+        this.reportsLoading = false;
+      }
+    },
+
+    /* ── Atendimentos ────────────────────────────────────────────────── */
+    async selectConv(conv) {
+      this.selectedConv  = conv.id;
+      this.atendPhone    = conv.phone;
+      this.atendMessages = [];
+      this.atendHumano   = conv.humano_ativo || false;
+      this.atendLead     = this.leads.find(l => l.phone === conv.phone) || null;
+      try {
+        const r = await this.authFetch('/api/messages/' + conv.phone);
+        const j = await r.json();
+        if (j.ok && Array.isArray(j.data)) {
+          this.atendMessages = j.data.map(m => ({
+            from: m.direcao === 'saida' ? 'bot' : 'user',
+            text: m.conteudo,
+            time: this.fmtTime(m.criado_em),
+          }));
+          this.$nextTick(() => this.scrollChat());
+        }
+      } catch (_) {}
+    },
+
+    async assumeConv() {
+      if (!this.atendPhone) return;
+      await this.authFetch(`/api/sessions/${this.atendPhone}/assume`, { method: 'POST' });
+      this.atendHumano = true;
+    },
+
+    async releaseConv() {
+      if (!this.atendPhone) return;
+      await this.authFetch(`/api/sessions/${this.atendPhone}/release`, { method: 'POST' });
+      this.atendHumano = false;
+    },
+
+    async sendAtendReply() {
+      const text = this.atendReply.trim();
+      if (!text || !this.atendPhone || this.atendSending) return;
+      this.atendSending = true;
+      const sent = text;
+      this.atendReply = '';
+      try {
+        const r = await this.authFetch(`/api/sessions/${this.atendPhone}/message`, {
+          method: 'POST',
+          body: JSON.stringify({ text: sent }),
+        });
+        const j = await r.json();
+        if (j.ok) {
+          this.atendMessages.push({ from: 'bot', text: sent, time: this.timeNow() });
+          this.$nextTick(() => this.scrollChat());
+        }
+      } catch (_) {}
+      finally { this.atendSending = false; }
+    },
+
+    atendKeydown(e) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.sendAtendReply(); }
+    },
+
     /* charts */
-    initCharts() {
-      const d = MOCK.chartData;
+    initCharts(data) {
+      const d = data || {
+        labels: ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'],
+        atendimentos: [0,0,0,0,0,0,0],
+        leads: [0,0,0,0,0,0,0],
+      };
       const opts = {
         responsive: true,
         maintainAspectRatio: false,
@@ -428,7 +722,8 @@ function FluxoCommand() {
       };
 
       const c1 = document.getElementById('chart-atend');
-      if (c1 && !c1._chart) {
+      if (c1) {
+        if (c1._chart) { c1._chart.destroy(); c1._chart = null; }
         c1._chart = new Chart(c1, {
           type: 'bar',
           data: {
@@ -446,7 +741,8 @@ function FluxoCommand() {
       }
 
       const c2 = document.getElementById('chart-leads');
-      if (c2 && !c2._chart) {
+      if (c2) {
+        if (c2._chart) { c2._chart.destroy(); c2._chart = null; }
         c2._chart = new Chart(c2, {
           type: 'line',
           data: {

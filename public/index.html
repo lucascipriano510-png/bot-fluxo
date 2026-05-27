@@ -129,7 +129,7 @@
 
     <div class="sb-item" :class="{ active: page==='leads' }" @click="navigate('leads')">
       <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      Clientes
+      CRM
     </div>
 
     <div class="sb-section">Catálogo</div>
@@ -199,7 +199,7 @@
 
     <div class="hdr-title">
       <h1 x-text="{
-        dashboard:'Dashboard', atendimentos:'Atendimentos', leads:'Clientes',
+        dashboard:'Dashboard', atendimentos:'Atendimentos', leads:'CRM',
         produtos:'Produtos', respostas:'Respostas Rápidas', kanban:'Kanban Comercial',
         relatorios:'Relatórios', simulador:'Testar Bot', integracoes:'Integrações',
         configuracoes:'Configurações'
@@ -207,11 +207,11 @@
       <span x-text="{
         dashboard:'Visão geral da operação, atendimentos e performance.',
         atendimentos:'Gerencie conversas e assuma atendimentos.',
-        leads:'Leads qualificados e status comercial.',
-        produtos:'Catálogo de produtos e estoque.',
+        leads:'Gestão completa de leads e relacionamento.',
+        produtos:'Catálogo de produtos, estoque e gerenciamento.',
         respostas:'Respostas automáticas do bot.',
         kanban:'Pipeline comercial por estágio.',
-        relatorios:'Métricas e performance.',
+        relatorios:'Métricas e performance real.',
         simulador:'Teste o bot em tempo real.',
         integracoes:'Conexões externas e APIs.',
         configuracoes:'Configurações da loja e do bot.',
@@ -388,36 +388,73 @@
     <!-- ── SIMULADOR ────────────────────────── -->
     <div x-show="page === 'simulador'">
       <div class="sim-wrap">
-        <div class="sim-phone-row">
-          <input type="tel" x-model="simPhone" placeholder="Telefone do cliente (ex: 5511999990000)" :disabled="simStarted">
-          <button class="btn" @click="simStarted = false; simMessages = []" x-show="simStarted">Reiniciar</button>
-          <button class="btn btn-green" @click="simStart()" x-show="!simStarted" :disabled="!simPhone">Iniciar conversa</button>
-        </div>
+        <div class="wa-sim-shell">
 
-        <div class="chat-window">
-          <div class="chat-header">
-            <div class="chat-avatar"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-            <div>
-              <div class="chat-name" x-text="cfg.nome_loja ? 'Bot ' + cfg.nome_loja : 'Bot'"></div>
-              <div class="chat-status" x-text="simLoading ? 'digitando...' : 'online'"></div>
+          <!-- WA status bar (decorativo) -->
+          <div class="wa-status-bar">
+            <span x-text="simPhone || '5511999990000'"></span>
+            <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+              <svg style="width:12px;height:12px;fill:rgba(255,255,255,.7)" viewBox="0 0 24 24"><path d="M1 6l5 5 5-5 5 5 5-5M1 12l5 5 5-5 5 5 5-5"/></svg>
+              <svg style="width:12px;height:12px;fill:rgba(255,255,255,.7)" viewBox="0 0 24 24"><rect x="3" y="8" width="4" height="12"/><rect x="10" y="4" width="4" height="16"/><rect x="17" y="1" width="4" height="19"/></svg>
+              🔋
+            </span>
+          </div>
+
+          <!-- WA header -->
+          <div class="wa-header">
+            <div class="wa-back">
+              <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:rgba(255,255,255,.85);stroke-width:2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            </div>
+            <div class="wa-avatar-lg">
+              <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:rgba(255,255,255,.8)"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div class="wa-contact-name" x-text="cfg.nome_loja ? 'Bot · ' + cfg.nome_loja : 'Bot Fluxo'"></div>
+              <div class="wa-contact-status" x-text="simLoading ? 'digitando...' : 'online'"></div>
+            </div>
+            <div style="display:flex;gap:16px;align-items:center;color:rgba(255,255,255,.8)">
+              <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.06 6.06l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
             </div>
           </div>
 
-          <div class="chat-messages" id="sim-messages">
-            <div x-show="!simStarted && simMessages.length === 0" class="empty">
-              <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              <p>Clique em "Iniciar conversa" para começar o teste.</p>
+          <!-- Setup bar (só quando não iniciado) -->
+          <div x-show="!simStarted" class="wa-setup-bar">
+            <input type="tel" x-model="simPhone" placeholder="Número do simulador (ex: 5511999990000)"
+              style="flex:1;background:transparent;border:none;color:rgba(255,255,255,.85);font-size:13px;outline:none"
+              @keydown.enter="simStart()">
+            <button class="btn btn-green" @click="simStart()" :disabled="!simPhone"
+              style="font-size:12px;padding:6px 14px">Iniciar</button>
+          </div>
+          <div x-show="simStarted" class="wa-setup-bar">
+            <span style="font-size:12px;color:rgba(255,255,255,.6)" x-text="'Simulando: ' + simPhone"></span>
+            <button class="btn" @click="simStarted = false; simMessages = []"
+              style="font-size:11px;padding:4px 10px;margin-left:auto">↺ Reiniciar</button>
+          </div>
+
+          <!-- Messages area -->
+          <div class="wa-messages" id="sim-messages">
+            <div x-show="!simStarted && simMessages.length === 0" style="text-align:center;padding:40px 20px;color:rgba(255,255,255,.35);font-size:13px">
+              🔒 As mensagens são criptografadas de ponta a ponta.<br>
+              <span style="font-size:12px;opacity:.7">Insira o número e clique em Iniciar para testar.</span>
             </div>
 
             <template x-for="(m, i) in simMessages" :key="i">
-              <div :class="m.from === 'system' ? 'sim-sys-msg' : (m.from === 'bot' ? 'bubble bubble-bot' : 'bubble bubble-user')">
-                <span x-text="m.text"></span>
-                <div x-show="m.from === 'bot' && m.intent" class="bubble-intent" x-text="`intent: ${m.intent} · ${Math.round((m.confidence||0)*100)}%`"></div>
-                <div x-show="m.from !== 'system'" class="bubble-time" x-text="m.time"></div>
+              <div>
+                <div x-show="m.from === 'system'" class="wa-sys-msg" x-text="m.text"></div>
+                <div x-show="m.from !== 'system'"
+                     :class="m.from === 'user' ? 'wa-bubble wa-out' : 'wa-bubble wa-in'">
+                  <span style="white-space:pre-wrap" x-text="m.text"></span>
+                  <div x-show="m.from === 'bot' && m.intent" style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px" x-text="`🧠 ${m.intent} · ${Math.round((m.confidence||0)*100)}%`"></div>
+                  <div class="wa-bubble-meta">
+                    <span x-text="m.time"></span>
+                    <span x-show="m.from === 'user'" style="margin-left:4px;color:#53bdeb">✓✓</span>
+                  </div>
+                </div>
               </div>
             </template>
 
-            <div class="bubble bubble-bot" x-show="simLoading">
+            <div class="wa-bubble wa-in" x-show="simLoading">
               <div class="bubble-typing">
                 <div class="typing-dot"></div>
                 <div class="typing-dot"></div>
@@ -426,17 +463,21 @@
             </div>
           </div>
 
-          <div class="chat-input-row">
-            <textarea class="chat-input" x-model="simInput" placeholder="Digite uma mensagem..." rows="1"
+          <!-- Input bar -->
+          <div class="wa-input-bar">
+            <div class="wa-emoji-btn">
+              <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:#8696a0;stroke-width:2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg>
+            </div>
+            <textarea class="wa-input" x-model="simInput" placeholder="Mensagem" rows="1"
               @keydown="simKeydown($event)" :disabled="!simStarted || simLoading"></textarea>
-            <button class="chat-send" @click="simSend()" :disabled="!simStarted || simLoading || !simInput.trim()">
-              <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            <button class="wa-send-btn" @click="simSend()" :disabled="!simStarted || simLoading || !simInput.trim()">
+              <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
           </div>
-        </div>
 
-        <div style="margin-top:12px;font-size:11px;color:var(--mu2)">
-          Pressione Enter para enviar · Shift+Enter para nova linha · Conectado à API real do bot.
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:var(--mu2);text-align:center">
+          Enter envia · Shift+Enter quebra linha · Conectado à API real do bot
         </div>
       </div>
     </div>
@@ -450,7 +491,7 @@
             Nenhuma conversa ainda.<br>Configure o webhook e envie a primeira mensagem.
           </div>
           <template x-for="c in conversations" :key="c.id">
-            <div class="conv-item" :class="{ selected: selectedConv === c.id }" style="margin:4px 6px;border-radius:8px" @click="selectedConv = c.id">
+            <div class="conv-item" :class="{ selected: selectedConv === c.id }" style="margin:4px 6px;border-radius:8px" @click="selectConv(c)">
               <div class="conv-avatar" x-text="c.avatar || c.name?.charAt(0)"></div>
               <div class="conv-info">
                 <div class="conv-name" x-text="c.name || c.phone"></div>
@@ -469,84 +510,250 @@
           <div class="atend-chat-header">
             <div class="conv-avatar" x-text="currentConv?.avatar || '?'"></div>
             <div>
-              <div style="font-size:13px;font-weight:700" x-text="currentConv?.name || currentConv?.phone"></div>
-              <div style="font-size:11px;color:var(--mu)" x-text="'Nó: ' + (currentConv?.node || 'INICIO')"></div>
+              <div style="font-size:13px;font-weight:700" x-text="currentConv?.name || currentConv?.phone || 'Selecione uma conversa'"></div>
+              <div style="font-size:11px;color:var(--mu)" x-text="atendHumano ? '🟡 Humano ativo' : ('Nó: ' + (currentConv?.node || 'INICIO'))"></div>
             </div>
             <div style="margin-left:auto;display:flex;gap:8px">
-              <button class="btn" style="font-size:11px;padding:5px 10px">Assumir</button>
-              <button class="btn btn-green" style="font-size:11px;padding:5px 10px">Devolver ao bot</button>
+              <button class="btn" style="font-size:11px;padding:5px 10px"
+                @click="assumeConv()" :disabled="!atendPhone || atendHumano"
+                :style="atendHumano ? 'opacity:.4' : ''">
+                👤 Assumir
+              </button>
+              <button class="btn btn-green" style="font-size:11px;padding:5px 10px"
+                @click="releaseConv()" :disabled="!atendPhone || !atendHumano"
+                :style="!atendHumano ? 'opacity:.4' : ''">
+                🤖 Devolver ao bot
+              </button>
             </div>
           </div>
 
           <div class="atend-messages" id="atend-messages">
             <template x-for="(m, i) in currentConvMessages" :key="i">
               <div :class="m.from === 'bot' ? 'bubble bubble-bot' : 'bubble bubble-user'">
-                <span x-text="m.text"></span>
+                <span style="white-space:pre-wrap" x-text="m.text"></span>
                 <div class="bubble-time" x-text="m.time"></div>
               </div>
             </template>
             <div x-show="currentConvMessages.length === 0" class="empty" style="padding:40px 20px">
               <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              <p>Nenhuma mensagem registrada.</p>
+              <p x-text="atendPhone ? 'Sem mensagens registradas.' : 'Selecione uma conversa.'"></p>
             </div>
           </div>
 
           <div class="atend-input-row">
-            <input class="atend-input" placeholder="Responder manualmente..." type="text">
-            <button class="btn btn-green" style="padding:8px 14px">Enviar</button>
+            <input class="atend-input" x-model="atendReply" placeholder="Responder manualmente..."
+              type="text" @keydown="atendKeydown($event)" :disabled="!atendPhone || atendSending">
+            <button class="btn btn-green" style="padding:8px 14px"
+              @click="sendAtendReply()" :disabled="!atendPhone || atendSending || !atendReply.trim()">
+              <span x-text="atendSending ? '...' : 'Enviar'"></span>
+            </button>
           </div>
         </div>
 
         <div class="atend-ficha">
           <div class="ficha-header">
             <div class="ficha-avatar" x-text="currentConv?.avatar || '?'"></div>
-            <div class="ficha-name" x-text="currentConv?.name || 'Cliente'"></div>
-            <div class="ficha-phone" x-text="currentConv?.phone"></div>
-            <div style="margin-top:10px"><span class="badge" :class="tagColor(currentConv?.tag || 'novo')" x-text="currentConv?.tag || 'novo'"></span></div>
+            <div class="ficha-name" x-text="currentConv?.name || currentConv?.phone || 'Cliente'"></div>
+            <div class="ficha-phone" x-text="currentConv?.phone || '—'"></div>
+            <div style="margin-top:10px">
+              <span class="badge" :class="statusColor(atendLead?.status_comercial)" x-text="atendLead?.status_comercial || 'novo'"></span>
+            </div>
           </div>
           <div class="ficha-field"><div class="ficha-field-label">Nó atual</div><div class="ficha-field-val" x-text="currentConv?.node || 'INICIO'"></div></div>
           <div class="ficha-field"><div class="ficha-field-label">Telefone</div><div class="ficha-field-val" x-text="currentConv?.phone || '—'"></div></div>
-          <div class="ficha-field"><div class="ficha-field-label">Interesse detectado</div><div class="ficha-field-val">Camisa G</div></div>
-          <div class="ficha-field"><div class="ficha-field-label">Valor estimado</div><div class="ficha-field-val" style="color:var(--gold)">R$189,90</div></div>
+          <div class="ficha-field"><div class="ficha-field-label">Interesse</div><div class="ficha-field-val" x-text="atendLead?.interesse || '—'"></div></div>
+          <div class="ficha-field"><div class="ficha-field-label">Cidade</div><div class="ficha-field-val" x-text="atendLead?.cidade || '—'"></div></div>
+          <div class="ficha-field"><div class="ficha-field-label">Valor estimado</div><div class="ficha-field-val" style="color:var(--gold)" x-text="atendLead ? fmtBRL(atendLead.valor_potencial) : '—'"></div></div>
+          <div class="ficha-field"><div class="ficha-field-label">Atendimento</div>
+            <div class="ficha-field-val">
+              <span :class="atendHumano ? 'badge badge-gold' : 'badge badge-green'" x-text="atendHumano ? 'Humano' : 'Bot'"></span>
+            </div>
+          </div>
           <div style="margin-top:18px;display:flex;flex-direction:column;gap:8px">
-            <button class="btn btn-green" style="justify-content:center">Criar pedido</button>
-            <button class="btn" style="justify-content:center">Adicionar nota</button>
+            <a x-show="currentConv?.phone" :href="'https://wa.me/' + (currentConv?.phone||'').replace(/\D/g,'')" target="_blank"
+              class="btn btn-green" style="justify-content:center;text-decoration:none">
+              📱 Abrir no WhatsApp
+            </a>
+            <button class="btn" style="justify-content:center" @click="navigate('leads'); $nextTick(() => { const l = leads.find(x=>x.phone===atendPhone); if(l) selectCrmLead(l); })">
+              📋 Ver no CRM
+            </button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ── LEADS / CLIENTES ─────────────────── -->
+    <!-- ── CRM ───────────────────────────────── -->
     <div x-show="page === 'leads'">
+
+      <!-- CRM feedback toast -->
+      <div x-show="crmFeedback !== null" x-transition
+        :style="`position:fixed;bottom:28px;right:28px;z-index:999;background:${crmFeedback==='ok'?'var(--green)':'#ef4444'};color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.4)`"
+        x-text="crmFeedbackMsg"></div>
+
+      <!-- Top metrics -->
       <div class="metrics-row" style="margin-bottom:20px">
-        <div class="metric-card"><div class="metric-top"><div class="metric-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div></div><div class="metric-val" x-text="leads.length"></div><div class="metric-label">Total de leads</div></div>
-        <div class="metric-card gold"><div class="metric-top"><div class="metric-icon"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div></div><div class="metric-val" x-text="leadsQuentes"></div><div class="metric-label">Leads quentes</div></div>
-        <div class="metric-card blue"><div class="metric-top"><div class="metric-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div></div><div class="metric-val" x-text="leadsMornos"></div><div class="metric-label">Leads mornos</div></div>
-        <div class="metric-card"><div class="metric-top"><div class="metric-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div></div><div class="metric-val" x-text="leadsFrios"></div><div class="metric-label">Leads frios</div></div>
+        <div class="metric-card"><div class="metric-val" x-text="leads.length"></div><div class="metric-label">Total de leads</div></div>
+        <div class="metric-card gold"><div class="metric-val" x-text="leadsQuentes"></div><div class="metric-label">🔥 Quentes</div></div>
+        <div class="metric-card blue"><div class="metric-val" x-text="leadsMornos"></div><div class="metric-label">🌡️ Mornos</div></div>
+        <div class="metric-card"><div class="metric-val" x-text="leadsFrios"></div><div class="metric-label">🧊 Frios</div></div>
       </div>
 
-      <div class="card">
-        <div class="card-header"><div class="card-title">Todos os leads</div><div style="font-size:11px;color:var(--mu)">Atualizado em tempo real</div></div>
-        <table class="tbl">
-          <thead><tr><th>Cliente</th><th>Interesse</th><th>Status</th><th>Valor est.</th><th>Atualizado</th></tr></thead>
-          <tbody>
-            <tr x-show="leads.length === 0"><td colspan="5" style="text-align:center;padding:28px;color:var(--mu);font-size:12px">Nenhum lead ainda. Os leads aparecem quando clientes chegam ao fim do funil.</td></tr>
-            <template x-for="l in leads" :key="l.id">
-              <tr>
-                <td><div style="font-weight:600" x-text="l.nome || l.phone"></div><div style="font-size:11px;color:var(--mu)" x-text="l.phone"></div></td>
-                <td x-text="l.interesse || '—'"></td>
-                <td><span class="badge" :class="statusColor(l.status_comercial)" x-text="l.status_comercial"></span></td>
-                <td style="color:var(--gold);font-weight:700" x-text="fmtBRL(l.valor_potencial)"></td>
-                <td style="color:var(--mu);font-size:12px" x-text="fmtTime(l.atualizado_em)"></td>
-              </tr>
+      <!-- 3-col CRM layout -->
+      <div class="crm-shell">
+
+        <!-- Left: lead list -->
+        <div class="crm-list">
+          <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px">
+            <input type="text" x-model="crmSearch" placeholder="Buscar nome, telefone, interesse..."
+              style="background:var(--card2);border:1px solid var(--border2);border-radius:8px;color:var(--tx);padding:7px 12px;font-size:12px;font-family:var(--font);outline:none;width:100%">
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button @click="crmFilter=''" :class="crmFilter==='' ? 'btn btn-green' : 'btn btn-ghost'" style="font-size:10px;padding:3px 9px">Todos</button>
+              <button @click="crmFilter='QUENTE'" :class="crmFilter==='QUENTE' ? 'btn' : 'btn btn-ghost'" style="font-size:10px;padding:3px 9px;color:#ef4444">🔥 Quentes</button>
+              <button @click="crmFilter='MORNO'" :class="crmFilter==='MORNO' ? 'btn' : 'btn btn-ghost'" style="font-size:10px;padding:3px 9px;color:var(--gold)">🌡️ Mornos</button>
+              <button @click="crmFilter='FRIO'" :class="crmFilter==='FRIO' ? 'btn' : 'btn btn-ghost'" style="font-size:10px;padding:3px 9px;color:var(--mu)">🧊 Frios</button>
+            </div>
+          </div>
+          <div style="overflow-y:auto;flex:1">
+            <div x-show="crmFilteredLeads.length === 0" style="padding:32px 16px;text-align:center;color:var(--mu);font-size:12px">Nenhum lead encontrado.</div>
+            <template x-for="l in crmFilteredLeads" :key="l.id">
+              <div class="crm-lead-item" :class="{ selected: crmLead?.id === l.id }" @click="selectCrmLead(l)">
+                <div class="conv-avatar" style="width:32px;height:32px;font-size:12px;flex-shrink:0" x-text="(l.nome||l.phone).charAt(0).toUpperCase()"></div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="l.nome || l.phone"></div>
+                  <div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="l.interesse || l.phone"></div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
+                  <span class="badge" :class="statusColor(l.status_comercial)" style="font-size:9px" x-text="l.status_comercial"></span>
+                  <span style="font-size:10px;color:var(--mu2)" x-text="fmtTime(l.atualizado_em)"></span>
+                </div>
+              </div>
             </template>
-          </tbody>
-        </table>
+          </div>
+        </div>
+
+        <!-- Center: lead editor -->
+        <div class="crm-editor">
+          <div x-show="!crmLead" style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--mu);font-size:13px;text-align:center;padding:40px">
+            <div>
+              <div style="font-size:32px;margin-bottom:12px">👈</div>
+              Selecione um lead para editar
+            </div>
+          </div>
+
+          <template x-if="crmLead">
+            <div style="display:flex;flex-direction:column;height:100%">
+              <!-- header -->
+              <div style="padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px">
+                <div class="ficha-avatar" style="width:44px;height:44px;font-size:17px;flex-shrink:0" x-text="(crmLead.nome||crmLead.phone).charAt(0).toUpperCase()"></div>
+                <div style="flex:1">
+                  <div style="font-size:15px;font-weight:700" x-text="crmLead.nome || crmLead.phone"></div>
+                  <div style="font-size:12px;color:var(--mu)" x-text="crmLead.phone"></div>
+                </div>
+                <a :href="crmWhatsApp(crmLead.phone)" target="_blank" class="btn btn-green" style="font-size:11px;padding:6px 12px;text-decoration:none">📱 WhatsApp</a>
+              </div>
+
+              <!-- form -->
+              <div style="flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px">
+                <div class="crm-row2">
+                  <div class="field"><label>Nome</label><input type="text" x-model="crmLead.nome" placeholder="Nome do cliente"></div>
+                  <div class="field"><label>Interesse</label><input type="text" x-model="crmLead.interesse" placeholder="Produto ou serviço"></div>
+                </div>
+                <div class="crm-row3">
+                  <div class="field">
+                    <label>Status comercial</label>
+                    <select x-model="crmLead.status_comercial">
+                      <option value="QUENTE">🔥 QUENTE</option>
+                      <option value="MORNO">🌡️ MORNO</option>
+                      <option value="FRIO">🧊 FRIO</option>
+                    </select>
+                  </div>
+                  <div class="field"><label>Valor potencial (R$)</label><input type="number" x-model="crmLead.valor_potencial" placeholder="0"></div>
+                  <div class="field"><label>Cidade</label><input type="text" x-model="crmLead.cidade" placeholder="Cidade"></div>
+                </div>
+                <div class="crm-row3">
+                  <div class="field"><label>Tamanho</label><input type="text" x-model="crmLead.tamanho" placeholder="P, M, G, GG..."></div>
+                  <div class="field"><label>Estilo/tipo</label><input type="text" x-model="crmLead.estilo" placeholder="Ex: básica, polo..."></div>
+                  <div class="field"><label>Origem</label><input type="text" x-model="crmLead.origem" placeholder="Instagram, WhatsApp..."></div>
+                </div>
+                <div class="field"><label>Próxima ação</label><input type="text" x-model="crmLead.proxima_acao" placeholder="O que fazer com esse lead?"></div>
+                <div class="field"><label>Notas internas</label><textarea x-model="crmLead.notes" rows="4" placeholder="Observações, histórico de contato, preferências..."></textarea></div>
+              </div>
+
+              <!-- save bar -->
+              <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">
+                <button class="btn btn-green" style="padding:10px 28px;font-weight:700" @click="saveCrmLead()" :disabled="crmSaving">
+                  <span x-text="crmSaving ? 'Salvando...' : 'Salvar alterações'"></span>
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Right: message history -->
+        <div class="crm-history">
+          <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--mu2);text-transform:uppercase;letter-spacing:.05em">
+            Histórico de mensagens
+          </div>
+          <div style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px">
+            <div x-show="!crmLead" style="text-align:center;padding:32px 0;color:var(--mu);font-size:12px">Selecione um lead.</div>
+            <div x-show="crmLead && crmMessages.length === 0" style="text-align:center;padding:32px 0;color:var(--mu);font-size:12px">Sem mensagens registradas.</div>
+            <template x-for="(m, i) in crmMessages" :key="i">
+              <div :class="m.from === 'bot' ? 'bubble bubble-bot' : 'bubble bubble-user'" style="font-size:12px;max-width:90%">
+                <span style="white-space:pre-wrap" x-text="m.text"></span>
+                <div class="bubble-time" x-text="m.time"></div>
+              </div>
+            </template>
+          </div>
+        </div>
+
       </div>
     </div>
 
     <!-- ── PRODUTOS ─────────────────────────── -->
     <div x-show="page === 'produtos'">
+
+      <!-- Product feedback toast -->
+      <div x-show="productFeedback !== null" x-transition
+        :style="`position:fixed;bottom:28px;right:28px;z-index:999;background:${productFeedback==='ok'?'var(--green)':'#ef4444'};color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.4)`"
+        x-text="productFeedbackMsg"></div>
+
+      <!-- Product modal -->
+      <div x-show="productModal" style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px" @click.self="productModal=false">
+        <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto">
+          <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:15px;font-weight:700" x-text="productEditId ? 'Editar produto' : 'Novo produto'"></div>
+            <button @click="productModal=false" style="background:none;border:none;color:var(--mu);cursor:pointer;font-size:18px;line-height:1">×</button>
+          </div>
+          <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="field" style="grid-column:span 2"><label>Nome *</label><input type="text" x-model="productForm.name" placeholder="Nome do produto"></div>
+              <div class="field"><label>SKU</label><input type="text" x-model="productForm.sku" placeholder="Código único"></div>
+              <div class="field"><label>Categoria</label><input type="text" x-model="productForm.category" placeholder="Ex: Camisetas"></div>
+              <div class="field"><label>Subcategoria</label><input type="text" x-model="productForm.subcategory" placeholder="Ex: Polo"></div>
+              <div class="field"><label>Tipo</label><input type="text" x-model="productForm.product_type" placeholder="Ex: malha, jeans..."></div>
+              <div class="field"><label>Preço (R$) *</label><input type="number" x-model="productForm.price" placeholder="0.00" step="0.01"></div>
+              <div class="field"><label>Preço promocional (R$)</label><input type="number" x-model="productForm.promotional_price" placeholder="Opcional" step="0.01"></div>
+              <div class="field"><label>Estoque</label><input type="number" x-model="productForm.stock" placeholder="0"></div>
+              <div class="field"><label>Cor</label><input type="text" x-model="productForm.color" placeholder="Ex: Azul marinho"></div>
+              <div class="field" style="grid-column:span 2"><label>URL da imagem</label><input type="text" x-model="productForm.image_url" placeholder="https://..."></div>
+            </div>
+            <div style="display:flex;gap:20px;align-items:center">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+                <input type="checkbox" x-model="productForm.featured"> ★ Produto em destaque
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+                <input type="checkbox" x-model="productForm.is_active"> ✓ Produto ativo
+              </label>
+            </div>
+          </div>
+          <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px">
+            <button class="btn btn-ghost" @click="productModal=false">Cancelar</button>
+            <button class="btn btn-green" @click="saveProduct()" :disabled="productSaving || !productForm.name.trim()">
+              <span x-text="productSaving ? 'Salvando...' : (productEditId ? 'Salvar alterações' : 'Criar produto')"></span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       <!-- Toolbar -->
       <div class="card-header" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
@@ -564,6 +771,7 @@
         <button class="btn" @click="loadProducts()" :disabled="productsLoading" style="white-space:nowrap">
           <span x-text="productsLoading ? 'Carregando...' : '↺ Atualizar'"></span>
         </button>
+        <button class="btn btn-green" @click="openProductModal(null)" style="white-space:nowrap">+ Adicionar produto</button>
       </div>
 
       <!-- Stats -->
@@ -649,6 +857,12 @@
                 style="display:block;margin-top:8px;font-size:10px;color:var(--blue);opacity:.75;text-decoration:none">
                 🔗 Ver no site
               </a>
+
+              <!-- CRUD actions -->
+              <div style="display:flex;gap:6px;margin-top:10px">
+                <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:10px;padding:5px 0" @click="openProductModal(p)">✏️ Editar</button>
+                <button style="flex:0;padding:5px 10px;background:var(--red2);border:1px solid rgba(239,68,68,.2);border-radius:7px;color:#ef4444;font-size:10px;cursor:pointer" @click="deleteProduct(p.id)">🗑️</button>
+              </div>
             </div>
           </div>
         </template>
@@ -688,9 +902,16 @@
 
     <!-- ── KANBAN ───────────────────────────── -->
     <div x-show="page === 'kanban'">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+        <button class="btn" @click="loadKanban()" style="font-size:12px">↺ Atualizar</button>
+      </div>
       <div class="kanban-wrap">
         <template x-for="col in kanban" :key="col.id">
-          <div class="kanban-col">
+          <div class="kanban-col"
+            :class="{ 'kanban-drag-over': kanbanDragOver === col.id }"
+            @dragover.prevent="kanbanDragOver = col.id"
+            @dragleave="kanbanDragOver = null"
+            @drop.prevent="kanbanDrop(col.id)">
             <div class="kanban-col-header">
               <div style="display:flex;align-items:center;gap:8px">
                 <div style="width:8px;height:8px;border-radius:50%" :style="`background:${col.color}`"></div>
@@ -698,15 +919,23 @@
               </div>
               <span class="kanban-count" x-text="col.items.length"></span>
             </div>
-            <template x-for="(item, i) in col.items" :key="i">
-              <div class="kanban-card">
-                <div class="kanban-card-name" x-text="item.name"></div>
+            <template x-for="item in col.items" :key="item.id">
+              <div class="kanban-card" draggable="true"
+                @dragstart="kanbanDragStart(item.id, col.id)"
+                @dragend="kanbanDragOver = null"
+                style="cursor:grab">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+                  <div class="kanban-card-name" x-text="item.name"></div>
+                  <span class="badge" :class="statusColor(item.status)" style="font-size:9px" x-text="item.status"></span>
+                </div>
                 <div class="kanban-card-info" x-text="item.phone"></div>
                 <div class="kanban-card-info" style="margin-top:4px" x-text="item.interesse"></div>
                 <div class="kanban-card-val" x-text="item.val"></div>
               </div>
             </template>
-            <div x-show="col.items.length === 0" style="text-align:center;padding:20px 0;font-size:12px;color:var(--mu2)">Sem leads aqui</div>
+            <div x-show="col.items.length === 0" style="text-align:center;padding:20px 0;font-size:12px;color:var(--mu2);border:2px dashed var(--border);border-radius:8px;margin-top:4px">
+              Arraste leads aqui
+            </div>
           </div>
         </template>
       </div>
@@ -714,20 +943,38 @@
 
     <!-- ── RELATÓRIOS ───────────────────────── -->
     <div x-show="page === 'relatorios'">
-      <div class="grid-2 mb-6">
-        <div class="card">
-          <div class="card-header"><div class="card-title">Atendimentos por dia</div><span class="badge badge-green">Últimos 7 dias</span></div>
-          <div style="height:200px"><canvas id="chart-atend"></canvas></div>
+      <div x-show="reportsLoading" style="text-align:center;padding:40px;color:var(--mu);font-size:13px">Carregando relatórios...</div>
+      <div x-show="!reportsLoading">
+        <div class="grid-2 mb-6">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Atendimentos por dia</div><span class="badge badge-green">Últimos 7 dias</span></div>
+            <div style="height:200px"><canvas id="chart-atend"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Leads gerados por dia</div><span class="badge badge-gold">Últimos 7 dias</span></div>
+            <div style="height:200px"><canvas id="chart-leads"></canvas></div>
+          </div>
         </div>
-        <div class="card">
-          <div class="card-header"><div class="card-title">Leads gerados por dia</div><span class="badge badge-gold">Últimos 7 dias</span></div>
-          <div style="height:200px"><canvas id="chart-leads"></canvas></div>
+        <div class="grid-3">
+          <div class="card" style="text-align:center">
+            <div style="font-size:32px;font-weight:800;color:var(--green);margin-bottom:6px" x-text="(reports?.taxaResposta ?? '—') + (reports ? '%' : '')"></div>
+            <div style="font-size:13px;font-weight:600">Taxa de resposta</div>
+            <div style="font-size:11px;color:var(--mu);margin-top:4px">mensagens respondidas pelo bot (7 dias)</div>
+          </div>
+          <div class="card" style="text-align:center">
+            <div style="font-size:32px;font-weight:800;color:var(--gold);margin-bottom:6px" x-text="reports?.peakHour ?? '—'"></div>
+            <div style="font-size:13px;font-weight:600">Horário de pico</div>
+            <div style="font-size:11px;color:var(--mu);margin-top:4px">hora com mais mensagens recebidas</div>
+          </div>
+          <div class="card" style="text-align:center">
+            <div style="font-size:32px;font-weight:800;color:var(--blue);margin-bottom:6px" x-text="(reports?.pctEncaminhados ?? '—') + (reports ? '%' : '')"></div>
+            <div style="font-size:13px;font-weight:600">Encaminhados p/ humano</div>
+            <div style="font-size:11px;color:var(--mu);margin-top:4px">leads com status "encaminhado"</div>
+          </div>
         </div>
-      </div>
-      <div class="grid-3">
-        <div class="card" style="text-align:center"><div style="font-size:32px;font-weight:800;color:var(--green);margin-bottom:6px">87%</div><div style="font-size:13px;font-weight:600">Taxa de resposta</div><div style="font-size:11px;color:var(--mu);margin-top:4px">mensagens respondidas pelo bot</div></div>
-        <div class="card" style="text-align:center"><div style="font-size:32px;font-weight:800;color:var(--gold);margin-bottom:6px">14h</div><div style="font-size:13px;font-weight:600">Horário de pico</div><div style="font-size:11px;color:var(--mu);margin-top:4px">mais mensagens às 14:00–16:00</div></div>
-        <div class="card" style="text-align:center"><div style="font-size:32px;font-weight:800;color:var(--blue);margin-bottom:6px">23%</div><div style="font-size:13px;font-weight:600">Encaminhados p/ humano</div><div style="font-size:11px;color:var(--mu);margin-top:4px">conversas que saíram do bot</div></div>
+        <div style="margin-top:14px;text-align:right">
+          <button class="btn" @click="loadReports()" style="font-size:11px">↺ Atualizar relatórios</button>
+        </div>
       </div>
     </div>
 
