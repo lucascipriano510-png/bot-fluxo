@@ -15,10 +15,26 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   // Lê store_id do app_metadata (no JWT) — sem query extra ao banco
-  const storeId: string | undefined = user.app_metadata?.store_id;
+  let storeId: string | undefined = user.app_metadata?.store_id;
 
+  // Fallback: conta antiga sem app_metadata — busca em store_users
   if (!storeId) {
-    return res.status(403).json({ ok: false, error: 'Sem acesso a nenhuma loja' });
+    const { data: su } = await supabase
+      .from('store_users')
+      .select('store_id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (!su?.store_id) {
+      return res.status(403).json({ ok: false, error: 'Sem acesso a nenhuma loja' });
+    }
+
+    storeId = su.store_id;
+    // Corrige app_metadata em background para evitar fallback nas próximas requisições
+    supabase.auth.admin.updateUserById(user.id, {
+      app_metadata: { ...user.app_metadata, store_id: storeId, role: 'owner' },
+    }).catch(() => {});
   }
 
   req.storeId = storeId;
