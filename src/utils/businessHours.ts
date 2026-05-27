@@ -1,22 +1,35 @@
 // Verifica se estamos dentro do horário de atendimento da loja.
-// Configure via .env: HORARIO_INICIO, HORARIO_FIM, DIAS_UTEIS, TIMEZONE
+// Recebe os settings da loja como fonte primária.
+// Env vars (HORARIO_INICIO, HORARIO_FIM, DIAS_UTEIS, TIMEZONE) são fallback apenas para
+// deploy single-store legado — nunca devem ser a fonte principal no modo SaaS.
 
-const START_HOUR = Number((process.env.HORARIO_INICIO ?? '09:00').split(':')[0]);
-const START_MIN  = Number((process.env.HORARIO_INICIO ?? '09:00').split(':')[1]);
-const END_HOUR   = Number((process.env.HORARIO_FIM   ?? '18:00').split(':')[0]);
-const END_MIN    = Number((process.env.HORARIO_FIM   ?? '18:00').split(':')[1]);
-// 0=Dom, 1=Seg ... 6=Sáb — padrão Seg-Sáb
-const WORK_DAYS  = (process.env.DIAS_UTEIS ?? '1,2,3,4,5,6').split(',').map(Number);
-const TZ         = process.env.TIMEZONE ?? 'America/Sao_Paulo';
+interface HoursSettings {
+  horario_inicio:  string;
+  horario_fim:     string;
+  ignorar_horario: boolean;
+}
 
-export function isBusinessHours(): boolean {
-  if (process.env.IGNORAR_HORARIO === 'true') return true;
+const TZ       = process.env.TIMEZONE  ?? 'America/Sao_Paulo';
+const WORK_DAYS = (process.env.DIAS_UTEIS ?? '1,2,3,4,5,6').split(',').map(Number);
+
+export function isBusinessHours(settings?: HoursSettings): boolean {
+  if (settings?.ignorar_horario) return true;
+
+  const inicio = settings?.horario_inicio ?? process.env.HORARIO_INICIO ?? '09:00';
+  const fim    = settings?.horario_fim    ?? process.env.HORARIO_FIM    ?? '18:00';
+
+  const [sh, sm] = inicio.split(':').map(Number);
+  const [eh, em] = fim.split(':').map(Number);
+
   const now  = new Date(new Date().toLocaleString('en-US', { timeZone: TZ }));
   const day  = now.getDay();
   const mins = now.getHours() * 60 + now.getMinutes();
-  return WORK_DAYS.includes(day) && mins >= START_HOUR * 60 + START_MIN && mins < END_HOUR * 60 + END_MIN;
+
+  return WORK_DAYS.includes(day) && mins >= sh * 60 + sm && mins < eh * 60 + em;
 }
 
-export function openingTimeStr(): string {
-  return `${String(START_HOUR).padStart(2, '0')}:${String(START_MIN).padStart(2, '0')}`;
+export function openingTimeStr(settings?: Pick<HoursSettings, 'horario_inicio'>): string {
+  const inicio = settings?.horario_inicio ?? process.env.HORARIO_INICIO ?? '09:00';
+  const [h, m] = inicio.split(':');
+  return `${String(h).padStart(2, '0')}:${String(m || '0').padStart(2, '0')}`;
 }

@@ -7,7 +7,7 @@ import { generateWhatsAppLink } from '../providers/messaging';
 import { isOptedOut, registerOptOut, removeOptOut } from '../services/optoutService';
 import { isBusinessHours, openingTimeStr } from '../utils/businessHours';
 import { loadFlowConfig, triggerToRegex } from '../services/flowConfigService';
-import { getStoreContext } from '../services/storeService';
+import { getStoreById } from '../services/storeService';
 import {
   detectProductQuery,
   logInventoryQuery,
@@ -33,10 +33,9 @@ export async function processMessage(
   messageText: string,
 ): Promise<BotResponse> {
 
-  // Contexto da loja — único ponto de verdade do store_id no runtime
-  const storeCtx = await getStoreContext();
-  const storeId   = session.store_id;   // UUID para queries no banco do bot
-  const storeSlug = storeCtx.slug;      // slug para queries no catálogo (InventoryBridge)
+  // Contexto da loja — fonte de verdade é sempre session.store_id (UUID)
+  const storeId  = session.store_id;
+  const storeCtx = await getStoreById(storeId);
 
   // ── PRÉ-CHECAGEM 0: Bot ativo ─────────────────────────────────────────────
   const rtSettings = await getRuntimeSettings(storeId);
@@ -68,9 +67,9 @@ export async function processMessage(
   }
 
   // ── PRÉ-CHECAGEM 3: Fora do horário (abertura de conversa) ───────────────
-  if (session.current_node === 'INICIO' && !rtSettings.ignorar_horario && !isBusinessHours()) {
+  if (session.current_node === 'INICIO' && !isBusinessHours(rtSettings)) {
     await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: 'FORA_HORARIO' });
-    const ctx = { _abertura: openingTimeStr(), _storeName: storeCtx.name };
+    const ctx = { _abertura: openingTimeStr(rtSettings), _storeName: storeCtx.name };
     const msgFn = FLOW_MAP['FORA_HORARIO'].message;
     const reply = typeof msgFn === 'function' ? msgFn(ctx) : msgFn as string;
     await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida', conteudo: reply, node: 'FORA_HORARIO' });
@@ -94,10 +93,10 @@ export async function processMessage(
   // ── PRÉ-CHECAGEM 4: Consulta de catálogo via CatalogBridge (busca em camadas) ──
   const rawFilters = detectProductQuery(messageText);
   if (rawFilters) {
-    const offerFilters               = buildOfferFilters(storeSlug, rawFilters);
+    const offerFilters               = buildOfferFilters(storeId, rawFilters);
     const { offers, matched, dropped } = await findOffersWithFallback(offerFilters);
     const reply                      = formatFallbackResponse(offers, offerFilters, matched, dropped);
-    logInventoryQuery(storeSlug, session.phone, messageText, rawFilters, offers.length, reply);
+    logInventoryQuery(storeId, session.phone, messageText, rawFilters, offers.length, reply);
 
     await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
     await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: reply,       node: 'CATALOG' });
