@@ -79,8 +79,28 @@
   <div style="color:#8b8fa8;font-size:.9rem;">Carregando...</div>
 </div>
 
-<!-- ── Painel (só aparece autenticado) ───────────────────────────────────── -->
-<div x-show="!authLoading && authUser">
+<!-- ── Loja bloqueada (aguardando ativação) ──────────────────────────────── -->
+<div x-show="!authLoading && authUser && storeBlocked"
+     style="position:fixed;inset:0;z-index:9997;background:#0f1117;display:flex;align-items:center;justify-content:center;padding:1.5rem;">
+  <div style="width:100%;max-width:400px;background:#1a1d27;border:1px solid #2a2d3e;border-radius:14px;padding:2.5rem;text-align:center;">
+    <div style="font-size:2.5rem;margin-bottom:1rem;">⏳</div>
+    <div style="font-size:1.2rem;font-weight:700;color:#fff;margin-bottom:.75rem;">Conta criada com sucesso!</div>
+    <div style="font-size:.9rem;color:#8b8fa8;line-height:1.7;margin-bottom:2rem;">
+      Sua loja está criada e aguardando ativação do plano.<br>
+      Em breve você receberá o acesso liberado.
+    </div>
+    <div style="font-size:.8rem;color:#4b5270;margin-bottom:1.5rem;">
+      Status: <span style="color:#facc15;font-weight:600;" x-text="storeStatus"></span>
+    </div>
+    <button @click="logout()"
+            style="width:100%;padding:.7rem;background:transparent;color:#8b8fa8;border:1px solid #2a2d3e;border-radius:8px;cursor:pointer;font-size:.9rem;">
+      Sair da conta
+    </button>
+  </div>
+</div>
+
+<!-- ── Painel (só aparece autenticado e com loja ativa) ──────────────────── -->
+<div x-show="!authLoading && authUser && !storeBlocked">
 
 <!-- Mobile overlay -->
 <div class="overlay" :class="{ visible: sidebarOpen }" @click="sidebarOpen = false"></div>

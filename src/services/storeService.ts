@@ -5,13 +5,15 @@ export interface StoreContext {
   slug: string;
   name: string;
   whatsappNumber: string;
+  status: string;
+  plan: string;
 }
 
 // Cache por chave composta — múltiplas lojas na mesma instância
 const _cache = new Map<string, StoreContext>();
 
-function fromRow(row: { id: string; slug: string; name: string; whatsapp_number: string }): StoreContext {
-  return { storeId: row.id, slug: row.slug, name: row.name, whatsappNumber: row.whatsapp_number };
+function fromRow(row: { id: string; slug: string; name: string; whatsapp_number: string; status: string; plan: string }): StoreContext {
+  return { storeId: row.id, slug: row.slug, name: row.name, whatsappNumber: row.whatsapp_number, status: row.status ?? 'pending_payment', plan: row.plan ?? 'bot' };
 }
 
 function setCache(ctx: StoreContext) {
@@ -26,7 +28,7 @@ export async function getStoreBySlug(slug: string): Promise<StoreContext> {
 
   const { data, error } = await supabase
     .from('stores')
-    .select('id, slug, name, whatsapp_number')
+    .select('id, slug, name, whatsapp_number, status, plan')
     .eq('slug', slug)
     .eq('is_active', true)
     .single();
@@ -43,7 +45,7 @@ export async function getStoreById(id: string): Promise<StoreContext> {
 
   const { data, error } = await supabase
     .from('stores')
-    .select('id, slug, name, whatsapp_number')
+    .select('id, slug, name, whatsapp_number, status, plan')
     .eq('id', id)
     .eq('is_active', true)
     .single();
@@ -60,7 +62,7 @@ export async function getStoreByWhatsapp(phone: string): Promise<StoreContext> {
 
   const { data, error } = await supabase
     .from('stores')
-    .select('id, slug, name, whatsapp_number')
+    .select('id, slug, name, whatsapp_number, status, plan')
     .eq('whatsapp_number', phone)
     .eq('is_active', true)
     .single();

@@ -33,6 +33,12 @@ export async function resolveStoreBySlug(req: Request, res: Response, next: Next
 
   try {
     const store = await getStoreBySlug(slug);
+
+    if (store.status !== 'active' && store.status !== 'trial') {
+      console.log(`[webhook] store "${slug}" blocked — status: ${store.status}`);
+      return res.status(200).json({ ok: false, error: 'Store inactive' });
+    }
+
     req.storeId = store.storeId;
     (req as Request & { storeCtx: unknown }).storeCtx = store;
     next();

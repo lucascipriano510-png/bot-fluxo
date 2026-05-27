@@ -36,13 +36,16 @@ function slugify(text: string): string {
 }
 
 router.post('/signup', async (req, res) => {
-  const { nome, email, senha, nome_loja, whatsapp, business_type } = req.body as {
+  const { nome, email, senha, nome_loja, whatsapp, business_type, invite_code } = req.body as {
     nome?: string; email?: string; senha?: string;
-    nome_loja?: string; whatsapp?: string; business_type?: string;
+    nome_loja?: string; whatsapp?: string; business_type?: string; invite_code?: string;
   };
 
   if (!nome?.trim() || !email?.trim() || !senha || !nome_loja?.trim() || !whatsapp?.trim()) {
     return res.status(400).json({ ok: false, error: 'Todos os campos são obrigatórios.' });
+  }
+  if (!invite_code?.trim()) {
+    return res.status(400).json({ ok: false, error: 'Código de convite obrigatório.' });
   }
   if (senha.length < 6) {
     return res.status(400).json({ ok: false, error: 'Senha deve ter pelo menos 6 caracteres.' });
@@ -56,7 +59,28 @@ router.post('/signup', async (req, res) => {
   const slug = slugify(nome_loja);
 
   try {
-    // 1. Verifica duplicatas
+    // 1. Valida invite_code (backend — nunca apenas frontend)
+    const { data: invite, error: inviteError } = await supabase
+      .from('invite_codes')
+      .select('id, status, max_uses, used_count, expires_at, plan')
+      .eq('code', invite_code.trim().toUpperCase())
+      .maybeSingle();
+
+    if (inviteError) throw inviteError;
+    if (!invite) {
+      return res.status(400).json({ ok: false, error: 'Código de convite inválido.' });
+    }
+    if (invite.status !== 'active') {
+      return res.status(400).json({ ok: false, error: 'Código de convite inativo ou já utilizado.' });
+    }
+    if (invite.used_count >= invite.max_uses) {
+      return res.status(400).json({ ok: false, error: 'Código de convite já atingiu o limite de usos.' });
+    }
+    if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+      return res.status(400).json({ ok: false, error: 'Código de convite expirado.' });
+    }
+
+    // 2. Verifica duplicatas de loja
     const { data: existing } = await supabase
       .from('stores')
       .select('id')
@@ -67,7 +91,7 @@ router.post('/signup', async (req, res) => {
       return res.status(409).json({ ok: false, error: 'Já existe uma loja com esse nome ou WhatsApp.' });
     }
 
-    // 2. Cria usuário no Supabase Auth
+    // 3. Cria usuário no Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email:           email.trim(),
       password:        senha,
@@ -81,32 +105,40 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ ok: false, error: msg });
     }
 
-    // 3. Cria loja
+    // 4. Cria loja com status pending_payment e plano do invite_code
     const newStoreId = randomUUID();
     const { data: store, error: storeError } = await supabase
       .from('stores')
-      .insert({ id: newStoreId, slug, name: nome_loja.trim(), whatsapp_number: cleanPhone, is_active: true })
+      .insert({
+        id:              newStoreId,
+        slug,
+        name:            nome_loja.trim(),
+        whatsapp_number: cleanPhone,
+        is_active:       true,
+        status:          'pending_payment',
+        plan:            invite.plan || 'bot',
+      })
       .select('id')
       .single();
     if (storeError) throw storeError;
 
-    // 4. Grava store_id no app_metadata do usuário (via GoTrue, sem PostgREST)
+    // 5. Grava store_id no app_metadata do usuário
     const { error: metaError } = await supabase.auth.admin.updateUserById(
       authData.user.id,
       { app_metadata: { store_id: store.id, role: 'owner' } }
     );
     if (metaError) throw metaError;
 
-    // 4b. Tenta inserir em store_users via RPC — falha silenciosa se PostgREST não tiver recarregado ainda
+    // 5b. Insere em store_users via RPC
     await supabase.rpc('insert_store_user', {
-      p_user_id: authData.user.id,
+      p_user_id:  authData.user.id,
       p_store_id: store.id,
-      p_role: 'owner',
+      p_role:     'owner',
     }).then(({ error }) => {
       if (error) console.warn('[signup] store_users RPC fallback failed (não crítico):', error.message);
     });
 
-    // 5. Cria settings padrão para a loja
+    // 6. Cria settings padrão para a loja
     await supabase.from('bot_settings').upsert([{
       store_id:        store.id,
       nome_loja:       nome_loja.trim(),
@@ -120,7 +152,7 @@ router.post('/signup', async (req, res) => {
       delay_resposta:  true,
     }], { onConflict: 'store_id' });
 
-    // 6. Aplica preset de fluxo para o tipo de negócio escolhido
+    // 7. Aplica preset de fluxo para o tipo de negócio escolhido
     const validTypes: BusinessType[] = ['varejo', 'servicos', 'agendamento', 'generico'];
     const bType: BusinessType = validTypes.includes(business_type as BusinessType)
       ? (business_type as BusinessType)
@@ -137,6 +169,18 @@ router.post('/signup', async (req, res) => {
         }))
       );
     }
+
+    // 8. Incrementa uso do invite_code
+    const newUsedCount = invite.used_count + 1;
+    await supabase
+      .from('invite_codes')
+      .update({
+        used_count: newUsedCount,
+        status:     newUsedCount >= invite.max_uses ? 'used' : 'active',
+        used_by:    authData.user.id,
+        used_at:    new Date().toISOString(),
+      })
+      .eq('id', invite.id);
 
     const protocol   = req.headers['x-forwarded-proto'] || 'https';
     const host       = req.headers['x-forwarded-host'] || req.get('host');
@@ -157,6 +201,23 @@ router.get('/health', (_req, res) => {
 
 // A partir daqui todas as rotas exigem autenticação
 router.use(requireAuth);
+
+// ── Dados da loja autenticada ─────────────────────────────────────────────────
+router.get('/store', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('stores')
+      .select('id, slug, name, status, plan, trial_ends_at')
+      .eq('id', req.storeId!)
+      .single();
+    if (error || !data) {
+      return res.status(404).json({ ok: false, error: 'Loja não encontrada' });
+    }
+    return res.json({ ok: true, data });
+  } catch (err: unknown) {
+    return res.status(500).json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Simulador (painel) — movido de app.ts para cair sob auth

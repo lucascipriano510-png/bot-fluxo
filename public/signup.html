@@ -140,6 +140,15 @@
       <div class="field-hint">Número que receberá as mensagens. Sem espaços ou símbolos.</div>
     </div>
 
+    <hr class="divider">
+
+    <div class="field">
+      <label>Código de convite <span style="color:#f87171">*</span></label>
+      <input x-model="form.invite_code" type="text" placeholder="Ex: FLUXO-BETA-001"
+             style="text-transform:uppercase;" @input="form.invite_code = form.invite_code.toUpperCase()">
+      <div class="field-hint">Necessário para criar uma conta. Solicite ao administrador.</div>
+    </div>
+
     <div x-show="error" class="alert alert-err" x-text="error"></div>
 
     <button class="btn" @click="submit()" :disabled="loading">
@@ -173,7 +182,7 @@
 <script>
 function Signup() {
   return {
-    form: { nome: '', email: '', senha: '', nome_loja: '', whatsapp: '', business_type: 'generico' },
+    form: { nome: '', email: '', senha: '', nome_loja: '', whatsapp: '', business_type: 'generico', invite_code: '' },
     slug:       '',
     showPwd:    false,
     loading:    false,
@@ -196,9 +205,12 @@ function Signup() {
       if (this.loading) return;
       this.error = '';
 
-      const { nome, email, senha, nome_loja, whatsapp, business_type } = this.form;
+      const { nome, email, senha, nome_loja, whatsapp, business_type, invite_code } = this.form;
       if (!nome.trim() || !email.trim() || !senha || !nome_loja.trim() || !whatsapp.trim()) {
         this.error = 'Preencha todos os campos.'; return;
+      }
+      if (!invite_code.trim()) {
+        this.error = 'Código de convite obrigatório.'; return;
       }
       if (senha.length < 6) {
         this.error = 'Senha deve ter pelo menos 6 caracteres.'; return;
@@ -209,7 +221,7 @@ function Signup() {
         const r = await fetch('/api/signup', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ nome, email, senha, nome_loja, whatsapp, business_type }),
+          body:    JSON.stringify({ nome, email, senha, nome_loja, whatsapp, business_type, invite_code: invite_code.trim().toUpperCase() }),
         });
         const j = await r.json();
         if (!j.ok) { this.error = j.error || 'Erro ao criar conta.'; return; }

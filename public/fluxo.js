@@ -26,14 +26,18 @@ const MOCK = {
 function FluxoCommand() {
   return {
     /* auth */
-    _sb:          null,   // Supabase client instance
-    _authToken:   null,   // JWT do usuário logado
-    authUser:     null,   // objeto user do Supabase
-    authLoading:  true,   // true enquanto verifica sessão
-    loginEmail:   '',
-    loginPassword:'',
-    loginError:   '',
-    loginLoading: false,
+    _sb:           null,   // Supabase client instance
+    _authToken:    null,   // JWT do usuário logado
+    authUser:      null,   // objeto user do Supabase
+    authLoading:   true,   // true enquanto verifica sessão
+    loginEmail:    '',
+    loginPassword: '',
+    loginError:    '',
+    loginLoading:  false,
+
+    /* store status */
+    storeBlocked: false,   // true se status != active/trial
+    storeStatus:  null,    // valor atual de stores.status
 
     /* state */
     page: 'dashboard',
@@ -219,12 +223,28 @@ function FluxoCommand() {
     },
 
     async _loadPanelData() {
+      // Verifica status da loja antes de carregar dados sensíveis
+      const blocked = await this._checkStoreStatus();
+      if (blocked) return;
+
       await Promise.allSettled([
         this.loadLeads(),
         this.loadSessions(),
         this.loadProducts(),
         this.loadSettings(),
       ]);
+    },
+
+    async _checkStoreStatus() {
+      try {
+        const r = await this.authFetch('/api/store');
+        const j = await r.json();
+        if (j.ok && j.data) {
+          this.storeStatus = j.data.status;
+          this.storeBlocked = j.data.status !== 'active' && j.data.status !== 'trial';
+        }
+      } catch (_) { /* mantém desbloqueado em caso de erro de rede */ }
+      return this.storeBlocked;
     },
 
     /* ── Configurações ─────────────────────────────────────────────────── */
