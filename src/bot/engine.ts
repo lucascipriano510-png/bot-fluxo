@@ -21,13 +21,8 @@ import { detectIntent } from '../services/intentService';
 import { handleIntent } from '../services/chatBrainService';
 import { getRuntimeSettings } from '../services/settingsService';
 
-const VALOR_BASE: Record<string, number> = {
-  tenis: 189, camisa: 89, bermuda: 99, promocao: 59,
-};
-function estimateValue(ctx: Record<string, string>): number {
-  const base = VALOR_BASE[ctx.interesse ?? ctx.origem ?? ''] ?? 89;
-  const premium = ctx.preferencia === 'premium' || (ctx.estilo?.includes('malha') ?? false);
-  return Math.round(base * (premium ? 1.4 : 1));
+function estimateValue(_ctx: Record<string, string>): number {
+  return 100;
 }
 
 const OPTOUT_TRIGGER = /\b(parar|stop|sair|cancelar|n[aã]o quero|remover|descadastrar|opt.?out)\b/i;

@@ -221,31 +221,28 @@
         <div class="metric-card">
           <div class="metric-top">
             <div class="metric-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-            <span class="metric-delta">+18%</span>
           </div>
-          <div class="metric-val">27</div>
-          <div class="metric-label">Atendimentos hoje</div>
-          <div class="metric-sub">vs. 23 ontem</div>
+          <div class="metric-val" x-text="conversations.length"></div>
+          <div class="metric-label">Conversas ativas</div>
+          <div class="metric-sub">sessões com o bot</div>
         </div>
 
         <div class="metric-card gold">
           <div class="metric-top">
             <div class="metric-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
-            <span class="metric-delta">+6 novos</span>
           </div>
-          <div class="metric-val" x-text="leads.length || 14"></div>
+          <div class="metric-val" x-text="leads.length"></div>
           <div class="metric-label">Leads capturados</div>
-          <div class="metric-sub" x-text="leadsQuentes + ' quentes'"></div>
+          <div class="metric-sub" x-text="leadsQuentes + ' quentes · ' + leadsMornos + ' mornos'"></div>
         </div>
 
         <div class="metric-card blue">
           <div class="metric-top">
             <div class="metric-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></div>
-            <span class="metric-delta neutral">R$1.840</span>
           </div>
-          <div class="metric-val">9</div>
-          <div class="metric-label">Pedidos iniciados</div>
-          <div class="metric-sub">intenção de compra</div>
+          <div class="metric-val" x-text="leadsFrios"></div>
+          <div class="metric-label">Leads frios</div>
+          <div class="metric-sub">aguardando reativação</div>
         </div>
 
         <div class="metric-card purple">
@@ -253,9 +250,9 @@
             <div class="metric-icon"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
             <span class="metric-delta" :class="botOn ? '' : 'neutral'" x-text="botOn ? 'Online' : 'Offline'"></span>
           </div>
-          <div class="metric-val">2.3s</div>
-          <div class="metric-label">Tempo médio de resposta</div>
-          <div class="metric-sub">última hora</div>
+          <div class="metric-val" x-text="botOn ? 'Ativo' : 'Pausado'"></div>
+          <div class="metric-label">Status do bot</div>
+          <div class="metric-sub" x-text="cfg.nome_loja || 'Configure a loja'"></div>
         </div>
       </div>
 
@@ -356,21 +353,8 @@
         </div>
         <div class="card">
           <div class="card-header"><div class="card-title">Produtos mais perguntados</div></div>
-          <div style="display:flex;flex-direction:column;gap:10px">
-            <template x-for="(p, i) in [
-              {name:'Camisa Polo Lacoste',n:18,pct:72},
-              {name:'Tênis Running',n:12,pct:48},
-              {name:'Bermuda Jeans',n:9,pct:36},
-              {name:'Boné Snapback',n:6,pct:24},
-            ]" :key="i">
-              <div style="display:flex;align-items:center;gap:12px">
-                <div style="font-size:12px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="p.name"></div>
-                <div style="flex:2;height:6px;background:rgba(255,255,255,.07);border-radius:20px;overflow:hidden">
-                  <div style="height:100%;background:var(--green);border-radius:20px;transition:width .4s" :style="`width:${p.pct}%`"></div>
-                </div>
-                <div style="font-size:11px;color:var(--mu);min-width:24px;text-align:right" x-text="p.n"></div>
-              </div>
-            </template>
+          <div style="padding:24px;text-align:center;color:var(--mu);font-size:12px;line-height:1.6">
+            Disponível após as primeiras conversas.<br>Os produtos mais buscados aparecem aqui automaticamente.
           </div>
         </div>
       </div>
@@ -380,7 +364,7 @@
     <div x-show="page === 'simulador'">
       <div class="sim-wrap">
         <div class="sim-phone-row">
-          <input type="tel" x-model="simPhone" placeholder="Telefone do cliente (ex: 5534999999999)" :disabled="simStarted">
+          <input type="tel" x-model="simPhone" placeholder="Telefone do cliente (ex: 5511999990000)" :disabled="simStarted">
           <button class="btn" @click="simStarted = false; simMessages = []" x-show="simStarted">Reiniciar</button>
           <button class="btn btn-green" @click="simStart()" x-show="!simStarted" :disabled="!simPhone">Iniciar conversa</button>
         </div>

@@ -11,7 +11,6 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { Intent, IntentResult } from './intentService';
-import { STORE } from '../data/botKnowledge';
 
 export interface BrainResult {
   reply:           string;
@@ -100,18 +99,18 @@ export function handleIntent(
     // ── TROCA / DEVOLUÇÃO ────────────────────────────────────────────────────
     case 'exchange':
       reply = pick([
-        `Pode trocar sim, ${STORE.exchange.conditions}. Mas acertar o tamanho agora evita esse trabalho. Me fala o produto e seu tamanho que eu já te direciono certo.`,
-        `Temos troca em até ${STORE.exchange.deadlineDays} dias, sem uso e com etiqueta. Me conta o que você procura e me fala sua medida que eu ajudo a acertar de primeira.`,
-        `Pode trocar — ${STORE.exchange.deadlineDays} dias após o recebimento, sem uso. Melhor é escolher certo agora. Me fala o tamanho que você usa que eu te ajudo.`,
+        `Pode trocar sim! Para saber as condições exatas, posso te conectar com um atendente agora. Quer?`,
+        `Temos política de troca. Me fala o que aconteceu que eu te direciono pro atendente responsável.`,
+        `Sem problema! Me conta a situação que eu te ajudo a resolver ou chamo um atendente.`,
       ], message) + p;
       break;
 
     // ── PAGAMENTO ────────────────────────────────────────────────────────────
     case 'payment':
       reply = pick([
-        `Aceitamos ${STORE.payment.short}. Tudo certo pra fechar! O que você quer levar?`,
-        `Pode pagar por Pix, cartão crédito em até 6x, débito ou boleto. Me fala o que você quer que eu te direciono.`,
-        `${STORE.payment.methods[0]}, cartão em até 6x, débito e boleto — tem de tudo. O que você está procurando?`,
+        `Aceitamos as principais formas de pagamento. Para confirmar as opções disponíveis, posso chamar um atendente.`,
+        `Tem várias formas de pagamento disponíveis. Me fala o que você precisa que te informo.`,
+        `Para detalhes sobre pagamento, posso te conectar com um atendente agora. Quer?`,
       ], message) + p;
       break;
 

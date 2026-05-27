@@ -9,8 +9,8 @@
  *   - custom_quote     → orçamento sob demanda
  *
  * O InventoryBridge (camada atual) alimenta o CatalogBridge mapeando
- * produtos da Fluxo Outlet para BusinessOffer. Futuramente, outros
- * segmentos cadastram suas offers diretamente no nosso painel SaaS.
+ * produtos de catálogos externos para BusinessOffer. Futuramente, lojas
+ * cadastram suas offers diretamente no painel SaaS.
  */
 
 export type OfferType =

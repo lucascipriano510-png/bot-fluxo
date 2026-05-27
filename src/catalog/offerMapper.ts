@@ -1,10 +1,7 @@
 /**
- * Adapta produtos atuais da Fluxo Outlet (BotProduct) para o formato
- * genérico BusinessOffer — sem alterar banco, sem alterar InventoryBridge.
- *
- * Este mapper é o "tradutor" temporário enquanto a Fluxo Outlet ainda usa
- * o catálogo do site. Quando migrar para o painel SaaS, os dados já entram
- * como BusinessOffer nativamente e este mapper não é mais necessário.
+ * Adapta produtos do catálogo (BotProduct) para o formato genérico BusinessOffer.
+ * Quando as lojas cadastrarem produtos direto no painel SaaS, este mapper
+ * não será mais necessário.
  */
 
 import { BotProduct } from '../inventory/inventoryTypes';
@@ -15,7 +12,7 @@ export function botProductToOffer(product: BotProduct): BusinessOffer {
     ? 'physical_product'
     : product.stockQuantity === 0
       ? 'physical_product'  // sem estoque mas existente
-      : 'physical_product'; // Fluxo Outlet só tem produtos físicos por enquanto
+      : 'physical_product';
 
   const availabilityType: AvailabilityType = 'stock';
 

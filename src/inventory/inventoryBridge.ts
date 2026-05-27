@@ -4,8 +4,7 @@
  *
  * Arquitetura multi-tenant:
  * - Toda consulta recebe storeId para garantir isolamento entre lojas.
- * - DEFAULT_STORE_ID = 'fluxo-outlet' (loja padrão enquanto há apenas uma loja).
- * - Fluxo Outlet usa o Supabase do site (SITE_SUPABASE_URL) como fonte atual.
+ * - SITE_SUPABASE_URL aponta para o catálogo externo da loja (read-only).
  * - Futuras lojas usarão o Supabase do próprio bot com store_id.
  */
 
@@ -14,9 +13,9 @@ import { BotProduct, BotProductSearchFilters, SiteProductRow } from './inventory
 import { mapMany, mapSiteProductToBotProduct } from './inventoryMapper';
 import { normalizeText, normalizeSize } from './inventoryUtils';
 
-// ── Cliente Supabase do SITE da Fluxo Outlet (anon key — somente leitura) ────
-// Fonte atual de produtos enquanto o catálogo vive no Supabase do site.
-// Quando o cliente migrar para o painel SaaS, isso pode ser removido.
+// ── Cliente Supabase do catálogo externo (anon key — somente leitura) ────────
+// Fonte de produtos via SITE_SUPABASE_URL. Quando a loja migrar para o painel
+// SaaS com catálogo próprio, este cliente pode ser removido.
 let _siteClient: SupabaseClient | null = null;
 
 function getSiteClient(): SupabaseClient | null {

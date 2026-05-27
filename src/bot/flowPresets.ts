@@ -6,7 +6,7 @@
  * camada acima do flowMap base, portanto nenhuma outra mudança é necessária.
  *
  * Tipos disponíveis:
- *   varejo       — loja de roupas, calçados, acessórios (ex: Fluxo Outlet)
+ *   varejo       — loja de roupas, calçados, acessórios
  *   servicos     — serviços por demanda (ex: lava-jato, assistência técnica)
  *   agendamento  — serviços com hora marcada (ex: barbearia, salão, clínica)
  *   generico     — funil simples sem captura de atributos

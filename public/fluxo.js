@@ -4,21 +4,12 @@
 
 const MOCK = {
   kanban: [
-    { id: 'novo', label: 'Novo Lead', color: '#38BDF8', items: [
-      { name: 'Thiago L.', phone: '5534993456789', interesse: 'Tênis 42', val: 'R$299' },
-      { name: 'Luana F.', phone: '5534994567890', interesse: 'Bermuda', val: 'R$149' },
-    ]},
-    { id: 'interessado', label: 'Interessado', color: '#A855F7', items: [
-      { name: 'Bruno S.', phone: '5534993456789', interesse: 'Kit Polo', val: 'R$450' },
-    ]},
-    { id: 'escolhendo', label: 'Escolhendo', color: '#FACC15', items: [
-      { name: 'Rafael P.', phone: '5511988765432', interesse: 'Bermuda Jeans', val: 'R$189' },
-    ]},
-    { id: 'carrinho', label: 'Carrinho Montado', color: '#F97316', items: [
-      { name: 'Carlos M.', phone: '5534991234567', interesse: 'Camisa Lacoste G', val: 'R$340' },
-    ]},
-    { id: 'pagamento', label: 'Aguardando Pgto.', color: '#22C55E', items: [] },
-    { id: 'finalizado', label: 'Finalizado', color: '#6B7280', items: [] },
+    { id: 'novo',        label: 'Novo Lead',        color: '#38BDF8', items: [] },
+    { id: 'interessado', label: 'Interessado',       color: '#A855F7', items: [] },
+    { id: 'escolhendo',  label: 'Escolhendo',        color: '#FACC15', items: [] },
+    { id: 'carrinho',    label: 'Carrinho Montado',  color: '#F97316', items: [] },
+    { id: 'pagamento',   label: 'Aguardando Pgto.',  color: '#22C55E', items: [] },
+    { id: 'finalizado',  label: 'Finalizado',        color: '#6B7280', items: [] },
   ],
 
   chartData: {
@@ -57,7 +48,7 @@ function FluxoCommand() {
     sessions: [],
 
     /* simulador */
-    simPhone: '5534999999999',
+    simPhone: '',
     simInput: '',
     simMessages: [],
     simLoading: false,
