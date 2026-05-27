@@ -33,9 +33,9 @@ export interface BotSettings {
 }
 
 const DEFAULTS: BotSettings = {
-  nome_loja:       process.env.STORE_NAME       || 'Fluxo Outlet',
+  nome_loja:       process.env.STORE_NAME       || '',
   whatsapp:        process.env.LOJA_WHATSAPP    || '',
-  saudacao:        'Olá! Bem-vindo à Fluxo Outlet! 👋',
+  saudacao:        'Olá! 👋 Como posso te ajudar?',
   horario_inicio:  process.env.HORARIO_INICIO   || '09:00',
   horario_fim:     process.env.HORARIO_FIM      || '18:00',
   bot_ativo:       true,

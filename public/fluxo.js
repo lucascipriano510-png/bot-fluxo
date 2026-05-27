@@ -3,50 +3,6 @@
    ═══════════════════════════════════════════════════ */
 
 const MOCK = {
-  metrics: {
-    atendimentos: 27,
-    atendDelta: '+18%',
-    leads: 14,
-    leadDelta: '+6 novos',
-    pedidos: 9,
-    pedidosVal: 'R$1.840',
-    botStatus: 'Online',
-    botResp: '2.3s',
-  },
-
-  conversations: [
-    { id: 1, name: 'Carlos M.', phone: '5534991234567', msg: 'Tem camisa Lacoste G preta?', time: '14:22', unread: 2, tag: 'quente', node: 'CATALOGO', avatar: 'C' },
-    { id: 2, name: 'Rafael P.', phone: '5511988765432', msg: 'Qual o prazo de entrega?', time: '13:47', unread: 0, tag: 'aguardando', node: 'SUPORTE', avatar: 'R' },
-    { id: 3, name: 'Thiago L.', phone: '5534992345678', msg: 'Tem tênis 42 disponível?', time: '13:12', unread: 1, tag: 'novo', node: 'CATALOGO', avatar: 'T' },
-    { id: 4, name: 'Bruno S.', phone: '5534993456789', msg: 'Obrigado! Vou pensar.', time: '11:30', unread: 0, tag: 'morno', node: 'INICIO', avatar: 'B' },
-    { id: 5, name: 'Luana F.', phone: '5534994567890', msg: 'Vocês fazem entrega?', time: '10:15', unread: 0, tag: 'frio', node: 'SUPORTE', avatar: 'L' },
-  ],
-
-  convMessages: {
-    1: [
-      { from: 'bot', text: 'Olá! Bem-vindo à Fluxo Outlet 👋\n\nSou o assistente virtual. Como posso te ajudar?\n\n1️⃣ Ver catálogo\n2️⃣ Consultar pedido\n3️⃣ Falar com atendente', time: '14:20' },
-      { from: 'user', text: 'Tem camisa Lacoste G preta?', time: '14:21' },
-      { from: 'bot', text: 'Tenho algumas opções em *camisa* da *lacoste*. Qual tamanho você usa?\n\n• Camisa Polo Lacoste Preta\n• Camisa Lacoste Live Preta\n🔗 fluxooutlet.com.br/?produto=LAC-001', time: '14:22' },
-      { from: 'user', text: 'Legal! Quanto custa?', time: '14:22' },
-    ],
-  },
-
-  leads: [
-    { id: 1, phone: '5534991234567', nome: 'Carlos M.', interesse: 'Camisa Lacoste', status_comercial: 'QUENTE', valor_potencial: 340, status: 'encaminhado', atualizado_em: '2024-01-15T14:22:00Z' },
-    { id: 2, phone: '5534993456789', nome: 'Thiago L.', interesse: 'Tênis Running', status_comercial: 'MORNO', valor_potencial: 299, status: 'qualificado', atualizado_em: '2024-01-15T13:12:00Z' },
-    { id: 3, phone: '5511988765432', nome: 'Rafael P.', interesse: 'Bermuda Jeans', status_comercial: 'FRIO', valor_potencial: 189, status: 'novo', atualizado_em: '2024-01-15T11:30:00Z' },
-    { id: 4, phone: '5534994567890', nome: 'Bruno S.', interesse: 'Kit Polo', status_comercial: 'MORNO', valor_potencial: 450, status: 'qualificado', atualizado_em: '2024-01-14T16:45:00Z' },
-  ],
-
-  products: [
-    { id: 1, name: 'Camisa Polo Lacoste Preta', category: 'CAMISA', subcategory: 'Lacoste', price: 189.90, stock: 12, image: '', featured: true },
-    { id: 2, name: 'Tênis Running Pro', category: 'TÊNIS', subcategory: 'Nike', price: 299.90, stock: 4, image: '', featured: true },
-    { id: 3, name: 'Bermuda Jeans Skinny', category: 'BERMUDA', subcategory: '', price: 149.90, stock: 18, image: '', featured: false },
-    { id: 4, name: 'Boné Snapback Fluxo', category: 'BONÉ', subcategory: 'Fluxo', price: 79.90, stock: 30, image: '', featured: false },
-    { id: 5, name: 'Camisa Malha Egípcia Branca', category: 'CAMISA', subcategory: '', price: 119.90, stock: 8, image: '', featured: true },
-    { id: 6, name: 'Kit Polo 3 Peças', category: 'KITS', subcategory: '', price: 449.90, stock: 5, image: '', featured: true },
-  ],
-
   kanban: [
     { id: 'novo', label: 'Novo Lead', color: '#38BDF8', items: [
       { name: 'Thiago L.', phone: '5534993456789', interesse: 'Tênis 42', val: 'R$299' },
@@ -71,12 +27,6 @@ const MOCK = {
     leads: [5, 8, 11, 9, 14, 18, 14],
   },
 
-  respostas: [
-    { id: 1, titulo: 'Horário de funcionamento', gatilho: 'horário, abre, fecha', resposta: 'A Fluxo Outlet atende de segunda a sábado, das 9h às 18h.', ativo: true },
-    { id: 2, titulo: 'Política de envio', gatilho: 'entrega, frete, envio, prazo', resposta: 'Enviamos para todo o Brasil via Correios. Prazo de 3 a 7 dias úteis.', ativo: true },
-    { id: 3, titulo: 'Troca e devolução', gatilho: 'trocar, troca, devolução, devolver', resposta: 'Trocas em até 7 dias após o recebimento. Entre em contato conosco.', ativo: true },
-    { id: 4, titulo: 'Formas de pagamento', gatilho: 'pagamento, pagar, pix, cartão', resposta: 'Aceitamos Pix, cartão de crédito (até 6x) e boleto.', ativo: false },
-  ],
 };
 
 /* ─────────────────────────────────────────────────────
@@ -99,11 +49,11 @@ function FluxoCommand() {
     sidebarOpen: false,
     selectedConv: 1,
 
-    /* data — starts with mocks, replaced by real API when available */
-    conversations: MOCK.conversations,
-    convMessages: MOCK.convMessages,
-    leads: MOCK.leads,
-    products: MOCK.products,
+    /* data — starts empty, populated by real API after login */
+    conversations: [],
+    convMessages: {},
+    leads: [],
+    products: [],
     sessions: [],
 
     /* simulador */
@@ -120,13 +70,13 @@ function FluxoCommand() {
 
     /* settings */
     cfg: {
-      nome_loja:       'Fluxo Outlet',
-      whatsapp:        '5534984148067',
-      saudacao:        'Olá! Bem-vindo à Fluxo Outlet! 👋',
+      nome_loja:       '',
+      whatsapp:        '',
+      saudacao:        '',
       horario_inicio:  '09:00',
       horario_fim:     '18:00',
       bot_ativo:       true,
-      ignorar_horario: true,
+      ignorar_horario: false,
       fallback_humano: true,
       delay_resposta:  true,
     },
@@ -352,8 +302,8 @@ function FluxoCommand() {
       try {
         const r = await this.authFetch('/api/leads');
         const j = await r.json();
-        if (j.ok && j.data?.length) this.leads = j.data;
-      } catch (_) { /* keep mock */ }
+        if (j.ok && Array.isArray(j.data)) this.leads = j.data;
+      } catch (_) {}
     },
 
     async loadProducts() {
@@ -361,10 +311,8 @@ function FluxoCommand() {
       try {
         const r = await this.authFetch('/api/products');
         const j = await r.json();
-        if (j.ok && Array.isArray(j.data) && j.data.length) {
-          this.products = j.data;
-        }
-      } catch (_) { /* keep mock */ }
+        if (j.ok && Array.isArray(j.data)) this.products = j.data;
+      } catch (_) {}
       finally { this.productsLoading = false; }
     },
 
@@ -372,10 +320,9 @@ function FluxoCommand() {
       try {
         const r = await this.authFetch('/api/sessions');
         const j = await r.json();
-        if (j.ok && j.data?.length) {
+        if (j.ok && Array.isArray(j.data)) {
           this.sessions = j.data;
-          // Merge sessions into conversations list
-          const mapped = j.data.slice(0, 10).map((s, i) => ({
+          this.conversations = j.data.slice(0, 10).map(s => ({
             id: s.id,
             name: s.nome || s.phone,
             phone: s.phone,
@@ -386,9 +333,8 @@ function FluxoCommand() {
             node: s.current_node,
             avatar: (s.nome || s.phone).charAt(0).toUpperCase(),
           }));
-          if (mapped.length) this.conversations = mapped;
         }
-      } catch (_) { /* keep mock */ }
+      } catch (_) {}
     },
 
     /* chat simulator */

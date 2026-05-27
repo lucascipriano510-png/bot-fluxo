@@ -73,27 +73,27 @@ export function handleIntent(
     // ── ENTREGA ─────────────────────────────────────────────────────────────
     case 'delivery':
       reply = pick([
-        `Fazemos sim. Entregamos em Uberaba e enviamos pra todo o Brasil pelos Correios. Me fala seu bairro ou cidade que eu te ajudo com a melhor opção.`,
-        `Entregamos sim! Uberaba tem entrega local rápida, e pra todo o Brasil mandamos pelos Correios — prazo de ${STORE.delivery.nationwideDays}. Qual é sua cidade?`,
-        `Sim, entregamos. Tanto pra Uberaba quanto pra qualquer cidade do Brasil. Me fala onde você está que eu calculo a melhor forma.`,
+        `Fazemos entregas sim! Me fala sua cidade que te informo o prazo e a melhor opção de envio.`,
+        `Entregamos para todo o Brasil. Qual é sua cidade?`,
+        `Tem entrega sim! Me conta onde você está que te passo as opções disponíveis.`,
       ], message) + p;
       break;
 
     // ── HORÁRIO ──────────────────────────────────────────────────────────────
     case 'hours':
       reply = pick([
-        `A Fluxo funciona de ${STORE.hours.full}. Quer que eu te ajude a escolher uma peça antes de vir?`,
-        `Funcionamos ${STORE.hours.full}. Domingo fechado. Posso te ajudar a separar algo antes de você aparecer.`,
-        `Nosso horário: ${STORE.hours.full}. Me fala o que você procura que eu já preparo antes de você vir.`,
+        `Para confirmar o horário de atendimento, posso te conectar com um atendente agora. Quer?`,
+        `Me deixa chamar um atendente que ele te confirma o horário certinho.`,
+        `Nosso horário comercial pode variar. Posso te conectar com alguém que confirma pra você agora.`,
       ], message) + p;
       break;
 
     // ── LOCALIZAÇÃO ──────────────────────────────────────────────────────────
     case 'location':
       reply = pick([
-        `Temos loja física aqui em Uberaba, MG. O endereço completo te mando pelo WhatsApp. Você também pode retirar pessoalmente. Me fala o que você procura que eu separo antes de você chegar.`,
-        `Temos ponto físico em Uberaba. Pode vir buscar na loja ou pedir entrega. Me fala o que você quer que eu já separo.`,
-        `Loja física em Uberaba, MG — pode vir retirar. Para o endereço exato, te mando direto no WhatsApp. O que você está procurando?`,
+        `Temos loja física! Para o endereço exato, posso te mandar pelo WhatsApp ou chamar um atendente. O que prefere?`,
+        `Tem loja física sim. Me fala que eu passo o endereço ou te conecto com um atendente.`,
+        `Pode vir retirar na loja. Para o endereço completo, é só pedir que eu te passo agora.`,
       ], message) + p;
       break;
 
@@ -118,9 +118,9 @@ export function handleIntent(
     // ── CATÁLOGO / LINK ──────────────────────────────────────────────────────
     case 'catalog':
       reply = pick([
-        `Você pode ver as peças em *${STORE.catalog.website}* ou no nosso Instagram *${STORE.catalog.instagram}*. Me fala o que você procura que eu te ajudo direto aqui: camisa, polo, tênis, bermuda ou boné.`,
-        `O catálogo completo está em *${STORE.catalog.website}*. Me fala o que você curte que eu já te mostro as opções aqui mesmo.`,
-        `Pode ver pelo site *${STORE.catalog.website}* ou pelo Insta *${STORE.catalog.instagram}*. Me fala a categoria e eu te direciono melhor.`,
+        `Posso te ajudar a encontrar o que você precisa direto aqui. Me fala o produto e eu te direciono.`,
+        `Me fala o que você está procurando que eu te mostro as opções disponíveis.`,
+        `Aqui mesmo consigo te ajudar. Qual produto ou categoria você quer ver?`,
       ], message) + p;
       break;
 
@@ -128,9 +128,9 @@ export function handleIntent(
     case 'price': {
       const prod = entities?.product;
       reply = pick([
-        `Temos peças em vários preços${prod ? ` de ${prod}` : ''} — me fala o produto e tamanho que eu te dou os valores disponíveis.`,
-        `Os preços variam por modelo e tamanho${prod ? ` (${prod})` : ''}. Me fala o que você quer ver que eu te mostro as opções.`,
-        `Tem promoção e tem linha premium. Me fala o produto${prod ? '' : ' (camisa, polo, tênis, bermuda ou boné)'} e tamanho que eu te mostro os melhores preços.`,
+        `Me fala ${prod ? `mais sobre ${prod}` : 'o produto que você quer'} que eu te passo os valores disponíveis.`,
+        `Os preços variam por modelo. Me fala o que você quer ver que eu te mostro as opções.`,
+        `Me conta o produto${prod ? '' : ' que você precisa'} e eu te dou as informações de preço.`,
       ], message) + p;
       break;
     }
@@ -165,18 +165,18 @@ export function handleIntent(
     // ── PRESENTE ─────────────────────────────────────────────────────────────
     case 'gift':
       reply = pick([
-        `Boa ideia! A Fluxo tem ótimas pedidas pra presente. Me fala: é pra homem? Qual tamanho usa? Com isso já te indico o que vai agradar.`,
-        `Presente na Fluxo é certeiro. Me conta sobre a pessoa — tamanho e estilo — que eu te ajudo a escolher certo.`,
-        `Boa escolha! Me conta: qual tamanho a pessoa usa e o que costuma vestir. Aí te indico as melhores opções.`,
+        `Boa ideia! Me conta sobre a pessoa — o que ela costuma usar — que eu te ajudo a escolher certo.`,
+        `Presente é uma ótima pedida! Me fala o estilo e tamanho da pessoa que eu te indico as melhores opções.`,
+        `Boa escolha! Me conta: qual é o estilo e tamanho que a pessoa usa. Com isso já te direciono certinho.`,
       ], message) + p;
       break;
 
     // ── NOVIDADES ────────────────────────────────────────────────────────────
     case 'new_arrivals':
       reply = pick([
-        `Estamos sempre renovando o estoque! Me fala o que você curte — camisa, polo, tênis ou bermuda — que eu te mostro o que tem de mais recente.`,
-        `Novidade chega toda semana. Me fala a categoria que você quer e eu te conto o que entrou mais novo.`,
-        `Tem novidade sim! Me fala o que você procura que eu te direciono pro que chegou mais recente.`,
+        `Estamos sempre renovando! Me fala o que você procura que eu te mostro o que há de mais recente.`,
+        `Novidades chegam com frequência. Me fala a categoria que você quer e eu te mostro o que entrou mais novo.`,
+        `Tem novidade sim! Me conta o que você está buscando que eu te direciono.`,
       ], message) + p;
       break;
 

@@ -204,7 +204,7 @@
         Testar Bot
       </button>
       <div class="badge-env">Produção</div>
-      <div class="hdr-avatar" title="Fluxo Outlet">FO</div>
+      <div class="hdr-avatar" :title="cfg.nome_loja || 'Loja'" x-text="(cfg.nome_loja || 'L').slice(0,2).toUpperCase()"></div>
     </div>
   </header>
 
@@ -315,6 +315,9 @@
             <button class="btn btn-ghost" @click="navigate('atendimentos')" style="font-size:11px;padding:5px 10px">Ver todas</button>
           </div>
           <div class="conv-list">
+            <div x-show="conversations.length === 0" style="padding:24px;text-align:center;color:var(--mu);font-size:12px">
+              Nenhuma conversa ainda. O bot responderá quando o primeiro cliente enviar mensagem.
+            </div>
             <template x-for="c in conversations.slice(0,5)" :key="c.id">
               <div class="conv-item" @click="navigate('atendimentos'); selectedConv = c.id">
                 <div class="conv-avatar" x-text="c.avatar || c.name?.charAt(0)"></div>
@@ -386,7 +389,7 @@
           <div class="chat-header">
             <div class="chat-avatar"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
             <div>
-              <div class="chat-name">Bot Fluxo Outlet</div>
+              <div class="chat-name" x-text="cfg.nome_loja ? 'Bot ' + cfg.nome_loja : 'Bot'"></div>
               <div class="chat-status" x-text="simLoading ? 'digitando...' : 'online'"></div>
             </div>
           </div>
@@ -434,6 +437,9 @@
       <div class="atend-shell">
         <div class="atend-list">
           <div class="atend-list-header">Conversas — <span x-text="conversations.length"></span></div>
+          <div x-show="conversations.length === 0" style="padding:32px 16px;text-align:center;color:var(--mu);font-size:12px;line-height:1.6">
+            Nenhuma conversa ainda.<br>Configure o webhook e envie a primeira mensagem.
+          </div>
           <template x-for="c in conversations" :key="c.id">
             <div class="conv-item" :class="{ selected: selectedConv === c.id }" style="margin:4px 6px;border-radius:8px" @click="selectedConv = c.id">
               <div class="conv-avatar" x-text="c.avatar || c.name?.charAt(0)"></div>
@@ -515,6 +521,7 @@
         <table class="tbl">
           <thead><tr><th>Cliente</th><th>Interesse</th><th>Status</th><th>Valor est.</th><th>Atualizado</th></tr></thead>
           <tbody>
+            <tr x-show="leads.length === 0"><td colspan="5" style="text-align:center;padding:28px;color:var(--mu);font-size:12px">Nenhum lead ainda. Os leads aparecem quando clientes chegam ao fim do funil.</td></tr>
             <template x-for="l in leads" :key="l.id">
               <tr>
                 <td><div style="font-weight:600" x-text="l.nome || l.phone"></div><div style="font-size:11px;color:var(--mu)" x-text="l.phone"></div></td>
@@ -628,7 +635,7 @@
               </div>
 
               <!-- Link site -->
-              <a x-show="p.sku" :href="'https://fluxooutlet.com.br/?produto=' + p.sku"
+              <a x-show="p.sku && p.url" :href="p.url"
                 target="_blank" rel="noopener"
                 style="display:block;margin-top:8px;font-size:10px;color:var(--blue);opacity:.75;text-decoration:none">
                 🔗 Ver no site
@@ -646,7 +653,7 @@
       </div>
       <div style="display:flex;flex-direction:column;gap:12px">
         <template x-for="r in [
-          {titulo:'Horário de funcionamento',gatilho:'horário, abre, fecha',resposta:'A Fluxo Outlet atende de segunda a sábado, das 9h às 18h.',ativo:true},
+          {titulo:'Horário de funcionamento',gatilho:'horário, abre, fecha',resposta:'Configure essa informação nas configurações da sua loja.',ativo:true},
           {titulo:'Política de envio',gatilho:'entrega, frete, envio, prazo',resposta:'Enviamos para todo o Brasil via Correios. Prazo de 3 a 7 dias úteis.',ativo:true},
           {titulo:'Troca e devolução',gatilho:'trocar, troca, devolução',resposta:'Trocas em até 7 dias após o recebimento.',ativo:true},
           {titulo:'Formas de pagamento',gatilho:'pagamento, pix, cartão',resposta:'Aceitamos Pix, cartão de crédito em até 6x e boleto.',ativo:false},
@@ -735,8 +742,8 @@
         </div>
         <div class="int-card">
           <div class="int-logo" style="background:#111;font-size:22px">🛍️</div>
-          <div><div class="int-name">Catálogo Fluxo Outlet</div><div class="int-desc">Leitura do catálogo de produtos via Supabase do site (read-only).</div></div>
-          <div style="display:flex;align-items:center;justify-content:space-between"><span class="badge badge-green">Conectado</span><a class="btn" href="https://fluxooutlet.com.br" target="_blank" style="font-size:11px;padding:6px 12px">Abrir site</a></div>
+          <div><div class="int-name" x-text="(cfg.nome_loja || 'Loja') + ' — Catálogo'"></div><div class="int-desc">Leitura do catálogo de produtos via Supabase do site (read-only).</div></div>
+          <div><span class="badge badge-green">Conectado</span></div>
         </div>
         <div class="int-card" style="opacity:.5">
           <div class="int-logo" style="background:#1877F2;font-size:22px">📊</div>
@@ -804,7 +811,7 @@
             <h3>Informações da loja</h3>
             <div class="field">
               <label>Nome da loja</label>
-              <input type="text" x-model="cfg.nome_loja" placeholder="Ex: Fluxo Outlet">
+              <input type="text" x-model="cfg.nome_loja" placeholder="Ex: Meu Negócio">
             </div>
             <div class="field">
               <label>WhatsApp principal</label>
