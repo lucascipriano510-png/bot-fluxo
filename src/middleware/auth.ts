@@ -14,17 +14,14 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return res.status(401).json({ ok: false, error: 'Sessão inválida' });
   }
 
-  const { data: storeUser } = await supabase
-    .from('store_users')
-    .select('store_id')
-    .eq('user_id', user.id)
-    .single();
+  // Lê store_id do app_metadata (no JWT) — sem query extra ao banco
+  const storeId: string | undefined = user.app_metadata?.store_id;
 
-  if (!storeUser) {
+  if (!storeId) {
     return res.status(403).json({ ok: false, error: 'Sem acesso a nenhuma loja' });
   }
 
-  req.storeId = storeUser.store_id;
+  req.storeId = storeId;
   next();
 }
 

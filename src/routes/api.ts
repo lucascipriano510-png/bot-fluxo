@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomUUID } from 'crypto';
 import { supabase } from '../lib/supabase';
 import { fetchLeads } from '../services/leadService';
 import { fetchHistorico } from '../services/mensagemService';
@@ -81,18 +82,29 @@ router.post('/signup', async (req, res) => {
     }
 
     // 3. Cria loja
+    const newStoreId = randomUUID();
     const { data: store, error: storeError } = await supabase
       .from('stores')
-      .insert({ slug, name: nome_loja.trim(), whatsapp_number: cleanPhone, is_active: true })
+      .insert({ id: newStoreId, slug, name: nome_loja.trim(), whatsapp_number: cleanPhone, is_active: true })
       .select('id')
       .single();
     if (storeError) throw storeError;
 
-    // 4. Vincula usuário à loja
-    const { error: linkError } = await supabase
-      .from('store_users')
-      .insert({ user_id: authData.user.id, store_id: store.id, role: 'owner' });
-    if (linkError) throw linkError;
+    // 4. Grava store_id no app_metadata do usuário (via GoTrue, sem PostgREST)
+    const { error: metaError } = await supabase.auth.admin.updateUserById(
+      authData.user.id,
+      { app_metadata: { store_id: store.id, role: 'owner' } }
+    );
+    if (metaError) throw metaError;
+
+    // 4b. Tenta inserir em store_users via RPC — falha silenciosa se PostgREST não tiver recarregado ainda
+    await supabase.rpc('insert_store_user', {
+      p_user_id: authData.user.id,
+      p_store_id: store.id,
+      p_role: 'owner',
+    }).then(({ error }) => {
+      if (error) console.warn('[signup] store_users RPC fallback failed (não crítico):', error.message);
+    });
 
     // 5. Cria settings padrão para a loja
     await supabase.from('bot_settings').upsert([{
