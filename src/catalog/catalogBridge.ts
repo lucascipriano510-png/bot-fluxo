@@ -265,6 +265,7 @@ export function formatOffersResponse(
     else if (o.priceType === 'a_partir_de' && priceStr) line += ` — a partir de ${priceStr}`;
     else if (priceStr)                           line += ` — ${priceStr}`;
     if (o.description)                           line += `\n📝 ${o.description}`;
+    if (o.includedItems)                         line += `\n📦 Inclui: ${o.includedItems}`;
     if (showSizes && sizes.length)               line += `\n📏 Tamanhos: ${sizes.join(', ')}`;
     if (o.productUrl)                            line += `\n🔗 ${o.productUrl}`;
     return line;

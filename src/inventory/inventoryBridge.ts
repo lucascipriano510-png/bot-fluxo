@@ -307,6 +307,7 @@ export function formatProductsResponse(
 
     let msg = `*${p.name}*\n`;
     msg += priceStr ? `💰 ${priceStr}\n` : `💰 Vou confirmar o valor certinho pra você.\n`;
+    if (p.includedItems) msg += `📦 Inclui: ${p.includedItems}\n`;
     msg += `📏 Tamanhos disponíveis: ${sizesStr}\n`;
     if (p.productUrl) msg += `🔗 ${p.productUrl}`;
     return msg;
