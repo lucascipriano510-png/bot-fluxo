@@ -104,6 +104,9 @@ function FluxoCommand() {
     reports: null,
     reportsLoading: false,
 
+    /* integracoes — ia generativa */
+    aiConfig: { configured: false, provider: 'gemini', model: 'gemini-1.5-flash', testing: false, feedback: null, feedbackMsg: '' },
+
     /* integracoes — evolution api */
     evoForm: { evolution_url: '', evolution_instance: '', evolution_token: '' },
     evoLoaded:      false,
@@ -231,7 +234,7 @@ function FluxoCommand() {
       if (p === 'relatorios')  this.$nextTick(() => this.loadReports());
       if (p === 'kanban')      this.loadKanban();
       if (p === 'respostas')   this.loadRespostas();
-      if (p === 'integracoes') this.loadIntegrations();
+      if (p === 'integracoes') { this.loadIntegrations(); this.loadAiIntegration(); }
     },
 
     /* ── Helpers ──────────────────────────────────────────────────────────── */
@@ -1044,6 +1047,39 @@ function FluxoCommand() {
     statusColor(s) {
       const map = { QUENTE: 'badge-red', MORNO: 'badge-gold', FRIO: 'badge-gray' };
       return map[s] || 'badge-gray';
+    },
+
+    /* ── Integrações — IA Generativa ─────────────────────────────────── */
+    async loadAiIntegration() {
+      try {
+        const r = await this.authFetch('/api/integrations/ai');
+        const j = await r.json();
+        if (j.ok) {
+          this.aiConfig.configured = j.configured || false;
+          this.aiConfig.provider   = j.provider   || 'gemini';
+          this.aiConfig.model      = j.model       || 'gemini-1.5-flash';
+        }
+      } catch (_) {}
+    },
+
+    async testAi() {
+      if (this.aiConfig.testing) return;
+      this.aiConfig.testing  = true;
+      this.aiConfig.feedback = null;
+      try {
+        const r = await this.authFetch('/api/integrations/ai/test', { method: 'POST' });
+        const j = await r.json();
+        this.aiConfig.feedback    = j.ok ? 'ok' : 'erro';
+        this.aiConfig.feedbackMsg = j.ok
+          ? `${j.message || 'IA funcionando!'} Resposta: "${j.reply || ''}"`
+          : (j.error || 'Erro ao testar IA.');
+      } catch (_) {
+        this.aiConfig.feedback    = 'erro';
+        this.aiConfig.feedbackMsg = 'Erro de conexão.';
+      } finally {
+        this.aiConfig.testing = false;
+        setTimeout(() => { this.aiConfig.feedback = null; }, 6000);
+      }
     },
 
     /* ── Integrações — Evolution API ─────────────────────────────────── */

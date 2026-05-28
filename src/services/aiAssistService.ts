@@ -1,30 +1,22 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  aiAssistService — Camada de IA controlada para respostas conversacionais
 //
-//  Arquitetura:
-//  - Quando o roteador fixo não consegue classificar uma mensagem com confiança,
-//    o motor pode chamar aiAssist() para uma resposta contextualizada.
-//  - O AI Assist opera com guardrails rígidos: nunca inventa produto, preço,
-//    estoque, prazo, promoção ou disponibilidade sem dado real.
-//  - Se não houver provider de IA configurado (AI_ASSIST_KEY não definida),
-//    aiAssist() retorna null e o bot cai no fallback fixo.
-//  - Nunca inserir API keys no código. Sempre ler de process.env.
+//  Provider atual: Gemini (Google Generative AI REST API)
+//  Ativação: definir AI_ASSIST_PROVIDER=gemini e AI_ASSIST_KEY nas env vars.
+//  Modelo padrão: AI_ASSIST_MODEL=gemini-1.5-flash
 //
-//  Para ativar no futuro:
-//  1. Defina AI_ASSIST_PROVIDER=openai|anthropic no ambiente de produção.
-//  2. Defina AI_ASSIST_KEY com a chave do provider.
-//  3. O sistema usará createSystemPrompt() para construir o contexto da loja.
+//  Guardrails: nunca inventa preço, estoque, produto, prazo ou promoção.
+//  Quando não há dados, redireciona para catálogo, orçamento ou humano.
+//  API key NUNCA sai do backend — nunca exposta no frontend ou nos logs.
 // ═══════════════════════════════════════════════════════════════════════════
 
-// ── Perfil de voz da loja — base para "treinamento" futuro ──────────────────
-// Quando o painel permitir configurar o tom da loja, esses campos serão
-// preenchidos pelo dono e usados no system prompt da IA.
+// ── Perfil de voz da loja — base para personalização futura ─────────────────
 export interface StoreVoiceProfile {
   tone:               'formal' | 'casual' | 'friendly' | 'commercial';
-  greetingStyle:      string;  // ex: "curto e direto", "acolhedor com emoji"
-  salesStyle:         string;  // ex: "consultivo", "direto ao ponto"
-  objectionHandling:  string;  // ex: "sempre oferece alternativa", "não pressiona"
-  closingStyle:       string;  // ex: "convida para WhatsApp", "agenda visita"
+  greetingStyle:      string;
+  salesStyle:         string;
+  objectionHandling:  string;
+  closingStyle:       string;
 }
 
 // ── Contexto seguro que a IA pode usar ──────────────────────────────────────
@@ -36,61 +28,117 @@ export interface AiAssistContext {
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
-// ── Guardrails — o que a IA jamais pode fazer ────────────────────────────────
+// ── Guardrails — embutidos no system prompt, nunca removíveis ────────────────
 const GUARDRAILS = `
-REGRAS RÍGIDAS (nunca violar):
+REGRAS OBRIGATÓRIAS (nunca violar):
 - Nunca invente preço, valor ou promoção.
 - Nunca invente estoque, disponibilidade ou prazo.
-- Nunca invente produto ou serviço que não foi mencionado.
-- Nunca confirme desconto sem dado real.
-- Nunca use linguagem exclusiva de loja de roupas (peça, tamanho P/M/G) se não for o contexto.
-- Se não souber a resposta, diga que vai verificar ou redirecione para atendente.
-- Sempre conduza para catálogo, orçamento ou atendente humano quando necessário.
+- Nunca invente produto ou serviço sem dado real.
+- Nunca confirme desconto sem informação concreta.
+- Se não souber a resposta, diga que vai verificar ou redirecione para um atendente.
+- Sempre conduza para catálogo, orçamento ou atendente quando necessário.
 - Linguagem universal — funciona para qualquer negócio local.
+- Responda sempre em português brasileiro, máximo 3 linhas.
 `.trim();
 
-// ── Monta system prompt para o provider de IA ───────────────────────────────
+// ── Monta system prompt seguro para o provider de IA ────────────────────────
 export function createSystemPrompt(ctx: AiAssistContext): string {
-  const vp = ctx.voiceProfile;
+  const vp   = ctx.voiceProfile;
   const tone = vp?.tone ?? 'friendly';
-  const greetingStyle = vp?.greetingStyle ?? 'natural e acolhedor';
-  const salesStyle = vp?.salesStyle ?? 'consultivo';
 
-  return `Você é o assistente virtual da loja *${ctx.storeName}*.
-Seu tom é ${tone}. Estilo de saudação: ${greetingStyle}. Estilo de vendas: ${salesStyle}.
-${ctx.storePhone ? `WhatsApp da loja: ${ctx.storePhone}.` : ''}
-${ctx.greetingMsg ? `Mensagem de saudação configurada: "${ctx.greetingMsg}".` : ''}
-
-${GUARDRAILS}
-
-Responda sempre em português brasileiro, de forma concisa (máximo 3 linhas).
-Quando o cliente perguntar sobre algo que você não tem dados, redirecione com naturalidade.`;
+  return [
+    `Você é o assistente virtual de *${ctx.storeName}*.`,
+    `Tom: ${tone}.`,
+    ctx.storePhone ? `WhatsApp da loja: ${ctx.storePhone}.` : '',
+    ctx.greetingMsg ? `Saudação padrão: "${ctx.greetingMsg}".` : '',
+    '',
+    GUARDRAILS,
+  ].filter(Boolean).join('\n');
 }
 
-// ── Função principal — retorna null se não houver IA configurada ─────────────
-export async function aiAssist(
-  _message: string,
-  _ctx: AiAssistContext,
+// ── Chamada direta à Gemini REST API ────────────────────────────────────────
+async function callGemini(
+  message: string,
+  systemPrompt: string,
+  key: string,
+  model: string,
 ): Promise<string | null> {
-  const provider = process.env.AI_ASSIST_PROVIDER;
-  const key      = process.env.AI_ASSIST_KEY;
+  const url  = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+  const body = {
+    contents:          [{ role: 'user', parts: [{ text: message }] }],
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    generationConfig:  { maxOutputTokens: 200, temperature: 0.7 },
+  };
 
-  // Sem provider configurado — retorna null, bot usa resposta fixa
+  const resp = await fetch(url, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+    signal:  AbortSignal.timeout(8_000),
+  });
+
+  if (!resp.ok) {
+    const errBody = await resp.text().catch(() => '');
+    throw new Error(`Gemini ${resp.status}: ${errBody.slice(0, 200)}`);
+  }
+
+  const json      = await resp.json() as Record<string, unknown>;
+  const candidate = (json?.candidates as Array<Record<string, unknown>>)?.[0];
+  const content   = candidate?.content as Record<string, unknown>;
+  const parts     = content?.parts     as Array<Record<string, unknown>>;
+  const text      = parts?.[0]?.text   as string | undefined;
+
+  return text?.trim() || null;
+}
+
+// ── Teste de conexão — usado pelo endpoint /api/integrations/ai/test ────────
+export async function testAiConnection(): Promise<{ ok: boolean; reply?: string; error?: string; provider?: string; model?: string }> {
+  const provider = (process.env.AI_ASSIST_PROVIDER || '').toLowerCase();
+  const key      = process.env.AI_ASSIST_KEY || '';
+  const model    = process.env.AI_ASSIST_MODEL || 'gemini-1.5-flash';
+
+  if (!provider || !key) {
+    return { ok: false, error: 'IA não configurada. Defina AI_ASSIST_PROVIDER e AI_ASSIST_KEY nas variáveis de ambiente.' };
+  }
+
+  try {
+    if (provider === 'gemini') {
+      const reply = await callGemini(
+        'Responda apenas: "IA Generativa funcionando corretamente."',
+        'Você é um assistente de teste. Responda exatamente o que for pedido, em português.',
+        key,
+        model,
+      );
+      return { ok: true, reply: reply || 'Resposta vazia.', provider, model };
+    }
+    return { ok: false, error: `Provider "${provider}" não suportado. Use: gemini.` };
+  } catch (err) {
+    const msg = (err as Error).message || String(err);
+    if (msg.includes('TimeoutError') || msg.includes('timeout')) {
+      return { ok: false, error: 'Timeout: API não respondeu em 8s. Verifique a chave.', provider, model };
+    }
+    return { ok: false, error: msg, provider, model };
+  }
+}
+
+// ── Função principal chamada pelo motor do bot ───────────────────────────────
+export async function aiAssist(
+  message: string,
+  ctx: AiAssistContext,
+): Promise<string | null> {
+  const provider = (process.env.AI_ASSIST_PROVIDER || '').toLowerCase();
+  const key      = process.env.AI_ASSIST_KEY || '';
+  const model    = process.env.AI_ASSIST_MODEL || 'gemini-1.5-flash';
+
   if (!provider || !key) return null;
 
-  // Placeholder para integração futura com OpenAI/Anthropic/etc.
-  // Exemplo de implementação Anthropic:
-  //
-  // const { Anthropic } = await import('@anthropic-ai/sdk');
-  // const client = new Anthropic({ apiKey: key });
-  // const systemPrompt = createSystemPrompt(_ctx);
-  // const response = await client.messages.create({
-  //   model: 'claude-haiku-4-5-20251001',
-  //   max_tokens: 200,
-  //   system: systemPrompt,
-  //   messages: [{ role: 'user', content: _message }],
-  // });
-  // return response.content[0].type === 'text' ? response.content[0].text : null;
-
-  return null;
+  try {
+    if (provider === 'gemini') {
+      return await callGemini(message, createSystemPrompt(ctx), key, model);
+    }
+    return null;
+  } catch (err) {
+    console.error('[AI Assist] Erro:', (err as Error).message);
+    return null;
+  }
 }

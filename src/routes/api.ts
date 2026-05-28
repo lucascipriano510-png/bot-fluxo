@@ -856,6 +856,29 @@ router.post('/integrations/evolution/test', async (req, res) => {
   }
 });
 
+// ── IA Assist — status e teste ───────────────────────────────────────────────
+router.get('/integrations/ai', (_req, res) => {
+  const provider    = process.env.AI_ASSIST_PROVIDER || '';
+  const key         = process.env.AI_ASSIST_KEY      || '';
+  const model       = process.env.AI_ASSIST_MODEL    || 'gemini-1.5-flash';
+  const configured  = !!(provider && key);
+  res.json({ ok: true, configured, provider: provider || 'gemini', model });
+});
+
+router.post('/integrations/ai/test', async (_req, res) => {
+  try {
+    const { testAiConnection } = await import('../services/aiAssistService');
+    const result = await testAiConnection();
+    if (result.ok) {
+      res.json({ ok: true, message: `IA Generativa (${result.provider} / ${result.model}) funcionando!`, reply: result.reply });
+    } else {
+      res.json({ ok: false, error: result.error });
+    }
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
 // ── Respostas Rápidas CRUD ────────────────────────────────────────────────────
 function isMissingTable(err: { code?: string; message?: string } | null): boolean {
   if (!err) return false;

@@ -19,6 +19,7 @@ import {
 } from '../catalog/catalogBridge';
 import { detectIntent } from '../services/intentService';
 import { handleIntent } from '../services/chatBrainService';
+import { aiAssist, AiAssistContext } from '../services/aiAssistService';
 import { getRuntimeSettings } from '../services/settingsService';
 
 function estimateValue(_ctx: Record<string, string>): number {
@@ -117,7 +118,25 @@ export async function processMessage(
     }
   }
 
-  // ── PRÉ-CHECAGEM 5: Camada cerebral (reutiliza intenção já detectada) ────
+  // ── PRÉ-CHECAGEM 5: Camada de IA Assist (para intents conversacionais) ────
+  // Roda antes do brain fixo. Se IA não estiver configurada, retorna null e
+  // cai no brain fixo sem impacto de performance (só lê env vars).
+  const AI_ASSIST_INTENTS = new Set(['conversa_geral', 'identidade_loja', 'duvida_operacional', 'unknown']);
+  if (AI_ASSIST_INTENTS.has(intentResult.intent)) {
+    const aiCtx: AiAssistContext = {
+      storeName:   ctx._storeName  || 'nossa loja',
+      storePhone:  ctx._wa_loja    || undefined,
+      greetingMsg: ctx._saudacao   || undefined,
+    };
+    const aiReply = await aiAssist(messageText, aiCtx);
+    if (aiReply) {
+      await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
+      await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: aiReply,     node: 'AI_ASSIST' });
+      return { text: aiReply, nextNode: currentNodeId, context: ctx, detectedIntent: intentResult.intent, confidence: intentResult.confidence };
+    }
+  }
+
+  // ── PRÉ-CHECAGEM 6: Brain fixo (fallback quando IA não está configurada) ──
   const brainResult = handleIntent(messageText, intentResult, ctx, currentNodeId);
   if (brainResult) {
     await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText,      node: currentNodeId });
