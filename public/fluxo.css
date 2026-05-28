@@ -1273,7 +1273,62 @@ body {
 .badge-type-combo    { background: rgba(250,204,21,.1);  color: var(--gold); }
 .badge-type-orcamento{ background: rgba(239,68,68,.1);   color: var(--red); }
 
-/* ── Motor de Ingestão ─────────────────────────────── */
+/* ── Motor de Catálogo — source cards ─────────────── */
+.motor-source {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 10px;
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: center;
+  transition: all .15s;
+  user-select: none;
+  min-height: 88px;
+}
+.motor-source:hover {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+.motor-source-active {
+  border-color: var(--accent) !important;
+  background: var(--accent-bg) !important;
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.motor-source-soon {
+  opacity: .45;
+  cursor: default;
+  pointer-events: none;
+}
+.motor-source-soon div:last-child {
+  color: var(--mu2);
+  font-style: italic;
+}
+
+/* ── Motor de Catálogo — upload area ──────────────── */
+.motor-upload-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  border: 2px dashed var(--border2);
+  border-radius: var(--radius);
+  background: var(--card2);
+  cursor: pointer;
+  text-align: center;
+  transition: all .15s;
+  min-height: 140px;
+}
+.motor-upload-area:hover {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+/* ── Motor de Ingestão — legacy item card ──────────── */
 .ingest-item {
   display: flex;
   align-items: center;
