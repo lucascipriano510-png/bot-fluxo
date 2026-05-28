@@ -104,6 +104,10 @@ function FluxoCommand() {
     reports: null,
     reportsLoading: false,
 
+    /* integracoes — inteligência da loja */
+    knowledge: null,
+    knowledgeLoading: false,
+
     /* integracoes — canais */
     channels: [],
     channelsLoading: false,
@@ -238,7 +242,7 @@ function FluxoCommand() {
       if (p === 'relatorios')  this.$nextTick(() => this.loadReports());
       if (p === 'kanban')      this.loadKanban();
       if (p === 'respostas')   this.loadRespostas();
-      if (p === 'integracoes') { this.loadIntegrations(); this.loadAiIntegration(); this.loadChannels(); }
+      if (p === 'integracoes') { this.loadIntegrations(); this.loadAiIntegration(); this.loadChannels(); this.loadKnowledge(); }
     },
 
     /* ── Helpers ──────────────────────────────────────────────────────────── */
@@ -1054,6 +1058,17 @@ function FluxoCommand() {
     },
 
     /* ── Integrações — IA Generativa ─────────────────────────────────── */
+    async loadKnowledge() {
+      if (this.knowledgeLoading) return;
+      this.knowledgeLoading = true;
+      try {
+        const r = await this.authFetch('/api/knowledge');
+        const j = await r.json();
+        if (j.ok) this.knowledge = j.knowledge;
+      } catch (_) {}
+      finally { this.knowledgeLoading = false; }
+    },
+
     async loadChannels() {
       if (this.channelsLoading) return;
       this.channelsLoading = true;

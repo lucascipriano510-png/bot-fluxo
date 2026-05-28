@@ -20,7 +20,7 @@ import {
 import { detectIntent } from '../services/intentService';
 import { handleIntent } from '../services/chatBrainService';
 import { aiAssist, AiAssistContext } from '../services/aiAssistService';
-import { getBusinessProfile } from '../services/storeProfileService';
+import { buildRuntimeKnowledgeContext } from '../services/storeKnowledgeService';
 import { getRuntimeSettings } from '../services/settingsService';
 
 function estimateValue(_ctx: Record<string, string>): number {
@@ -79,25 +79,29 @@ export async function processMessage(
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  const flowConfig     = await loadFlowConfig(storeId);
-  const businessProfile = await getBusinessProfile(storeId);
+  const flowConfig        = await loadFlowConfig(storeId);
+  const runtimeKnowledge  = await buildRuntimeKnowledgeContext(storeId);
 
   const currentNodeId = (session.current_node as NodeId) || 'INICIO';
   const currentNode   = FLOW_MAP[currentNodeId] || FLOW_MAP['INICIO'];
 
-  // Injeta contexto da loja para uso nos templates de mensagem e brain
+  // Injeta contexto enriquecido pela StoreKnowledgeBase
   const ctx: Record<string, string> = {
     ...session.context,
     _storeName:    storeCtx.name,
     _wa_loja:      storeCtx.whatsappNumber,
     _saudacao:     rtSettings.saudacao,
-    // Business profile — campos opcionais, string vazia quando ausente
-    _city:         businessProfile.city         || '',
-    _state:        businessProfile.state        || '',
-    _deliveryInfo: businessProfile.deliveryInfo || '',
-    _instagram:    businessProfile.instagram    || '',
-    _businessType: businessProfile.businessType || '',
-    _salesTone:    businessProfile.salesTone     || '',
+    // Identity knowledge
+    _city:         runtimeKnowledge.identity.city         || '',
+    _state:        runtimeKnowledge.identity.state        || '',
+    _instagram:    runtimeKnowledge.identity.instagram    || '',
+    _businessType: runtimeKnowledge.identity.businessType || '',
+    // Commercial knowledge
+    _deliveryInfo: runtimeKnowledge.commercial.deliveryInfo  || '',
+    _paymentInfo:  runtimeKnowledge.commercial.paymentInfo   || '',
+    _openingHours: runtimeKnowledge.commercial.openingHours  || '',
+    // Voice
+    _salesTone:    runtimeKnowledge.voice.salesTone || '',
   };
 
   // ── PRÉ-CHECAGEM 4: Roteamento por intenção + catálogo ──────────────────
@@ -162,12 +166,13 @@ export async function processMessage(
   const AI_ASSIST_INTENTS = new Set(['conversa_geral', 'identidade_loja', 'duvida_operacional', 'unknown']);
   if (AI_ASSIST_INTENTS.has(intentResult.intent)) {
     const aiCtx: AiAssistContext = {
-      storeName:    ctx._storeName || 'nossa loja',
-      businessType: ctx._businessType || undefined,
-      city:         ctx._city         || undefined,
-      storePhone:   ctx._wa_loja      || undefined,
-      openingHours: businessProfile.openingHours || undefined,
-      deliveryInfo: ctx._deliveryInfo || undefined,
+      storeName:    ctx._storeName      || 'nossa loja',
+      businessType: ctx._businessType   || undefined,
+      city:         ctx._city           || undefined,
+      storePhone:   ctx._wa_loja        || undefined,
+      openingHours: ctx._openingHours   || undefined,
+      deliveryInfo: ctx._deliveryInfo   || undefined,
+      paymentInfo:  ctx._paymentInfo    || undefined,
       // greetingMsg: passado apenas quando intent for saudação
       greetingMsg: intentResult.intent === 'greeting' ? (ctx._saudacao || undefined) : undefined,
     };

@@ -856,6 +856,17 @@ router.post('/integrations/evolution/test', async (req, res) => {
   }
 });
 
+// ── Store Knowledge — inteligência da loja ───────────────────────────────────
+router.get('/knowledge', async (req, res) => {
+  try {
+    const { getStoreKnowledge } = await import('../services/storeKnowledgeService');
+    const kb = await getStoreKnowledge(req.storeId!);
+    res.json({ ok: true, knowledge: kb });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
 // ── Canais — status de todos os conectores ───────────────────────────────────
 router.get('/channels', async (req, res) => {
   try {

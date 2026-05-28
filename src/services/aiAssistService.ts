@@ -57,6 +57,7 @@ export function createSystemPrompt(ctx: AiAssistContext, intentHint?: string): s
     ctx.openingHours  ? `Horário: ${ctx.openingHours}`         : '',
     ctx.deliveryInfo  ? `Entrega: ${ctx.deliveryInfo}`         : '',
     ctx.paymentInfo   ? `Pagamento: ${ctx.paymentInfo}`        : '',
+    ctx.paymentInfo   ? `Pagamento: ${ctx.paymentInfo}`        : '',
   ].filter(Boolean).join('\n');
 
   // Instrução de saudação: espelha saudação de horário se presente na mensagem;

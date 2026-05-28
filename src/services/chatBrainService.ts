@@ -68,17 +68,26 @@ export function handleIntent(
 
     // ── IDENTIDADE DA LOJA ──────────────────────────────────────────────────
     case 'identidade_loja': {
-      const storeName   = ctx._storeName || 'nossa loja';
-      const city        = ctx._city;
-      const state       = ctx._state;
-      const delivery    = ctx._deliveryInfo;
-      const msgLow      = message.toLowerCase();
-      const timeGreet   = /bom dia/.test(msgLow) ? 'Bom dia! '
+      const storeName = ctx._storeName || 'nossa loja';
+      const city      = ctx._city;
+      const state     = ctx._state;
+      const delivery  = ctx._deliveryInfo;
+      const instagram = ctx._instagram;
+      const msgLow    = message.toLowerCase();
+      const timeGreet = /bom dia/.test(msgLow) ? 'Bom dia! '
         : /boa tarde/.test(msgLow) ? 'Boa tarde! '
         : /boa noite/.test(msgLow) ? 'Boa noite! '
         : '';
 
-      // Monta linha de localização e entrega se disponíveis
+      // Sub-caso: pergunta específica sobre Instagram
+      if (/instagram/.test(msgLow)) {
+        reply = instagram
+          ? `Nosso Instagram é *${instagram}*. Me fala o que você está procurando!`
+          : `Ainda não tenho o Instagram cadastrado. Posso te conectar com um atendente para confirmar?`;
+        break;
+      }
+
+      // Resposta de identidade com localização e entrega
       const location     = [city, state].filter(Boolean).join('/');
       const locationPart = location ? `, de ${location}` : '';
       const deliveryPart = delivery ? ` ${delivery}.` : '';
@@ -173,13 +182,21 @@ export function handleIntent(
     }
 
     // ── HORÁRIO ──────────────────────────────────────────────────────────────
-    case 'hours':
-      reply = pick([
-        `Para confirmar o horário de atendimento, posso te conectar com um atendente agora. Quer?`,
-        `Me deixa chamar um atendente que ele te confirma o horário certinho.`,
-        `Nosso horário comercial pode variar. Posso te conectar com alguém que confirma pra você agora.`,
-      ], message) + p;
+    case 'hours': {
+      const hours = ctx._openingHours;
+      reply = hours
+        ? pick([
+          `Funcionamos das ${hours}. Me fala o que você precisa!`,
+          `Nosso horário é ${hours}. O que você está procurando?`,
+          `Estamos disponíveis das ${hours}. No que posso te ajudar?`,
+        ], message)
+        : pick([
+          `Preciso confirmar o horário com a loja. Posso te conectar com um atendente agora. Quer?`,
+          `O horário pode variar. Me deixa chamar um atendente que te confirma certinho.`,
+        ], message);
+      reply += p;
       break;
+    }
 
     // ── LOCALIZAÇÃO ──────────────────────────────────────────────────────────
     case 'location': {
@@ -223,12 +240,22 @@ export function handleIntent(
 
     // ── PREÇO / PROMOÇÃO ─────────────────────────────────────────────────────
     case 'price': {
-      const prod = entities?.product;
-      reply = pick([
-        `Me fala ${prod ? `mais sobre ${prod}` : 'o produto que você quer'} que eu te passo os valores disponíveis.`,
-        `Os preços variam por modelo. Me fala o que você quer ver que eu te mostro as opções.`,
-        `Me conta o produto${prod ? '' : ' que você precisa'} e eu te dou as informações de preço.`,
-      ], message) + p;
+      const prod    = entities?.product;
+      const msgLow  = message.toLowerCase();
+      // Desconto: honesto quando não há regra cadastrada
+      if (/desconto|promo[çc][aã]o|oferta especial/.test(msgLow)) {
+        reply = pick([
+          `No momento não tenho descontos especiais cadastrados. Me fala o produto que você quer e verifico os valores disponíveis.`,
+          `Não tenho promoção cadastrada agora. Me conta o que você está procurando que te mostro as opções.`,
+          `Não confirmei descontos disponíveis. Me fala o produto que você quer que eu te ajudo.`,
+        ], message) + p;
+      } else {
+        reply = pick([
+          `Me fala ${prod ? `mais sobre ${prod}` : 'o item que você quer'} que eu te passo os valores disponíveis.`,
+          `Os preços variam por item. Me fala o que você quer ver que eu te mostro as opções.`,
+          `Me conta o que você precisa e eu te dou as informações de preço.`,
+        ], message) + p;
+      }
       break;
     }
 
