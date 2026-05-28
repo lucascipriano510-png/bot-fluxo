@@ -435,6 +435,9 @@ router.post('/settings', async (req, res) => {
       'nome_loja','whatsapp','saudacao',
       'horario_inicio','horario_fim',
       'bot_ativo','ignorar_horario','fallback_humano','delay_resposta',
+      'business_type','city','state','delivery_info','payment_info',
+      'instagram','site_url','catalog_url',
+      'sales_tone','sales_instructions','return_policy','discount_rules',
     ] as const;
     const patch: Record<string, unknown> = {};
     for (const key of allowed) {

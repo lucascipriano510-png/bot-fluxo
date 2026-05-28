@@ -1802,6 +1802,97 @@
 
         </div>
       </div>
+
+      <!-- ── Perfil da Loja ──────────────────────────────────── -->
+      <div style="margin-top:28px">
+        <div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px">
+          Perfil da loja — alimenta a inteligência do bot
+        </div>
+
+        <div class="grid-2">
+
+          <!-- Localização e contato -->
+          <div style="display:flex;flex-direction:column;gap:20px">
+            <div class="settings-section">
+              <h3>Localização e contato</h3>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div class="field">
+                  <label>Cidade</label>
+                  <input type="text" x-model="cfg.city" placeholder="Ex: Uberaba">
+                </div>
+                <div class="field">
+                  <label>Estado (UF)</label>
+                  <input type="text" x-model="cfg.state" placeholder="Ex: MG" maxlength="2">
+                </div>
+              </div>
+              <div class="field">
+                <label>Instagram</label>
+                <input type="text" x-model="cfg.instagram" placeholder="@minhaloja">
+              </div>
+              <div class="field">
+                <label>Tipo de negócio</label>
+                <input type="text" x-model="cfg.business_type" placeholder="Ex: outlet de roupas masculinas">
+              </div>
+              <div class="field">
+                <label>Site da loja</label>
+                <input type="url" x-model="cfg.site_url" placeholder="https://meusite.com">
+                <small style="font-size:11px;color:var(--mu2);margin-top:4px;display:block">Substitui a variável de ambiente SITE_URL.</small>
+              </div>
+              <div class="field">
+                <label>URL do catálogo (opcional)</label>
+                <input type="url" x-model="cfg.catalog_url" placeholder="https://meusite.com/catalogo">
+              </div>
+            </div>
+          </div>
+
+          <!-- Informações comerciais -->
+          <div style="display:flex;flex-direction:column;gap:20px">
+            <div class="settings-section">
+              <h3>Informações comerciais</h3>
+              <div class="field">
+                <label>Informações de entrega</label>
+                <textarea x-model="cfg.delivery_info" rows="2" placeholder="Ex: Enviamos para todo o Brasil via Correios e transportadoras."></textarea>
+              </div>
+              <div class="field">
+                <label>Formas de pagamento</label>
+                <textarea x-model="cfg.payment_info" rows="2" placeholder="Ex: Pix, cartão de crédito/débito, boleto."></textarea>
+              </div>
+              <div class="field">
+                <label>Política de troca</label>
+                <textarea x-model="cfg.return_policy" rows="2" placeholder="Ex: Trocas em até 7 dias após o recebimento."></textarea>
+              </div>
+              <div class="field">
+                <label>Regras de desconto</label>
+                <textarea x-model="cfg.discount_rules" rows="2" placeholder="Ex: 5% de desconto no Pix acima de R$200."></textarea>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Tom de voz (full-width) -->
+        <div class="settings-section" style="margin-top:20px">
+          <h3>Tom de voz e instruções do bot</h3>
+          <div class="grid-2">
+            <div class="field">
+              <label>Tom de voz</label>
+              <input type="text" x-model="cfg.sales_tone" placeholder="Ex: direto, humano, vendedor, sem enrolação">
+              <small style="font-size:11px;color:var(--mu2);margin-top:4px;display:block">Como o bot deve se comunicar com o cliente.</small>
+            </div>
+            <div class="field">
+              <label>Instruções extras para o bot</label>
+              <textarea x-model="cfg.sales_instructions" rows="3" placeholder="Ex: Sempre mencionar o frete grátis acima de R$300. Não mencionar concorrentes."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Botão salvar perfil -->
+        <button class="btn btn-green" style="width:100%;justify-content:center;padding:14px;font-size:14px;font-weight:700;margin-top:16px"
+          @click="saveSettings()" :disabled="cfgSaving">
+          <span x-text="cfgSaving ? 'Salvando...' : 'Salvar perfil da loja'"></span>
+        </button>
+      </div>
+
     </div>
 
   </div><!-- /cmd-content -->

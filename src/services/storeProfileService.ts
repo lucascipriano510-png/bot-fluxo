@@ -28,6 +28,10 @@ export interface BusinessProfile {
   openingHours?:           string;
   instagram?:              string;
   whatsapp?:               string;
+  siteUrl?:                string;
+  catalogUrl?:             string;
+  returnPolicy?:           string;
+  discountRules?:          string;
   salesTone?:              string;
   salesInstructions?:      string;
   humanHandoffMessage?:    string;
@@ -59,18 +63,23 @@ export async function getBusinessProfile(storeId: string): Promise<BusinessProfi
   const settings = await getRuntimeSettings(storeId);
   const env      = fromEnv();
 
+  // Priority: painel (bot_settings) > env vars > undefined
   const profile: BusinessProfile = {
-    storeName:    settings.nome_loja || env.businessType || 'nossa loja',
-    businessType: env.businessType,
-    city:         env.city,
-    state:        env.state,
-    deliveryInfo: env.deliveryInfo,
-    paymentInfo:  env.paymentInfo,
-    instagram:    env.instagram,
-    whatsapp:     settings.whatsapp || undefined,
-    salesTone:    env.salesTone     || 'direto, humano e objetivo',
-    salesInstructions: env.salesInstructions,
-    openingHours: (settings.horario_inicio && settings.horario_fim)
+    storeName:         settings.nome_loja      || env.businessType || 'nossa loja',
+    businessType:      settings.business_type  || env.businessType,
+    city:              settings.city           || env.city,
+    state:             settings.state          || env.state,
+    deliveryInfo:      settings.delivery_info  || env.deliveryInfo,
+    paymentInfo:       settings.payment_info   || env.paymentInfo,
+    instagram:         settings.instagram      || env.instagram,
+    whatsapp:          settings.whatsapp       || undefined,
+    siteUrl:           settings.site_url       || process.env.SITE_URL || undefined,
+    catalogUrl:        settings.catalog_url    || undefined,
+    returnPolicy:      settings.return_policy  || undefined,
+    discountRules:     settings.discount_rules || undefined,
+    salesTone:         settings.sales_tone     || env.salesTone || 'direto, humano e objetivo',
+    salesInstructions: settings.sales_instructions || env.salesInstructions,
+    openingHours:      (settings.horario_inicio && settings.horario_fim)
       ? `${settings.horario_inicio} às ${settings.horario_fim}`
       : undefined,
   };

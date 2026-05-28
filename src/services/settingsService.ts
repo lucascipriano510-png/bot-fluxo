@@ -21,18 +21,31 @@
 import { supabase } from '../lib/supabase';
 
 export interface BotSettings {
-  nome_loja:          string;
-  whatsapp:           string;
-  saudacao:           string;
-  horario_inicio:     string;
-  horario_fim:        string;
-  bot_ativo:          boolean;
-  ignorar_horario:    boolean;
-  fallback_humano:    boolean;
-  delay_resposta:     boolean;
-  evolution_url?:     string;
+  nome_loja:           string;
+  whatsapp:            string;
+  saudacao:            string;
+  horario_inicio:      string;
+  horario_fim:         string;
+  bot_ativo:           boolean;
+  ignorar_horario:     boolean;
+  fallback_humano:     boolean;
+  delay_resposta:      boolean;
+  evolution_url?:      string;
   evolution_instance?: string;
-  evolution_token?:   string;
+  evolution_token?:    string;
+  // Store profile — alimenta StoreKnowledgeBase (Migration 11)
+  business_type?:      string;
+  city?:               string;
+  state?:              string;
+  delivery_info?:      string;
+  payment_info?:       string;
+  instagram?:          string;
+  site_url?:           string;
+  catalog_url?:        string;
+  sales_tone?:         string;
+  sales_instructions?: string;
+  return_policy?:      string;
+  discount_rules?:     string;
 }
 
 const DEFAULTS: BotSettings = {
@@ -65,6 +78,18 @@ function mergeDefaults(row: Record<string, unknown>): BotSettings {
     evolution_url:      (row.evolution_url      as string | undefined) ?? undefined,
     evolution_instance: (row.evolution_instance as string | undefined) ?? undefined,
     evolution_token:    (row.evolution_token    as string | undefined) ?? undefined,
+    business_type:      (row.business_type      as string | undefined) ?? undefined,
+    city:               (row.city               as string | undefined) ?? undefined,
+    state:              (row.state              as string | undefined) ?? undefined,
+    delivery_info:      (row.delivery_info      as string | undefined) ?? undefined,
+    payment_info:       (row.payment_info       as string | undefined) ?? undefined,
+    instagram:          (row.instagram          as string | undefined) ?? undefined,
+    site_url:           (row.site_url           as string | undefined) ?? undefined,
+    catalog_url:        (row.catalog_url        as string | undefined) ?? undefined,
+    sales_tone:         (row.sales_tone         as string | undefined) ?? undefined,
+    sales_instructions: (row.sales_instructions as string | undefined) ?? undefined,
+    return_policy:      (row.return_policy      as string | undefined) ?? undefined,
+    discount_rules:     (row.discount_rules     as string | undefined) ?? undefined,
   };
 }
 

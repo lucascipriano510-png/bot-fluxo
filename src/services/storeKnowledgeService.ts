@@ -121,6 +121,8 @@ export interface StoreKnowledgeBase {
     discountRules?:  string;
     returnPolicy?:   string;
     openingHours?:   string;
+    siteUrl?:        string;
+    catalogUrl?:     string;
     confidence:      number;
   };
 
@@ -236,29 +238,31 @@ function computeGaps(
   const gaps: KnowledgeGap[] = [];
 
   if (!profile.city)
-    gaps.push({ field: 'city', description: 'Cidade não cadastrada', howToFix: 'Configure STORE_CITY nas variáveis de ambiente.', priority: 'high' });
+    gaps.push({ field: 'city', description: 'Cidade não cadastrada', howToFix: 'Preencha em Configurações → Perfil da Loja.', priority: 'high' });
 
   if (!profile.state)
-    gaps.push({ field: 'state', description: 'Estado não cadastrado', howToFix: 'Configure STORE_STATE nas variáveis de ambiente.', priority: 'medium' });
+    gaps.push({ field: 'state', description: 'Estado não cadastrado', howToFix: 'Preencha em Configurações → Perfil da Loja.', priority: 'medium' });
 
   if (!profile.deliveryInfo)
-    gaps.push({ field: 'deliveryInfo', description: 'Informações de entrega não cadastradas', howToFix: 'Configure STORE_DELIVERY_INFO nas variáveis de ambiente.', priority: 'high' });
+    gaps.push({ field: 'deliveryInfo', description: 'Informações de entrega não cadastradas', howToFix: 'Preencha em Configurações → Perfil da Loja.', priority: 'high' });
 
   if (!profile.paymentInfo)
-    gaps.push({ field: 'paymentInfo', description: 'Formas de pagamento não cadastradas', howToFix: 'Configure STORE_PAYMENT_INFO nas variáveis de ambiente.', priority: 'high' });
+    gaps.push({ field: 'paymentInfo', description: 'Formas de pagamento não cadastradas', howToFix: 'Preencha em Configurações → Perfil da Loja.', priority: 'high' });
 
   if (!settings.horario_inicio || !settings.horario_fim)
     gaps.push({ field: 'openingHours', description: 'Horário de funcionamento não cadastrado', howToFix: 'Configure em Configurações → Horário.', priority: 'medium' });
 
   if (!profile.instagram)
-    gaps.push({ field: 'instagram', description: 'Instagram não cadastrado', howToFix: 'Configure STORE_INSTAGRAM nas variáveis de ambiente.', priority: 'medium' });
+    gaps.push({ field: 'instagram', description: 'Instagram não cadastrado', howToFix: 'Preencha em Configurações → Perfil da Loja.', priority: 'medium' });
+
+  if (!profile.siteUrl)
+    gaps.push({ field: 'website', description: 'Site da loja não cadastrado', howToFix: 'Preencha a URL em Configurações → Perfil da Loja.', priority: 'low' });
+
+  if (!profile.discountRules)
+    gaps.push({ field: 'discountRules', description: 'Regras de desconto não cadastradas', howToFix: 'Preencha em Configurações → Perfil da Loja.', priority: 'medium' });
 
   if (!settings.evolution_url)
     gaps.push({ field: 'whatsapp_connector', description: 'WhatsApp real não conectado', howToFix: 'Configure Evolution API em Integrações.', priority: 'high' });
-
-  gaps.push({ field: 'discountRules', description: 'Regras de desconto não cadastradas', howToFix: 'Configure STORE_DISCOUNT_RULES nas variáveis de ambiente ou via painel.', priority: 'medium' });
-
-  gaps.push({ field: 'website', description: 'Site da loja não conectado para scan', howToFix: 'Configure SITE_URL e ative o sensor de site.', priority: 'low' });
 
   return gaps;
 }
@@ -296,6 +300,10 @@ export async function getStoreKnowledge(storeId: string): Promise<StoreKnowledge
       deliveryInfo:  profile.deliveryInfo,
       paymentInfo:   profile.paymentInfo,
       openingHours:  profile.openingHours,
+      discountRules: profile.discountRules,
+      returnPolicy:  profile.returnPolicy,
+      siteUrl:       profile.siteUrl,
+      catalogUrl:    profile.catalogUrl,
       confidence:    (profile.deliveryInfo || profile.paymentInfo) ? 0.80 : 0.20,
     },
 
@@ -308,9 +316,10 @@ export async function getStoreKnowledge(storeId: string): Promise<StoreKnowledge
     catalog: { available: true, confidence: 0.95 },
 
     websiteSensor: {
-      websiteUrl: process.env.SITE_URL || undefined,
-      status:     process.env.SITE_URL ? 'pending' : 'unavailable',
-      note:       'Crawler controlado a implementar. Configure SITE_URL para ativar.',
+      websiteUrl:  profile.siteUrl || undefined,
+      catalogUrl:  profile.catalogUrl || undefined,
+      status:      profile.siteUrl ? 'pending' : 'unavailable',
+      note:        'Crawler controlado a implementar. Configure o site em Configurações → Perfil da Loja.',
     },
 
     instagramSensor: {

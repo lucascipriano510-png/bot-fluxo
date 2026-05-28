@@ -149,15 +149,28 @@ function FluxoCommand() {
 
     /* settings */
     cfg: {
-      nome_loja:       '',
-      whatsapp:        '',
-      saudacao:        '',
-      horario_inicio:  '09:00',
-      horario_fim:     '18:00',
-      bot_ativo:       true,
-      ignorar_horario: false,
-      fallback_humano: true,
-      delay_resposta:  true,
+      nome_loja:          '',
+      whatsapp:           '',
+      saudacao:           '',
+      horario_inicio:     '09:00',
+      horario_fim:        '18:00',
+      bot_ativo:          true,
+      ignorar_horario:    false,
+      fallback_humano:    true,
+      delay_resposta:     true,
+      // Perfil da loja (Migration 11)
+      business_type:      '',
+      city:               '',
+      state:              '',
+      delivery_info:      '',
+      payment_info:       '',
+      instagram:          '',
+      site_url:           '',
+      catalog_url:        '',
+      sales_tone:         '',
+      sales_instructions: '',
+      return_policy:      '',
+      discount_rules:     '',
     },
     cfgSaving:      false,
     cfgFeedback:    null,   // null | 'ok' | 'erro'
@@ -220,15 +233,27 @@ function FluxoCommand() {
         await this.authFetch('/api/settings', {
           method: 'POST',
           body: JSON.stringify({
-            nome_loja:       this.cfg.nome_loja,
-            whatsapp:        this.cfg.whatsapp,
-            saudacao:        this.cfg.saudacao,
-            horario_inicio:  this.cfg.horario_inicio,
-            horario_fim:     this.cfg.horario_fim,
-            bot_ativo:       this.cfg.bot_ativo,
-            ignorar_horario: this.cfg.ignorar_horario,
-            fallback_humano: this.cfg.fallback_humano,
-            delay_resposta:  this.cfg.delay_resposta,
+            nome_loja:          this.cfg.nome_loja,
+            whatsapp:           this.cfg.whatsapp,
+            saudacao:           this.cfg.saudacao,
+            horario_inicio:     this.cfg.horario_inicio,
+            horario_fim:        this.cfg.horario_fim,
+            bot_ativo:          this.cfg.bot_ativo,
+            ignorar_horario:    this.cfg.ignorar_horario,
+            fallback_humano:    this.cfg.fallback_humano,
+            delay_resposta:     this.cfg.delay_resposta,
+            business_type:      this.cfg.business_type      || null,
+            city:               this.cfg.city               || null,
+            state:              this.cfg.state              || null,
+            delivery_info:      this.cfg.delivery_info      || null,
+            payment_info:       this.cfg.payment_info       || null,
+            instagram:          this.cfg.instagram          || null,
+            site_url:           this.cfg.site_url           || null,
+            catalog_url:        this.cfg.catalog_url        || null,
+            sales_tone:         this.cfg.sales_tone         || null,
+            sales_instructions: this.cfg.sales_instructions || null,
+            return_policy:      this.cfg.return_policy      || null,
+            discount_rules:     this.cfg.discount_rules     || null,
           }),
         });
       } catch (_) {}
@@ -378,15 +403,27 @@ function FluxoCommand() {
         this.cfgSetupNeeded = j.setup_needed === true;
         if (j.ok && j.data) {
           const d = j.data;
-          this.cfg.nome_loja       = d.nome_loja       ?? this.cfg.nome_loja;
-          this.cfg.whatsapp        = d.whatsapp        ?? this.cfg.whatsapp;
-          this.cfg.saudacao        = d.saudacao        ?? this.cfg.saudacao;
-          this.cfg.horario_inicio  = d.horario_inicio  ?? this.cfg.horario_inicio;
-          this.cfg.horario_fim     = d.horario_fim     ?? this.cfg.horario_fim;
-          this.cfg.bot_ativo       = d.bot_ativo       ?? this.cfg.bot_ativo;
-          this.cfg.ignorar_horario = d.ignorar_horario ?? this.cfg.ignorar_horario;
-          this.cfg.fallback_humano = d.fallback_humano ?? this.cfg.fallback_humano;
-          this.cfg.delay_resposta  = d.delay_resposta  ?? this.cfg.delay_resposta;
+          this.cfg.nome_loja          = d.nome_loja          ?? this.cfg.nome_loja;
+          this.cfg.whatsapp           = d.whatsapp           ?? this.cfg.whatsapp;
+          this.cfg.saudacao           = d.saudacao           ?? this.cfg.saudacao;
+          this.cfg.horario_inicio     = d.horario_inicio     ?? this.cfg.horario_inicio;
+          this.cfg.horario_fim        = d.horario_fim        ?? this.cfg.horario_fim;
+          this.cfg.bot_ativo          = d.bot_ativo          ?? this.cfg.bot_ativo;
+          this.cfg.ignorar_horario    = d.ignorar_horario    ?? this.cfg.ignorar_horario;
+          this.cfg.fallback_humano    = d.fallback_humano    ?? this.cfg.fallback_humano;
+          this.cfg.delay_resposta     = d.delay_resposta     ?? this.cfg.delay_resposta;
+          this.cfg.business_type      = d.business_type      ?? this.cfg.business_type;
+          this.cfg.city               = d.city               ?? this.cfg.city;
+          this.cfg.state              = d.state              ?? this.cfg.state;
+          this.cfg.delivery_info      = d.delivery_info      ?? this.cfg.delivery_info;
+          this.cfg.payment_info       = d.payment_info       ?? this.cfg.payment_info;
+          this.cfg.instagram          = d.instagram          ?? this.cfg.instagram;
+          this.cfg.site_url           = d.site_url           ?? this.cfg.site_url;
+          this.cfg.catalog_url        = d.catalog_url        ?? this.cfg.catalog_url;
+          this.cfg.sales_tone         = d.sales_tone         ?? this.cfg.sales_tone;
+          this.cfg.sales_instructions = d.sales_instructions ?? this.cfg.sales_instructions;
+          this.cfg.return_policy      = d.return_policy      ?? this.cfg.return_policy;
+          this.cfg.discount_rules     = d.discount_rules     ?? this.cfg.discount_rules;
         }
       } catch (_) { /* mantém defaults */ }
     },
@@ -399,15 +436,27 @@ function FluxoCommand() {
         const r = await this.authFetch('/api/settings', {
           method: 'POST',
           body: JSON.stringify({
-            nome_loja:       this.cfg.nome_loja,
-            whatsapp:        this.cfg.whatsapp,
-            saudacao:        this.cfg.saudacao,
-            horario_inicio:  this.cfg.horario_inicio,
-            horario_fim:     this.cfg.horario_fim,
-            bot_ativo:       this.cfg.bot_ativo,
-            ignorar_horario: this.cfg.ignorar_horario,
-            fallback_humano: this.cfg.fallback_humano,
-            delay_resposta:  this.cfg.delay_resposta,
+            nome_loja:          this.cfg.nome_loja,
+            whatsapp:           this.cfg.whatsapp,
+            saudacao:           this.cfg.saudacao,
+            horario_inicio:     this.cfg.horario_inicio,
+            horario_fim:        this.cfg.horario_fim,
+            bot_ativo:          this.cfg.bot_ativo,
+            ignorar_horario:    this.cfg.ignorar_horario,
+            fallback_humano:    this.cfg.fallback_humano,
+            delay_resposta:     this.cfg.delay_resposta,
+            business_type:      this.cfg.business_type      || null,
+            city:               this.cfg.city               || null,
+            state:              this.cfg.state              || null,
+            delivery_info:      this.cfg.delivery_info      || null,
+            payment_info:       this.cfg.payment_info       || null,
+            instagram:          this.cfg.instagram          || null,
+            site_url:           this.cfg.site_url           || null,
+            catalog_url:        this.cfg.catalog_url        || null,
+            sales_tone:         this.cfg.sales_tone         || null,
+            sales_instructions: this.cfg.sales_instructions || null,
+            return_policy:      this.cfg.return_policy      || null,
+            discount_rules:     this.cfg.discount_rules     || null,
           }),
         });
         const j = await r.json();
