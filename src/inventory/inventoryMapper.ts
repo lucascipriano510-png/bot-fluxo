@@ -51,6 +51,7 @@ export function mapSiteProductToBotProduct(row: SiteProductRow, storeId: string)
     botInstructions:        row.bot_instructions || undefined,
     qualificationQuestions: row.qualification_questions ?? undefined,
     tags:                   row.tags || undefined,
+    includedItems:          row.included_items || undefined,
   };
 }
 

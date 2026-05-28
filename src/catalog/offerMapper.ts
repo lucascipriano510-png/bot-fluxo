@@ -7,7 +7,7 @@
 import { BotProduct } from '../inventory/inventoryTypes';
 import { BusinessOffer, OfferType, AvailabilityType } from './offerTypes';
 
-// Kit sem stockQuantity não pode afirmar disponibilidade ilimitada — requer confirmação manual.
+// Oferta composta sem stockQuantity não pode afirmar disponibilidade ilimitada — requer confirmação manual.
 function kitAvailability(product: BotProduct): AvailabilityType {
   if (product.stockQuantity !== undefined && product.stockQuantity !== null) {
     return 'stock';
@@ -53,6 +53,7 @@ export function botProductToOffer(product: BotProduct): BusinessOffer {
     botInstructions:        product.botInstructions,
     qualificationQuestions: product.qualificationQuestions,
     tags:                   product.tags,
+    includedItems:          product.includedItems,
   };
 }
 

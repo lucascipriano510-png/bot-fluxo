@@ -24,6 +24,7 @@ export interface BotProduct {
   botInstructions?: string;    // instrução específica para o bot
   qualificationQuestions?: unknown; // perguntas de qualificação (jsonb)
   tags?: string[];             // palavras-chave para busca
+  includedItems?: string;      // itens inclusos na oferta composta (pacote, plano, combo)
 }
 
 export interface BotProductSearchFilters {

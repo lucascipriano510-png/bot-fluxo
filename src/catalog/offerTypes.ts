@@ -57,6 +57,7 @@ export interface BusinessOffer {
   botInstructions?: string;
   qualificationQuestions?: unknown;
   tags?: string[];
+  includedItems?: string;          // itens inclusos na oferta composta (pacote, plano, combo)
 }
 
 export interface OfferSearchFilters {
