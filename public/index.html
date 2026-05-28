@@ -185,7 +185,7 @@
       <div class="dot-sm" :class="waConfigured ? '' : 'yellow'"></div>
       <span x-text="waConfigured ? 'WhatsApp ativo' : 'WhatsApp pendente'"></span>
     </div>
-    <div class="sb-status-row"><div class="dot-sm"></div> Supabase conectado</div>
+    <div class="sb-status-row"><div class="dot-sm"></div> Dados sincronizados</div>
   </div>
 </aside>
 
@@ -301,7 +301,7 @@
             <button class="toggle" :class="{ on: ignorarHorario }" @click="ignorarHorario = !ignorarHorario; autoSaveSettings()"></button>
           </div>
           <div class="toggle-row">
-            <div class="toggle-info"><h4>Modo teste</h4><p>Logs detalhados no console</p></div>
+            <div class="toggle-info"><h4>Modo diagnóstico</h4><p>Ativar diagnóstico detalhado</p></div>
             <button class="toggle" :class="{ on: modoTeste }" @click="modoTeste = !modoTeste"></button>
           </div>
 
@@ -315,13 +315,13 @@
                 </div>
               </div>
               <div style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">
-                <div style="font-size:10px;color:var(--mu2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Supabase</div>
+                <div style="font-size:10px;color:var(--mu2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Banco de dados</div>
                 <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--green)">
                   <div class="dot-sm"></div> Conectado
                 </div>
               </div>
               <div style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">
-                <div style="font-size:10px;color:var(--mu2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">API Bot</div>
+                <div style="font-size:10px;color:var(--mu2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Bot</div>
                 <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--green)">
                   <div class="dot-sm"></div> Online
                 </div>
@@ -492,7 +492,7 @@
         <div class="atend-list">
           <div class="atend-list-header">Conversas — <span x-text="conversations.length"></span></div>
           <div x-show="conversations.length === 0" style="padding:32px 16px;text-align:center;color:var(--mu);font-size:12px;line-height:1.6">
-            Nenhuma conversa ainda.<br>Configure o webhook e envie a primeira mensagem.
+            Nenhuma conversa ainda.<br>Aguardando a primeira mensagem do WhatsApp.
           </div>
           <template x-for="c in conversations" :key="c.id">
             <div class="conv-item" :class="{ selected: selectedConv === c.id }" style="margin:4px 6px;border-radius:8px" @click="selectConv(c)">
@@ -898,7 +898,7 @@
       <div x-show="!productsLoading && filteredProducts.length === 0" style="text-align:center;padding:60px 20px;color:var(--mu2);font-size:13px">
         <div x-show="productSearch || productCategory">Nenhum produto encontrado para essa busca.</div>
         <div x-show="!productSearch && !productCategory && products.length === 0">
-          Catálogo vazio ou variáveis SITE_SUPABASE_URL / SITE_SUPABASE_ANON_KEY não configuradas.
+          Catálogo ainda sem produtos cadastrados. Adicione um produto acima ou contate o suporte.
         </div>
       </div>
 
@@ -1100,12 +1100,12 @@
         </div>
         <div class="int-card">
           <div class="int-logo" style="background:#1C1C1E;border:1px solid var(--border);font-size:22px">🗄️</div>
-          <div><div class="int-name">Supabase</div><div class="int-desc">Banco de dados conectado. Sessões, leads e mensagens sendo gravados.</div></div>
+          <div><div class="int-name">Banco de dados</div><div class="int-desc">Banco de dados conectado. Sessões, leads e mensagens sendo gravados automaticamente.</div></div>
           <div style="display:flex;align-items:center;justify-content:space-between"><span class="badge badge-green">Conectado</span><button class="btn" style="font-size:11px;padding:6px 12px">Testar</button></div>
         </div>
         <div class="int-card">
           <div class="int-logo" style="background:#1a1a2e;font-size:22px">⚡</div>
-          <div><div class="int-name">API do Bot</div><div class="int-desc">Motor de fluxo online. Rotas /api/health e /api/chat respondendo.</div></div>
+          <div><div class="int-name">Motor do bot</div><div class="int-desc">Motor de atendimento automático online e respondendo normalmente.</div></div>
           <div style="display:flex;align-items:center;justify-content:space-between"><span class="badge badge-green">Online</span><button class="btn" style="font-size:11px;padding:6px 12px" @click="navigate('simulador')">Testar bot</button></div>
         </div>
         <div class="int-card">
@@ -1134,16 +1134,25 @@
         background:rgba(250,204,21,.08);border:1px solid rgba(250,204,21,.35);
         border-radius:10px;padding:16px 20px;margin-bottom:20px
       ">
-        <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:8px">
-          ⚠️ Configuração necessária — tabela <code>bot_settings</code> não existe no Supabase
+        <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:6px">
+          Configuração inicial pendente
         </div>
-        <div style="font-size:12px;color:var(--mu);margin-bottom:10px">
-          Execute o SQL abaixo no Supabase Dashboard → SQL Editor, depois clique em Salvar novamente:
+        <div style="font-size:12px;color:var(--mu);margin-bottom:12px;line-height:1.6">
+          O painel está sendo configurado. Se isso persistir por mais de alguns minutos,
+          entre em contato com o suporte para resolver rapidamente.
         </div>
-        <pre style="
-          background:var(--bg);border:1px solid var(--border);border-radius:8px;
-          padding:12px;font-size:11px;color:#a0c4ff;overflow-x:auto;line-height:1.6
-        ">CREATE TABLE IF NOT EXISTS bot_settings (
+        <button class="btn" style="font-size:12px;margin-bottom:10px" @click="loadSettings()">
+          Tentar novamente
+        </button>
+        <details style="margin-top:4px">
+          <summary style="font-size:11px;color:var(--mu2);cursor:pointer;user-select:none">Detalhes técnicos (suporte)</summary>
+          <div style="font-size:11px;color:var(--mu);margin:8px 0 4px">
+            Tabela <code>bot_settings</code> não encontrada. Execute no Supabase SQL Editor:
+          </div>
+          <pre style="
+            background:var(--bg);border:1px solid var(--border);border-radius:8px;
+            padding:12px;font-size:11px;color:#a0c4ff;overflow-x:auto;line-height:1.6
+          ">CREATE TABLE IF NOT EXISTS bot_settings (
   store_id        uuid PRIMARY KEY REFERENCES stores(id),
   nome_loja       text,
   whatsapp        text,
@@ -1156,6 +1165,7 @@
   delay_resposta  boolean DEFAULT true,
   updated_at      timestamptz DEFAULT now()
 );</pre>
+        </details>
       </div>
 
       <!-- Feedback toast -->

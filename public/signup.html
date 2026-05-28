@@ -152,7 +152,7 @@
     <div x-show="error" class="alert alert-err" x-text="error"></div>
 
     <button class="btn" @click="submit()" :disabled="loading">
-      <span x-text="loading ? 'Criando conta...' : 'Criar conta e gerar webhook'"></span>
+      <span x-text="loading ? 'Criando conta...' : 'Criar minha conta'"></span>
     </button>
 
     <div class="login-link">Já tem conta? <a href="/">Entrar</a></div>
@@ -163,15 +163,15 @@
     <div class="logo">
       <div style="font-size:2rem;">✅</div>
       <div class="logo-title" style="margin-top:.5rem;">Conta criada!</div>
-      <div class="logo-sub">Configure o Evolution API com a URL abaixo</div>
+      <div class="logo-sub">Seu bot está pronto para ser ativado</div>
     </div>
 
-    <div style="font-size:.85rem;color:#8b8fa8;margin-bottom:.4rem;">URL do seu webhook:</div>
+    <div style="font-size:.85rem;color:#8b8fa8;margin-bottom:.4rem;">URL de conexão do WhatsApp:</div>
     <div class="webhook-box" x-text="webhookUrl"></div>
 
     <div style="font-size:.82rem;color:#8b8fa8;line-height:1.6;margin-bottom:1.5rem;">
-      Cole essa URL nas configurações do seu Evolution API (ou provider de WhatsApp) como o endpoint de webhook.
-      Após configurar, acesse o painel para personalizar o bot.
+      Compartilhe a URL abaixo com a equipe da Fluxo para ativar seu número de WhatsApp.
+      Depois acesse o painel para personalizar seu atendimento automático.
     </div>
 
     <button class="btn" @click="window.location.href='/'">Ir para o painel →</button>
