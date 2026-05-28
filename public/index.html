@@ -1575,10 +1575,16 @@
               </div>
               <div style="flex:1;min-width:0">
                 <div class="int-name">Site da loja</div>
-                <div class="int-desc" x-text="knowledge.websiteSensor.note"></div>
+                <div class="int-desc" x-text="knowledge.websiteSensor.websiteUrl ? (knowledge.websiteSensor.websiteUrl + ' — ' + knowledge.websiteSensor.note) : knowledge.websiteSensor.note"></div>
               </div>
-              <span class="badge" :class="{'badge-green':knowledge.websiteSensor.status==='connected','badge-gold':knowledge.websiteSensor.status==='pending','badge-gray':knowledge.websiteSensor.status!=='connected'&&knowledge.websiteSensor.status!=='pending'}"
-                x-text="{'connected':'Conectado','pending':'Pendente','unavailable':'Inativo','error':'Erro'}[knowledge.websiteSensor.status]||'Inativo'"></span>
+              <span class="badge"
+                :class="{
+                  'badge-green': knowledge.websiteSensor.status==='connected',
+                  'badge-gold':  knowledge.websiteSensor.status==='pending_scan' || knowledge.websiteSensor.status==='pending',
+                  'badge-gray':  knowledge.websiteSensor.status==='unavailable' || knowledge.websiteSensor.status==='error'
+                }"
+                x-text="{'connected':'Conectado','pending_scan':'Configurado','pending':'Pendente','unavailable':'Inativo','error':'Erro'}[knowledge.websiteSensor.status]||'Inativo'">
+              </span>
             </div>
 
             <!-- Instagram -->
@@ -1590,8 +1596,14 @@
                 <div class="int-name">Instagram</div>
                 <div class="int-desc" x-text="knowledge.instagramSensor.instagramHandle ? knowledge.instagramSensor.instagramHandle + ' — ' + knowledge.instagramSensor.note : knowledge.instagramSensor.note"></div>
               </div>
-              <span class="badge" :class="{'badge-green':knowledge.instagramSensor.connectionStatus==='connected','badge-gold':knowledge.instagramSensor.connectionStatus==='pending','badge-gray':true}"
-                x-text="{'connected':'Conectado','pending':'Pendente','unavailable':'Inativo'}[knowledge.instagramSensor.connectionStatus]||'Inativo'"></span>
+              <span class="badge"
+                :class="{
+                  'badge-green': knowledge.instagramSensor.connectionStatus==='connected',
+                  'badge-gold':  knowledge.instagramSensor.connectionStatus==='configured_profile' || knowledge.instagramSensor.connectionStatus==='pending',
+                  'badge-gray':  knowledge.instagramSensor.connectionStatus==='unavailable' || knowledge.instagramSensor.connectionStatus==='error'
+                }"
+                x-text="{'connected':'Conectado','configured_profile':'Configurado','pending':'Pendente','unavailable':'Inativo'}[knowledge.instagramSensor.connectionStatus]||'Inativo'">
+              </span>
             </div>
 
             <!-- WhatsApp histórico -->

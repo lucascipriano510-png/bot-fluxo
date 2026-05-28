@@ -27,7 +27,7 @@ export type SourceType =
   | 'owner_instructions'
   | 'ai_tool';
 
-export type SourceStatus = 'connected' | 'pending' | 'unavailable' | 'error';
+export type SourceStatus = 'connected' | 'pending' | 'pending_scan' | 'configured_profile' | 'unavailable' | 'error';
 
 export interface KnowledgeSource {
   sourceType:     SourceType;
@@ -161,6 +161,13 @@ export interface RuntimeKnowledgeContext {
   safeToAnswer: (topic: string) => boolean;
 }
 
+// ── Normalização de Instagram ────────────────────────────────────────────────
+
+function normalizeInstagram(handle: string): string {
+  const clean = handle.trim().replace(/^@+/, '');
+  return clean ? `@${clean}` : '';
+}
+
 // ── Cache (60s TTL) ──────────────────────────────────────────────────────────
 
 const _cache = new Map<string, { data: StoreKnowledgeBase; expiresAt: number }>();
@@ -291,9 +298,12 @@ export async function getStoreKnowledge(storeId: string): Promise<StoreKnowledge
       businessType: profile.businessType,
       city:         profile.city,
       state:        profile.state,
-      instagram:    profile.instagram,
+      instagram:    profile.instagram ? normalizeInstagram(profile.instagram) : undefined,
       whatsapp:     profile.whatsapp || settings.whatsapp || undefined,
-      confidence:   profile.storeName ? 0.90 : 0.30,
+      confidence:   (() => {
+        const filled = [profile.storeName, profile.city, profile.state, profile.instagram].filter(Boolean).length;
+        return filled >= 3 ? 0.90 : filled >= 2 ? 0.70 : filled >= 1 ? 0.50 : 0.30;
+      })(),
     },
 
     commercial: {
@@ -304,7 +314,10 @@ export async function getStoreKnowledge(storeId: string): Promise<StoreKnowledge
       returnPolicy:  profile.returnPolicy,
       siteUrl:       profile.siteUrl,
       catalogUrl:    profile.catalogUrl,
-      confidence:    (profile.deliveryInfo || profile.paymentInfo) ? 0.80 : 0.20,
+      confidence:    (() => {
+        const filled = [profile.deliveryInfo, profile.paymentInfo, profile.openingHours].filter(Boolean).length;
+        return filled >= 2 ? 0.80 : filled >= 1 ? 0.50 : 0.20;
+      })(),
     },
 
     voice: {
@@ -318,14 +331,18 @@ export async function getStoreKnowledge(storeId: string): Promise<StoreKnowledge
     websiteSensor: {
       websiteUrl:  profile.siteUrl || undefined,
       catalogUrl:  profile.catalogUrl || undefined,
-      status:      profile.siteUrl ? 'pending' : 'unavailable',
-      note:        'Crawler controlado a implementar. Configure o site em Configurações → Perfil da Loja.',
+      status:      profile.siteUrl ? 'pending_scan' : 'unavailable',
+      note:        profile.siteUrl
+        ? 'Site configurado. Crawler controlado ainda não executado.'
+        : 'Configure o site em Configurações → Perfil da Loja.',
     },
 
     instagramSensor: {
-      instagramHandle:  profile.instagram,
-      connectionStatus: profile.instagram ? 'pending' : 'unavailable',
-      note: 'Requer integração oficial via Meta/Instagram Graph API com token de página.',
+      instagramHandle:  profile.instagram ? normalizeInstagram(profile.instagram) : undefined,
+      connectionStatus: profile.instagram ? 'configured_profile' : 'unavailable',
+      note: profile.instagram
+        ? 'Perfil configurado. Integração oficial via Meta/Instagram Graph API pendente.'
+        : 'Configure o Instagram em Configurações → Perfil da Loja.',
     },
 
     whatsappSensor: {
