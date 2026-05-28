@@ -3,6 +3,11 @@
 // ═══════════════════════════════════════════════════════════════
 
 export type Intent =
+  | 'humano'
+  | 'orcamento'
+  | 'compra'
+  | 'disponibilidade'
+  | 'busca_item'
   | 'delivery'
   | 'hours'
   | 'location'
@@ -52,6 +57,105 @@ function norm(s: string): string {
 }
 
 const INTENT_DEFS: IntentDef[] = [
+
+  // ── 0. Atendimento humano ────────────────────────────────────
+  {
+    intent: 'humano',
+    priority: 0,
+    primary: [
+      /\batendente\b/,
+      /\bfalar com (uma? )?pessoa\b/,
+      /\bquero (falar com\s)?(um\s)?humano\b/,
+      /\bchamar (um\s)?atendente\b/,
+      /\bfalar com (um\s)?vendedor\b/,
+      /\bme passa para (um\s)?atendente\b/,
+      /\bquero atendimento (humano|pessoal)\b/,
+      /\bfale com (um\s)?humano\b/,
+    ],
+    secondary: [
+      /\bhumano\b/,
+      /\bvendedor\b/,
+      /\bfalar com\b/,
+    ],
+  },
+
+  // ── 0. Orçamento / Sob medida ────────────────────────────────
+  {
+    intent: 'orcamento',
+    priority: 1,
+    primary: [
+      /\bor[çc]amento\b/,
+      /\bquero or[çc]ar\b/,
+      /\bsob medida\b/,
+      /\bme d[aá] (um\s)?or[çc]amento\b/,
+      /\bquanto fica (para|pra) fazer\b/,
+      /\bprecisa de or[çc]amento\b/,
+      /\bor[çc]ar (um|uma)\b/,
+    ],
+    secondary: [
+      /\bor[çc]ar\b/,
+      /\bpersonaliz\b/,
+      /\bsob encomenda\b/,
+    ],
+  },
+
+  // ── 0. Intenção de compra ────────────────────────────────────
+  {
+    intent: 'compra',
+    priority: 2,
+    primary: [
+      /\bquero comprar\b/,
+      /\bvou (comprar|levar|pegar|fechar)\b/,
+      /\bquero (esse|essa|este|esta)\b/,
+      /\bquero fazer (um\s)?pedido\b/,
+      /\bcomo (fa[çc]o|fazer) (para|pra) (comprar|pedir)\b/,
+      /\bquero (levar|pegar|fechar)\b/,
+    ],
+    secondary: [
+      /\bcomprar\b/,
+      /\bpedido\b/,
+      /\bfechar\b/,
+      /\bvou levar\b/,
+    ],
+  },
+
+  // ── 0. Disponibilidade ───────────────────────────────────────
+  {
+    intent: 'disponibilidade',
+    priority: 3,
+    primary: [
+      /\bdispon[ií]vel\b/,
+      /\btem (estoque|hor[aá]rio|vagas?)\b/,
+      /\bainda tem\b/,
+      /\bconsegue (hoje|amanha)\b/,
+      /\btem para (hoje|amanha|essa semana)\b/,
+      /\btem (vaga|hor[aá]rio) (livre|disponivel|vago)\b/,
+    ],
+    secondary: [
+      /\bestoque\b/,
+      /\bdisponibilidade\b/,
+      /\bvaga\b/,
+    ],
+  },
+
+  // ── 0. Busca de item / serviço ───────────────────────────────
+  {
+    intent: 'busca_item',
+    priority: 4,
+    primary: [
+      /\bvoc[eê]s? (t[eê]m|fazem|oferecem)\b/,
+      /\btem servi[çc]o de\b/,
+      /\bquais (s[aã]o\s)?(os\s+)?(servi[çc]os|produtos|op[çc][oõ]es|planos)\b/,
+      /\bo que voc[eê]s? (oferecem|t[eê]m)\b/,
+      /\bquero ver (o que|os servi[çc]os|as op[çc][oõ]es)\b/,
+    ],
+    secondary: [
+      /\bo que tem\b/,
+      /\bop[çc][oõ]es\b/,
+      /\bcatalogo de servi[çc]os\b/,
+    ],
+  },
+
   // ── 1. Entrega / Frete ───────────────────────────────────────
   {
     intent: 'delivery',

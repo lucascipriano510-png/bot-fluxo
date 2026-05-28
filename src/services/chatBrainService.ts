@@ -51,23 +51,61 @@ export function handleIntent(
 ): BrainResult | null {
   const { intent, confidence, entities } = intentResult;
 
-  // Mensagem não reconhecida no INICIO — responde com menu suave sem escalar para APRESENTACAO
-  if (intent === 'unknown' && currentNodeId === 'INICIO') {
-    const storeName = ctx._storeName || 'nossa loja';
+  // Mensagem não reconhecida — responde pedindo contexto, sem dizer "não encontrei produto"
+  if (intent === 'unknown') {
     const reply = pick([
-      `Não entendi muito bem 😅 Me fala o que você precisa que eu te direciono.`,
-      `Hmm, pode repetir? 😊 Estou aqui pra ajudar com *${storeName}*. O que você precisa?`,
-      `Não captei bem! Me conta o que você está buscando que eu te ajudo. 👇`,
+      `Me fala o que você está procurando ou que tipo de atendimento precisa. 👇`,
+      `Não entendi muito bem 😅 Me conta o que você precisa que eu te direciono.`,
+      `Pode me dar mais detalhes? Qual serviço, produto ou atendimento você está buscando?`,
     ], message);
     return { reply, detectedIntent: 'unknown', confidence: 0 };
   }
-
-  if (intent === 'unknown') return null;
 
   const p = pend(currentNodeId);
   let reply: string;
 
   switch (intent) {
+
+    // ── ATENDIMENTO HUMANO ───────────────────────────────────────────────────
+    // Retorna null: flowMap já tem trigger para 'atendente|humano' que navega para SUPORTE
+    case 'humano':
+      return null;
+
+    // ── ORÇAMENTO ────────────────────────────────────────────────────────────
+    case 'orcamento':
+      reply = pick([
+        `Claro! Para te passar um orçamento preciso, me conta mais detalhes:\n\nO que você precisa? Qual é o prazo e onde seria realizado?`,
+        `Posso te ajudar com um orçamento! Me fala o que você precisa — tipo de serviço, quantidade, prazo — que eu te retorno.`,
+        `Sem problema! Me conta o que você quer e as condições principais. Com isso já consigo te dar uma ideia de valor.`,
+      ], message) + p;
+      break;
+
+    // ── INTENÇÃO DE COMPRA ───────────────────────────────────────────────────
+    case 'compra':
+      reply = pick([
+        `Ótimo! Me fala o que você quer adquirir que eu te direciono pro processo de pedido.`,
+        `Perfeito! Para fechar o pedido, me conta o que você quer e eu te passo os próximos passos.`,
+        `Bora! Me fala o item ou serviço que você quer e eu te ajudo a concluir.`,
+      ], message) + p;
+      break;
+
+    // ── DISPONIBILIDADE ──────────────────────────────────────────────────────
+    case 'disponibilidade':
+      reply = pick([
+        `Me fala o que você quer verificar a disponibilidade que eu confiro pra você.`,
+        `Posso checar isso! Me conta o produto, serviço ou horário que você precisa.`,
+        `Claro! Me diz o que você precisa saber a disponibilidade que eu verifico.`,
+      ], message) + p;
+      break;
+
+    // ── BUSCA DE ITEM / SERVIÇO ──────────────────────────────────────────────
+    case 'busca_item':
+      reply = pick([
+        `Me fala o que você está procurando que eu te mostro as opções disponíveis.`,
+        `Posso te ajudar! Me conta o que você precisa — produto, serviço ou pacote — que eu verifico.`,
+        `Claro! Me diz o que você está buscando que eu te direciono.`,
+      ], message) + p;
+      break;
 
     // ── ENTREGA ─────────────────────────────────────────────────────────────
     case 'delivery':
@@ -137,9 +175,9 @@ export function handleIntent(
     // ── SENSIBILIDADE DE PREÇO ───────────────────────────────────────────────
     case 'price_sensitivity':
       reply = pick([
-        `Entendo! Temos opções que cabem no bolso sim. Me fala o produto que você quer e eu te mostro as pedidas mais em conta.`,
-        `Temos peças com ótimo custo-benefício. Me fala o que você procura que eu filtro as melhores opções de preço.`,
-        `Tem opção pra todo bolso aqui. Me fala o produto e tamanho que eu te mostro o que encaixa no seu orçamento.`,
+        `Entendo! Temos opções que cabem no bolso sim. Me fala o que você precisa que eu te mostro as alternativas mais em conta.`,
+        `Tem opção pra todo bolso aqui. Me fala o que você procura que eu filtro as melhores opções de preço.`,
+        `Posso te ajudar a encontrar algo dentro do seu orçamento. Me conta o que você precisa.`,
       ], message) + p;
       break;
 
@@ -182,9 +220,9 @@ export function handleIntent(
     // ── AJUDA COM TAMANHO ────────────────────────────────────────────────────
     case 'size_help':
       reply = pick([
-        `As peças seguem o padrão do mercado: *P* (até 90cm peito), *M* (até 98cm), *G* (até 106cm), *GG* (até 114cm). Me fala o que você usa em outras marcas que eu confirmo.`,
-        `Seguimos a tabela padrão brasileira. Me fala sua medida de peito ou o tamanho que você usa normalmente e eu te ajudo a acertar.`,
-        `Em geral: se você usa M em qualquer loja, usa M aqui. Me fala o tamanho que você costuma usar que eu confirmo pra você.`,
+        `Me fala o produto que você quer e o tamanho que costuma usar que eu confirmo se encaixa.`,
+        `Posso te ajudar com isso. Me conta o item e sua medida habitual que eu verifico.`,
+        `Me fala o que você precisa e o tamanho que costuma usar que eu te ajudo a acertar.`,
       ], message) + p;
       break;
 

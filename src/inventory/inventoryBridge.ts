@@ -293,7 +293,7 @@ export function formatProductsResponse(
   filters: BotProductSearchFilters,
 ): string {
   if (products.length === 0) {
-    return 'Não encontrei esse modelo disponível agora. Quer que eu veja opções parecidas?';
+    return 'Não encontrei esse item no catálogo agora. Me fala mais o que você precisa que eu te ajudo.';
   }
 
   const catDisplay = filters.category ? (CAT_DISPLAY[filters.category] || filters.category) : null;

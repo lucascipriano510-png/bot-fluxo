@@ -659,19 +659,24 @@ function FluxoCommand() {
           type = 'servico'; typeLabel = 'Serviço';
         }
 
+        // Sinal mínimo de contexto: ≥ 5 chars OU contém espaço
+        const hasMeaningfulName = name.length >= 5 || name.includes(' ');
+
         // Status e motivo de revisão
         let status = 'pronto', reviewReason = '';
         if (name.length < 3) {
           status = 'revisar'; reviewReason = 'Nome muito curto';
+        } else if (!hasMeaningfulName) {
+          status = 'revisar'; reviewReason = 'Nome curto ou item sem contexto';
         } else if (!price && type === 'produto_fisico') {
-          status = 'revisar'; reviewReason = 'Preço não detectado';
+          status = 'revisar'; reviewReason = 'Produto físico sem preço detectado';
         }
 
         return {
           raw: line, name, type, typeLabel, price,
           composition: type === 'pacote_combo' ? name : null,
           status, reviewReason,
-          selected: true,
+          selected: status === 'pronto',
           savedOk: false,
           savedError: '',
         };
@@ -723,20 +728,32 @@ function FluxoCommand() {
     },
 
     async saveIngestSelected() {
-      const toSave = this.ingestItems.filter(i => i.selected && !i.savedOk);
-      if (!toSave.length || this.ingestSaving) return;
+      if (this.ingestSaving) return;
+
+      const toSave  = this.ingestItems.filter(i => i.selected && !i.savedOk && i.status === 'pronto');
+      const blocked = this.ingestItems.filter(i => i.selected && !i.savedOk && i.status === 'revisar');
+
+      // Se só há itens revisar selecionados e nenhum pronto, bloqueia tudo
+      if (blocked.length > 0 && toSave.length === 0) {
+        this.productFeedback    = 'erro';
+        this.productFeedbackMsg = 'Revise os itens pendentes antes de salvar. Clique em ↗ para corrigir cada um.';
+        setTimeout(() => { this.productFeedback = null; }, 5000);
+        return;
+      }
+
+      if (!toSave.length) return;
       this.ingestSaving = true;
       let saved = 0, failed = 0;
 
       for (const item of toSave) {
         try {
           const body = {
-            name:          item.name,
-            item_type:     item.type,
-            price:         item.price || null,
-            price_type:    item.price ? 'fixo' : (item.type === 'orcamento' ? 'sob_consulta' : 'fixo'),
-            stock:         item.type === 'produto_fisico' ? 0 : null,
-            is_active:     true,
+            name:           item.name,
+            item_type:      item.type,
+            price:          item.price || null,
+            price_type:     item.price ? 'fixo' : (item.type === 'orcamento' ? 'sob_consulta' : 'fixo'),
+            stock:          item.type === 'produto_fisico' ? 0 : null,
+            is_active:      true,
             included_items: item.composition || null,
           };
           const r = await this.authFetch('/api/products', { method: 'POST', body: JSON.stringify(body) });
@@ -750,11 +767,15 @@ function FluxoCommand() {
 
       this.ingestSaving = false;
       if (saved > 0) await this.loadProducts();
-      this.productFeedback    = failed === 0 ? 'ok' : 'erro';
-      this.productFeedbackMsg = failed === 0
-        ? `${saved} item(ns) salvo(s) no catálogo!`
-        : `${saved} salvo(s), ${failed} com erro.`;
-      setTimeout(() => { this.productFeedback = null; }, 4000);
+
+      const parts = [];
+      if (saved > 0)      parts.push(`${saved} item(ns) salvo(s) no catálogo!`);
+      if (blocked.length) parts.push(`${blocked.length} item(ns) com "revisar" não foram salvos — corrija-os primeiro.`);
+      if (failed > 0)     parts.push(`${failed} com erro.`);
+
+      this.productFeedback    = (failed > 0 || blocked.length > 0) ? 'erro' : 'ok';
+      this.productFeedbackMsg = parts.join(' ');
+      setTimeout(() => { this.productFeedback = null; }, 5000);
     },
 
     /* ── CRM ─────────────────────────────────────────────────────────── */

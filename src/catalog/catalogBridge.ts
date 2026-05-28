@@ -241,7 +241,7 @@ export function formatOffersResponse(
   filters: OfferSearchFilters,
 ): string {
   if (offers.length === 0) {
-    return 'Não encontrei esse modelo disponível agora. Quer que eu veja opções parecidas?';
+    return 'Não encontrei esse item no catálogo agora. Me fala mais o que você está procurando que eu te ajudo.';
   }
 
   const catDisplay  = filters.category
@@ -323,11 +323,11 @@ export function formatFallbackResponse(
     const catDisplay = original.category ? (CAT_DISPLAY[original.category] || original.category) : null;
     const color      = original.attributes?.color ? String(original.attributes.color) : null;
 
-    if (sub && catDisplay)  return `Não encontrei *${sub}* em *${catDisplay}* disponível agora. Quer ver outras opções?`;
-    if (sub && color)       return `Não encontrei *${sub}* na cor *${color}* disponível agora. Quer ver outras opções?`;
-    if (sub)                return `Não encontrei *${sub}* disponível agora. Quer ver outras opções?`;
+    if (sub && catDisplay)  return `Não encontrei *${sub}* em *${catDisplay}* no catálogo agora. Quer ver outras opções?`;
+    if (sub && color)       return `Não encontrei *${sub}* na cor *${color}* no catálogo agora. Quer ver outras opções?`;
+    if (sub)                return `Não encontrei *${sub}* no catálogo agora. Quer ver outras opções?`;
     if (catDisplay)         return `Não encontrei nada em *${catDisplay}* com esses filtros. Quer ver outras opções?`;
-    return `Não encontrei esse produto disponível agora. Quer ver outras opções?`;
+    return `Não encontrei esse item no catálogo agora. Me fala mais o que você precisa que eu te ajudo.`;
   }
 
   // Resultado exato — resposta normal

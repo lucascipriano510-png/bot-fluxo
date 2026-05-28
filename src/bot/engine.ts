@@ -90,32 +90,40 @@ export async function processMessage(
     _saudacao:  rtSettings.saudacao,
   };
 
-  // ── PRÉ-CHECAGEM 4: Consulta de catálogo via CatalogBridge (busca em camadas) ──
-  const rawFilters = detectProductQuery(messageText);
-  if (rawFilters) {
-    const offerFilters               = buildOfferFilters(storeId, rawFilters);
-    const { offers, matched, dropped } = await findOffersWithFallback(offerFilters);
-    const reply                      = formatFallbackResponse(offers, offerFilters, matched, dropped);
-    logInventoryQuery(storeId, session.phone, messageText, rawFilters, offers.length, reply);
+  // ── PRÉ-CHECAGEM 4: Roteamento por intenção + catálogo ──────────────────
+  // Detecta intenção antes de buscar catálogo para evitar buscas desnecessárias
+  // em saudações, pedidos de atendente e orçamentos.
+  const intentResult = detectIntent(messageText);
 
-    await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
-    await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: reply,       node: 'CATALOG' });
+  // Intenções que nunca devem acionar busca de catálogo
+  const NON_CATALOG = ['greeting', 'thanks', 'farewell', 'orcamento', 'compra', 'humano'];
 
-    return { text: reply, nextNode: currentNodeId, context: ctx };
+  if (!NON_CATALOG.includes(intentResult.intent)) {
+    const rawFilters = detectProductQuery(messageText);
+    if (rawFilters) {
+      const offerFilters                 = buildOfferFilters(storeId, rawFilters);
+      const { offers, matched, dropped } = await findOffersWithFallback(offerFilters);
+      const reply                        = formatFallbackResponse(offers, offerFilters, matched, dropped);
+      logInventoryQuery(storeId, session.phone, messageText, rawFilters, offers.length, reply);
+
+      await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
+      await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: reply,       node: 'CATALOG' });
+
+      return { text: reply, nextNode: currentNodeId, context: ctx };
+    }
   }
 
-  // ── PRÉ-CHECAGEM 5: Camada cerebral — intenção e resposta natural ────────
-  const intentResult  = detectIntent(messageText);
-  const brainResult   = handleIntent(messageText, intentResult, ctx, currentNodeId);
+  // ── PRÉ-CHECAGEM 5: Camada cerebral (reutiliza intenção já detectada) ────
+  const brainResult = handleIntent(messageText, intentResult, ctx, currentNodeId);
   if (brainResult) {
-    await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText,    node: currentNodeId });
+    await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText,      node: currentNodeId });
     await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: brainResult.reply, node: 'BRAIN' });
     return {
-      text:            brainResult.reply,
-      nextNode:        currentNodeId,
-      context:         ctx,
-      detectedIntent:  brainResult.detectedIntent,
-      confidence:      brainResult.confidence,
+      text:           brainResult.reply,
+      nextNode:       currentNodeId,
+      context:        ctx,
+      detectedIntent: brainResult.detectedIntent,
+      confidence:     brainResult.confidence,
     };
   }
 
