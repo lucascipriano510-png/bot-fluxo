@@ -5,8 +5,8 @@
 //  Ativação: definir AI_ASSIST_PROVIDER=gemini e AI_ASSIST_KEY nas env vars.
 //  Modelo padrão: AI_ASSIST_MODEL=gemini-1.5-flash
 //
-//  Guardrails: nunca inventa preço, estoque, produto, prazo ou promoção.
-//  Quando não há dados, redireciona para catálogo, orçamento ou humano.
+//  Guardrails: nunca inventa preço, estoque, produto, prazo, endereço ou promoção.
+//  Quando não há dados, redireciona para atendimento — nunca diz "não sei".
 //  API key NUNCA sai do backend — nunca exposta no frontend ou nos logs.
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -21,42 +21,74 @@ export interface StoreVoiceProfile {
 
 // ── Contexto seguro que a IA pode usar ──────────────────────────────────────
 export interface AiAssistContext {
-  storeName:    string;
-  storePhone?:  string;
-  greetingMsg?: string;
+  storeName:     string;
+  businessType?: string;   // ex: "outlet de roupas", "barbearia", "lava-jato"
+  city?:         string;   // ex: "Uberaba"
+  storePhone?:   string;
+  openingHours?: string;   // ex: "09:00 às 18:00"
+  deliveryInfo?: string;   // ex: "Entregamos para todo o Brasil"
+  paymentInfo?:  string;   // ex: "Pix, cartão, boleto"
+  greetingMsg?:  string;   // usado APENAS quando intent = greeting
   voiceProfile?: StoreVoiceProfile;
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
-// ── Guardrails — embutidos no system prompt, nunca removíveis ────────────────
+// ── Guardrails rígidos — nunca removíveis ────────────────────────────────────
 const GUARDRAILS = `
-REGRAS OBRIGATÓRIAS (nunca violar):
-- Nunca invente preço, valor ou promoção.
+GUARDRAILS (NUNCA VIOLAR):
+- Nunca invente preço, valor, promoção ou desconto.
 - Nunca invente estoque, disponibilidade ou prazo.
-- Nunca invente produto ou serviço sem dado real.
-- Nunca confirme desconto sem informação concreta.
-- Se não souber a resposta, diga que vai verificar ou redirecione para um atendente.
-- Sempre conduza para catálogo, orçamento ou atendente quando necessário.
-- Linguagem universal — funciona para qualquer negócio local.
-- Responda sempre em português brasileiro, máximo 3 linhas.
+- Nunca invente produto, serviço, endereço ou horário.
+- Para perguntas de produto ou serviço específico, direcione para o catálogo ou atendente.
+- Nunca confirme disponibilidade sem dado real.
 `.trim();
 
-// ── Monta system prompt seguro para o provider de IA ────────────────────────
-export function createSystemPrompt(ctx: AiAssistContext): string {
-  const vp   = ctx.voiceProfile;
-  const tone = vp?.tone ?? 'friendly';
+// ── Monta system prompt seguro e contextualizado ────────────────────────────
+export function createSystemPrompt(ctx: AiAssistContext, intentHint?: string): string {
+  const storeName    = ctx.storeName || 'nossa loja';
+  const isGreeting   = intentHint === 'greeting';
+
+  // Dados disponíveis da loja — só inclui o que existe
+  const storeData = [
+    `Loja: ${storeName}`,
+    ctx.businessType  ? `Tipo de negócio: ${ctx.businessType}` : '',
+    ctx.city          ? `Cidade: ${ctx.city}`                  : '',
+    ctx.storePhone    ? `WhatsApp: ${ctx.storePhone}`          : '',
+    ctx.openingHours  ? `Horário: ${ctx.openingHours}`         : '',
+    ctx.deliveryInfo  ? `Entrega: ${ctx.deliveryInfo}`         : '',
+    ctx.paymentInfo   ? `Pagamento: ${ctx.paymentInfo}`        : '',
+  ].filter(Boolean).join('\n');
+
+  // Instrução de saudação: só usa quando for realmente uma saudação
+  const greetingRule = isGreeting && ctx.greetingMsg
+    ? `Quando cumprimentar, use: "${ctx.greetingMsg}"`
+    : 'NÃO comece a resposta com "Olá", "Oi", "Tudo bem?" ou qualquer saudação. Responda direto ao ponto.';
+
+  // Instrução para dados ausentes
+  const missingDataRule = [
+    ctx.city         ? '' : 'Se perguntarem de qual cidade somos: "Me fala o que você procura que te ajudo."',
+    ctx.deliveryInfo ? '' : 'Se perguntarem sobre entrega: "Posso confirmar isso com a loja. Me fala o que você quer comprar?"',
+    ctx.paymentInfo  ? '' : 'Se perguntarem sobre pagamento: "Posso confirmar as formas de pagamento disponíveis. Quer que eu chame um atendente?"',
+  ].filter(Boolean).join('\n');
 
   return [
-    `Você é o assistente virtual de *${ctx.storeName}*.`,
-    `Tom: ${tone}.`,
-    ctx.storePhone ? `WhatsApp da loja: ${ctx.storePhone}.` : '',
-    ctx.greetingMsg ? `Saudação padrão: "${ctx.greetingMsg}".` : '',
+    `Você é o assistente de vendas da loja ${storeName}.`,
+    '',
+    'DADOS DA LOJA:',
+    storeData,
+    '',
+    'REGRAS DE RESPOSTA (OBRIGATÓRIAS):',
+    `- ${greetingRule}`,
+    '- Respostas SEMPRE completas. NUNCA termine no meio de uma frase ou com vírgula.',
+    '- Máximo 2 linhas. Seja direto, comercial e humano.',
+    '- NUNCA use expressões como "não tenho essa informação" ou "não sei". Em vez disso, ofereça ajuda.',
+    missingDataRule ? `- ${missingDataRule.replace(/\n/g, '\n- ')}` : '',
     '',
     GUARDRAILS,
-  ].filter(Boolean).join('\n');
+  ].filter(s => s !== '').join('\n');
 }
 
-// ── Chamada direta à Gemini REST API ────────────────────────────────────────
+// ── Chamada à Gemini REST API ────────────────────────────────────────────────
 async function callGemini(
   message: string,
   systemPrompt: string,
@@ -67,7 +99,7 @@ async function callGemini(
   const body = {
     contents:          [{ role: 'user', parts: [{ text: message }] }],
     systemInstruction: { parts: [{ text: systemPrompt }] },
-    generationConfig:  { maxOutputTokens: 200, temperature: 0.7 },
+    generationConfig:  { maxOutputTokens: 300, temperature: 0.5 },
   };
 
   const resp = await fetch(url, {
@@ -91,7 +123,7 @@ async function callGemini(
   return text?.trim() || null;
 }
 
-// ── Teste de conexão — usado pelo endpoint /api/integrations/ai/test ────────
+// ── Teste de conexão ────────────────────────────────────────────────────────
 export async function testAiConnection(): Promise<{ ok: boolean; reply?: string; error?: string; provider?: string; model?: string }> {
   const provider = (process.env.AI_ASSIST_PROVIDER || '').toLowerCase();
   const key      = process.env.AI_ASSIST_KEY || '';
@@ -125,6 +157,7 @@ export async function testAiConnection(): Promise<{ ok: boolean; reply?: string;
 export async function aiAssist(
   message: string,
   ctx: AiAssistContext,
+  intentHint?: string,
 ): Promise<string | null> {
   const provider = (process.env.AI_ASSIST_PROVIDER || '').toLowerCase();
   const key      = process.env.AI_ASSIST_KEY || '';
@@ -134,7 +167,7 @@ export async function aiAssist(
 
   try {
     if (provider === 'gemini') {
-      return await callGemini(message, createSystemPrompt(ctx), key, model);
+      return await callGemini(message, createSystemPrompt(ctx, intentHint), key, model);
     }
     return null;
   } catch (err) {

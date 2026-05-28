@@ -70,9 +70,9 @@ export function handleIntent(
     case 'identidade_loja': {
       const storeName = ctx._storeName || 'nossa loja';
       reply = pick([
-        `Sim! Aqui é a *${storeName}*. Me fala o que você está procurando que eu te ajudo. 😊`,
-        `É isso mesmo! Você está falando com o assistente da *${storeName}*. No que posso te ajudar?`,
-        `Correto! Aqui é a *${storeName}*. Me conta o que você precisa.`,
+        `Sim, aqui é a *${storeName}*. Me fala o que você está procurando que eu te ajudo.`,
+        `Exato! Você está falando com o assistente da *${storeName}*. O que você está procurando hoje?`,
+        `Sim, você está falando com a *${storeName}*. Me conta o que você precisa.`,
       ], message);
       break;
     }
@@ -159,13 +159,17 @@ export function handleIntent(
       break;
 
     // ── LOCALIZAÇÃO ──────────────────────────────────────────────────────────
-    case 'location':
+    case 'location': {
+      const waLoja = ctx._wa_loja;
       reply = pick([
-        `Temos loja física! Para o endereço exato, posso te mandar pelo WhatsApp ou chamar um atendente. O que prefere?`,
-        `Tem loja física sim. Me fala que eu passo o endereço ou te conecto com um atendente.`,
-        `Pode vir retirar na loja. Para o endereço completo, é só pedir que eu te passo agora.`,
+        waLoja
+          ? `Para o endereço exato, posso te conectar direto no WhatsApp da loja: ${waLoja}`
+          : `Para o endereço exato, posso chamar um atendente pra te passar agora. Quer?`,
+        `Me deixa confirmar o endereço com a loja pra te passar certinho. Quer que eu chame um atendente?`,
+        `Para endereço e localização, o melhor é falar direto com a loja. Posso te conectar agora.`,
       ], message) + p;
       break;
+    }
 
     // ── TROCA / DEVOLUÇÃO ────────────────────────────────────────────────────
     case 'exchange':

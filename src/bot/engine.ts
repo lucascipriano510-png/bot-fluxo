@@ -136,11 +136,15 @@ export async function processMessage(
   const AI_ASSIST_INTENTS = new Set(['conversa_geral', 'identidade_loja', 'duvida_operacional', 'unknown']);
   if (AI_ASSIST_INTENTS.has(intentResult.intent)) {
     const aiCtx: AiAssistContext = {
-      storeName:   ctx._storeName  || 'nossa loja',
-      storePhone:  ctx._wa_loja    || undefined,
-      greetingMsg: ctx._saudacao   || undefined,
+      storeName:    ctx._storeName || 'nossa loja',
+      storePhone:   ctx._wa_loja  || undefined,
+      openingHours: (rtSettings.horario_inicio && rtSettings.horario_fim)
+        ? `${rtSettings.horario_inicio} às ${rtSettings.horario_fim}`
+        : undefined,
+      // greetingMsg: passado apenas quando intent for saudação
+      greetingMsg: intentResult.intent === 'greeting' ? (ctx._saudacao || undefined) : undefined,
     };
-    const aiReply = await aiAssist(messageText, aiCtx);
+    const aiReply = await aiAssist(messageText, aiCtx, intentResult.intent);
     if (aiReply) {
       await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
       await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: aiReply,     node: 'AI_ASSIST' });
