@@ -18,6 +18,19 @@ import { sendMessage, invalidateCredCache } from '../providers/messaging';
 
 const router = Router();
 
+function errMsg(err: unknown): string {
+  if (!err) return 'Erro desconhecido';
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'object') {
+    const e = err as Record<string, unknown>;
+    if (typeof e.message === 'string') return e.message;
+    if (typeof e.details === 'string') return e.details;
+    if (typeof e.hint   === 'string') return e.hint;
+    try { return JSON.stringify(err); } catch { return String(err); }
+  }
+  return String(err);
+}
+
 // ── Config pública (sem auth) — bootstrapa o cliente Supabase no frontend ────
 router.get('/config', (_req, res) => {
   res.json({
@@ -216,7 +229,7 @@ router.get('/store', async (req, res) => {
     }
     return res.json({ ok: true, data });
   } catch (err: unknown) {
-    return res.status(500).json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    return res.status(500).json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -285,7 +298,7 @@ router.get('/sessions', async (req, res) => {
     if (error) throw error;
     res.json({ ok: true, data: data || [] });
   } catch (err: unknown) {
-    res.json({ ok: false, data: [], error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, data: [], error: errMsg(err) });
   }
 });
 
@@ -294,7 +307,7 @@ router.get('/leads', async (req, res) => {
   try {
     res.json({ ok: true, data: await fetchLeads(req.storeId!) });
   } catch (err: unknown) {
-    res.json({ ok: false, data: [], error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, data: [], error: errMsg(err) });
   }
 });
 
@@ -303,7 +316,7 @@ router.get('/messages/:phone', async (req, res) => {
   try {
     res.json({ ok: true, data: await fetchHistorico(req.storeId!, req.params.phone, 60) });
   } catch (err: unknown) {
-    res.json({ ok: false, data: [], error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, data: [], error: errMsg(err) });
   }
 });
 
@@ -320,7 +333,7 @@ router.get('/recovery', async (req, res) => {
     if (error) throw error;
     res.json({ ok: true, data: data || [] });
   } catch (err: unknown) {
-    res.json({ ok: false, data: [], error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, data: [], error: errMsg(err) });
   }
 });
 
@@ -348,7 +361,7 @@ router.get('/flow', async (req, res) => {
     });
     res.json({ ok: true, data });
   } catch (err: unknown) {
-    res.json({ ok: false, data: [], error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, data: [], error: errMsg(err) });
   }
 });
 
@@ -362,7 +375,7 @@ router.get('/flow/config', async (req, res) => {
     if (error) throw error;
     res.json({ ok: true, data: data || [] });
   } catch (err: unknown) {
-    res.json({ ok: false, data: [], error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, data: [], error: errMsg(err) });
   }
 });
 
@@ -386,7 +399,7 @@ router.post('/flow/config', async (req, res) => {
     invalidateFlowCache(req.storeId!);
     res.json({ ok: true });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -401,7 +414,7 @@ router.delete('/flow/config/:nodeId', async (req, res) => {
     invalidateFlowCache(req.storeId!);
     res.json({ ok: true });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -412,7 +425,7 @@ router.get('/settings', async (req, res) => {
     const { setup_needed, ...cfg } = data as typeof data & { setup_needed?: boolean };
     res.json({ ok: true, data: cfg, setup_needed: setup_needed ?? false });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -433,7 +446,7 @@ router.post('/settings', async (req, res) => {
     await saveSettings(req.storeId!, patch as Parameters<typeof saveSettings>[1]);
     res.json({ ok: true });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -447,7 +460,7 @@ router.get('/products', async (req, res) => {
     });
     res.json({ ok: true, data, count: data.length });
   } catch (err: unknown) {
-    res.json({ ok: false, data: [], error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, data: [], error: errMsg(err) });
   }
 });
 
@@ -494,7 +507,7 @@ router.post('/products', async (req, res) => {
     if (error) throw error;
     res.json({ ok: true, data });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -521,7 +534,7 @@ router.put('/products/:id', async (req, res) => {
     if (!data) return res.status(404).json({ ok: false, error: 'Produto não encontrado' });
     res.json({ ok: true, data });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -535,7 +548,7 @@ router.delete('/products/:id', async (req, res) => {
     if (error) throw error;
     res.json({ ok: true });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -558,7 +571,7 @@ router.get('/leads/:id', async (req, res) => {
       .limit(100);
     res.json({ ok: true, data: { ...lead, messages: messages || [] } });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -580,7 +593,7 @@ router.put('/leads/:id', async (req, res) => {
     if (!data) return res.status(404).json({ ok: false, error: 'Lead não encontrado' });
     res.json({ ok: true, data });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -602,7 +615,7 @@ router.patch('/leads/:id/stage', async (req, res) => {
     if (!data) return res.status(404).json({ ok: false, error: 'Lead não encontrado' });
     res.json({ ok: true });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -659,7 +672,7 @@ router.get('/reports', async (req, res) => {
       },
     });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -674,7 +687,7 @@ router.post('/sessions/:phone/assume', async (req, res) => {
     if (error) throw error;
     res.json({ ok: true });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -688,7 +701,7 @@ router.post('/sessions/:phone/release', async (req, res) => {
     if (error) throw error;
     res.json({ ok: true });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -707,7 +720,7 @@ router.post('/sessions/:phone/message', async (req, res) => {
     const sent = await sendMessage(req.params.phone, text.trim(), req.storeId!);
     res.json({ ok: true, whatsappSent: sent.ok, whatsappError: sent.error });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -725,7 +738,7 @@ router.get('/webhook-url', async (req, res) => {
     const webhookUrl = `${protocol}://${host}/webhook/${data.slug}`;
     res.json({ ok: true, webhookUrl, slug: data.slug });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -755,7 +768,7 @@ router.get('/integrations/evolution', async (req, res) => {
       },
     });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -780,7 +793,7 @@ router.post('/integrations/evolution', async (req, res) => {
     invalidateCredCache(req.storeId!);
     res.json({ ok: true });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -825,7 +838,7 @@ router.post('/integrations/evolution/test', async (req, res) => {
     }
     return res.json({ ok: true, message: `Instância "${instance}" encontrada. Estado: ${state}.`, state });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = errMsg(err);
     if (msg.includes('TimeoutError') || msg.includes('ETIMEDOUT') || msg.includes('timeout')) {
       return res.json({ ok: false, error: 'Timeout: Evolution API não respondeu em 8s. Verifique a URL.' });
     }
@@ -851,7 +864,7 @@ router.get('/respostas', async (req, res) => {
     if (error) throw error;
     res.json({ ok: true, data: data || [] });
   } catch (err: unknown) {
-    res.json({ ok: false, data: [], error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, data: [], error: errMsg(err) });
   }
 });
 
@@ -886,7 +899,7 @@ router.post('/respostas', async (req, res) => {
     if (error) throw error;
     res.json({ ok: true, data });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -920,7 +933,7 @@ router.put('/respostas/:id', async (req, res) => {
     if (!data) return res.status(404).json({ ok: false, error: 'Resposta não encontrada.' });
     res.json({ ok: true, data });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
@@ -935,7 +948,7 @@ router.delete('/respostas/:id', async (req, res) => {
     if (error) throw error;
     res.json({ ok: true });
   } catch (err: unknown) {
-    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 

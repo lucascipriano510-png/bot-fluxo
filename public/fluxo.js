@@ -226,6 +226,15 @@ function FluxoCommand() {
       if (p === 'integracoes') this.loadIntegrations();
     },
 
+    /* ── Helpers ──────────────────────────────────────────────────────────── */
+    // Extrai mensagem legível de qualquer tipo de erro retornado pela API
+    apiErr(e) {
+      if (!e) return 'Erro desconhecido';
+      if (typeof e === 'string') return e;
+      if (typeof e === 'object') return e.message || e.details || e.hint || JSON.stringify(e);
+      return String(e);
+    },
+
     /* ── Auth ─────────────────────────────────────────────────────────────── */
     // Wrapper para fetch que injeta o token Bearer automaticamente
     async authFetch(url, opts = {}) {
@@ -391,7 +400,7 @@ function FluxoCommand() {
           this.cfgFeedback = 'erro';
           this.cfgFeedbackMsg = j.error === 'TABLE_MISSING'
             ? 'Tabela bot_settings não existe. Execute o SQL mostrado acima e tente novamente.'
-            : (j.error || 'Erro ao salvar.');
+            : this.apiErr(j.error);
           if (j.error === 'TABLE_MISSING') this.cfgSetupNeeded = true;
         }
       } catch (e) {
@@ -485,7 +494,7 @@ function FluxoCommand() {
           if (j.intent && j.intent !== 'unknown') { msg.intent = j.intent; msg.confidence = j.confidence; }
           this.simMessages.push(msg);
         } else {
-          this.simMessages.push({ from: 'bot', text: j.error || 'Erro ao processar.', time: this.timeNow(), intent: null, confidence: null });
+          this.simMessages.push({ from: 'bot', text: this.apiErr(j.error) || 'Erro ao processar.', time: this.timeNow(), intent: null, confidence: null });
         }
       } catch (e) {
         this.simMessages.push({ from: 'bot', text: 'Erro de conexão.', time: this.timeNow() });
@@ -576,7 +585,7 @@ function FluxoCommand() {
           this.productFeedbackMsg = this.productEditId ? 'Item atualizado!' : 'Item criado!';
         } else {
           this.productFeedback = 'erro';
-          this.productFeedbackMsg = j.error || 'Erro ao salvar.';
+          this.productFeedbackMsg = this.apiErr(j.error);
         }
       } catch (_) {
         this.productFeedback = 'erro';
@@ -639,7 +648,7 @@ function FluxoCommand() {
           this.crmFeedbackMsg = 'Lead salvo!';
         } else {
           this.crmFeedback = 'erro';
-          this.crmFeedbackMsg = j.error || 'Erro ao salvar.';
+          this.crmFeedbackMsg = this.apiErr(j.error);
         }
       } catch (_) {
         this.crmFeedback = 'erro';
@@ -909,7 +918,7 @@ function FluxoCommand() {
           this.evoForm.evolution_token = '';  // limpa após salvar
         } else {
           this.evoFeedback    = 'erro';
-          this.evoFeedbackMsg = j.error || 'Erro ao salvar.';
+          this.evoFeedbackMsg = this.apiErr(j.error);
         }
       } catch (_) {
         this.evoFeedback    = 'erro';
@@ -928,7 +937,7 @@ function FluxoCommand() {
         const r = await this.authFetch('/api/integrations/evolution/test', { method: 'POST' });
         const j = await r.json();
         this.evoFeedback    = j.ok ? 'ok' : 'erro';
-        this.evoFeedbackMsg = j.ok ? (j.message || 'Conexão ok!') : (j.error || 'Falhou.');
+        this.evoFeedbackMsg = j.ok ? (j.message || 'Conexão ok!') : this.apiErr(j.error);
       } catch (_) {
         this.evoFeedback    = 'erro';
         this.evoFeedbackMsg = 'Erro de conexão.';
@@ -1002,7 +1011,7 @@ function FluxoCommand() {
           this.respostaFeedbackMsg = this.respostaEditId ? 'Resposta atualizada!' : 'Resposta criada!';
         } else {
           this.respostaFeedback    = 'erro';
-          this.respostaFeedbackMsg = j.error || 'Erro ao salvar.';
+          this.respostaFeedbackMsg = this.apiErr(j.error);
         }
       } catch (_) {
         this.respostaFeedback    = 'erro';
