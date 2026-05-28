@@ -21,15 +21,18 @@
 import { supabase } from '../lib/supabase';
 
 export interface BotSettings {
-  nome_loja:       string;
-  whatsapp:        string;
-  saudacao:        string;
-  horario_inicio:  string;
-  horario_fim:     string;
-  bot_ativo:       boolean;
-  ignorar_horario: boolean;
-  fallback_humano: boolean;
-  delay_resposta:  boolean;
+  nome_loja:          string;
+  whatsapp:           string;
+  saudacao:           string;
+  horario_inicio:     string;
+  horario_fim:        string;
+  bot_ativo:          boolean;
+  ignorar_horario:    boolean;
+  fallback_humano:    boolean;
+  delay_resposta:     boolean;
+  evolution_url?:     string;
+  evolution_instance?: string;
+  evolution_token?:   string;
 }
 
 const DEFAULTS: BotSettings = {
@@ -50,15 +53,18 @@ const RT_TTL_MS = 60_000;
 
 function mergeDefaults(row: Record<string, unknown>): BotSettings {
   return {
-    nome_loja:       (row.nome_loja       as string)  ?? DEFAULTS.nome_loja,
-    whatsapp:        (row.whatsapp        as string)  ?? DEFAULTS.whatsapp,
-    saudacao:        (row.saudacao        as string)  ?? DEFAULTS.saudacao,
-    horario_inicio:  (row.horario_inicio  as string)  ?? DEFAULTS.horario_inicio,
-    horario_fim:     (row.horario_fim     as string)  ?? DEFAULTS.horario_fim,
-    bot_ativo:       (row.bot_ativo       as boolean) ?? DEFAULTS.bot_ativo,
-    ignorar_horario: (row.ignorar_horario as boolean) ?? DEFAULTS.ignorar_horario,
-    fallback_humano: (row.fallback_humano as boolean) ?? DEFAULTS.fallback_humano,
-    delay_resposta:  (row.delay_resposta  as boolean) ?? DEFAULTS.delay_resposta,
+    nome_loja:          (row.nome_loja       as string)  ?? DEFAULTS.nome_loja,
+    whatsapp:           (row.whatsapp        as string)  ?? DEFAULTS.whatsapp,
+    saudacao:           (row.saudacao        as string)  ?? DEFAULTS.saudacao,
+    horario_inicio:     (row.horario_inicio  as string)  ?? DEFAULTS.horario_inicio,
+    horario_fim:        (row.horario_fim     as string)  ?? DEFAULTS.horario_fim,
+    bot_ativo:          (row.bot_ativo       as boolean) ?? DEFAULTS.bot_ativo,
+    ignorar_horario:    (row.ignorar_horario as boolean) ?? DEFAULTS.ignorar_horario,
+    fallback_humano:    (row.fallback_humano as boolean) ?? DEFAULTS.fallback_humano,
+    delay_resposta:     (row.delay_resposta  as boolean) ?? DEFAULTS.delay_resposta,
+    evolution_url:      (row.evolution_url      as string | undefined) ?? undefined,
+    evolution_instance: (row.evolution_instance as string | undefined) ?? undefined,
+    evolution_token:    (row.evolution_token    as string | undefined) ?? undefined,
   };
 }
 

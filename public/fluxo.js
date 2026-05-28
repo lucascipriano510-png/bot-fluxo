@@ -96,6 +96,30 @@ function FluxoCommand() {
     reports: null,
     reportsLoading: false,
 
+    /* integracoes — evolution api */
+    evoForm: { evolution_url: '', evolution_instance: '', evolution_token: '' },
+    evoLoaded:      false,
+    evoConfigured:  false,
+    evoSaving:      false,
+    evoTesting:     false,
+    evoFeedback:    null,   // null | 'ok' | 'erro'
+    evoFeedbackMsg: '',
+    evoShowToken:   false,
+    webhookUrl:     '',
+    webhookCopied:  false,
+    evoSetupNeeded: false,
+
+    /* respostas rapidas */
+    respostas:         [],
+    respostasLoading:  false,
+    respostaSetupNeeded: false,
+    respostaModal:     false,
+    respostaEditId:    null,
+    respostaForm:      { titulo: '', gatilhos: '', resposta: '', ativo: true, prioridade: 0 },
+    respostaSaving:    false,
+    respostaFeedback:  null,
+    respostaFeedbackMsg: '',
+
     /* atendimentos */
     atendMessages: [],
     atendPhone: null,
@@ -142,7 +166,7 @@ function FluxoCommand() {
     get ignorarHorario()  { return this.cfg.ignorar_horario; },
     set ignorarHorario(v) { this.cfg.ignorar_horario = v; },
 
-    get waConfigured() { return !!(this.cfg.whatsapp && this.cfg.whatsapp.trim()); },
+    get waConfigured() { return this.evoConfigured; },
 
     get leadsQuentes() { return this.leads.filter(l => l.status_comercial === 'QUENTE').length; },
     get leadsMornos()  { return this.leads.filter(l => l.status_comercial === 'MORNO').length; },
@@ -196,8 +220,10 @@ function FluxoCommand() {
       this.page = p;
       this.sidebarOpen = false;
       window.location.hash = p;
-      if (p === 'relatorios') this.$nextTick(() => this.loadReports());
-      if (p === 'kanban')     this.loadKanban();
+      if (p === 'relatorios')  this.$nextTick(() => this.loadReports());
+      if (p === 'kanban')      this.loadKanban();
+      if (p === 'respostas')   this.loadRespostas();
+      if (p === 'integracoes') this.loadIntegrations();
     },
 
     /* ── Auth ─────────────────────────────────────────────────────────────── */
@@ -298,8 +324,10 @@ function FluxoCommand() {
         this.loadProducts(),
         this.loadSettings(),
       ]);
-      if (this.page === 'kanban')     this.loadKanban();
-      if (this.page === 'relatorios') this.loadReports();
+      if (this.page === 'kanban')      this.loadKanban();
+      if (this.page === 'relatorios')  this.loadReports();
+      if (this.page === 'respostas')   this.loadRespostas();
+      if (this.page === 'integracoes') this.loadIntegrations();
     },
 
     async _checkStoreStatus() {
@@ -832,6 +860,181 @@ function FluxoCommand() {
     statusColor(s) {
       const map = { QUENTE: 'badge-red', MORNO: 'badge-gold', FRIO: 'badge-gray' };
       return map[s] || 'badge-gray';
+    },
+
+    /* ── Integrações — Evolution API ─────────────────────────────────── */
+    async loadIntegrations() {
+      try {
+        const [evoRes, urlRes] = await Promise.all([
+          this.authFetch('/api/integrations/evolution'),
+          this.authFetch('/api/webhook-url'),
+        ]);
+        const evo = await evoRes.json();
+        const wh  = await urlRes.json();
+        if (evo.ok && evo.data) {
+          this.evoForm.evolution_url      = evo.data.evolution_url      || '';
+          this.evoForm.evolution_instance = evo.data.evolution_instance || '';
+          this.evoForm.evolution_token    = '';  // nunca pré-preenche — mascarado
+          this.evoConfigured = evo.data.configured || false;
+          this.evoLoaded     = true;
+        }
+        if (wh.ok) this.webhookUrl = wh.webhookUrl || '';
+      } catch (_) {}
+    },
+
+    async saveEvo() {
+      if (this.evoSaving) return;
+      if (!this.evoForm.evolution_url.trim() || !this.evoForm.evolution_instance.trim() || !this.evoForm.evolution_token.trim()) {
+        this.evoFeedback = 'erro';
+        this.evoFeedbackMsg = 'Preencha URL, instância e token.';
+        setTimeout(() => { this.evoFeedback = null; }, 4000);
+        return;
+      }
+      this.evoSaving = true;
+      this.evoFeedback = null;
+      try {
+        const r = await this.authFetch('/api/integrations/evolution', {
+          method: 'POST',
+          body: JSON.stringify({
+            evolution_url:      this.evoForm.evolution_url.trim(),
+            evolution_instance: this.evoForm.evolution_instance.trim(),
+            evolution_token:    this.evoForm.evolution_token.trim(),
+          }),
+        });
+        const j = await r.json();
+        if (j.ok) {
+          this.evoConfigured  = true;
+          this.evoFeedback    = 'ok';
+          this.evoFeedbackMsg = 'Credenciais salvas com sucesso!';
+          this.evoForm.evolution_token = '';  // limpa após salvar
+        } else {
+          this.evoFeedback    = 'erro';
+          this.evoFeedbackMsg = j.error || 'Erro ao salvar.';
+        }
+      } catch (_) {
+        this.evoFeedback    = 'erro';
+        this.evoFeedbackMsg = 'Erro de conexão.';
+      } finally {
+        this.evoSaving = false;
+        setTimeout(() => { this.evoFeedback = null; }, 4000);
+      }
+    },
+
+    async testEvo() {
+      if (this.evoTesting) return;
+      this.evoTesting  = true;
+      this.evoFeedback = null;
+      try {
+        const r = await this.authFetch('/api/integrations/evolution/test', { method: 'POST' });
+        const j = await r.json();
+        this.evoFeedback    = j.ok ? 'ok' : 'erro';
+        this.evoFeedbackMsg = j.ok ? (j.message || 'Conexão ok!') : (j.error || 'Falhou.');
+      } catch (_) {
+        this.evoFeedback    = 'erro';
+        this.evoFeedbackMsg = 'Erro de conexão.';
+      } finally {
+        this.evoTesting = false;
+        setTimeout(() => { this.evoFeedback = null; }, 5000);
+      }
+    },
+
+    copyWebhook() {
+      if (!this.webhookUrl) return;
+      navigator.clipboard.writeText(this.webhookUrl).then(() => {
+        this.webhookCopied = true;
+        setTimeout(() => { this.webhookCopied = false; }, 2000);
+      });
+    },
+
+    /* ── Respostas Rápidas CRUD ──────────────────────────────────────── */
+    async loadRespostas() {
+      if (this.respostasLoading) return;
+      this.respostasLoading = true;
+      try {
+        const r = await this.authFetch('/api/respostas');
+        const j = await r.json();
+        this.respostaSetupNeeded = j.setup_needed === true;
+        if (j.ok && Array.isArray(j.data)) this.respostas = j.data;
+      } catch (_) {}
+      finally { this.respostasLoading = false; }
+    },
+
+    openRespostaModal(item) {
+      if (item) {
+        this.respostaEditId = item.id;
+        this.respostaForm = {
+          titulo:     item.titulo || '',
+          gatilhos:   Array.isArray(item.gatilhos) ? item.gatilhos.join(', ') : (item.gatilhos || ''),
+          resposta:   item.resposta || '',
+          ativo:      item.ativo !== false,
+          prioridade: item.prioridade || 0,
+        };
+      } else {
+        this.respostaEditId = null;
+        this.respostaForm   = { titulo: '', gatilhos: '', resposta: '', ativo: true, prioridade: 0 };
+      }
+      this.respostaModal = true;
+    },
+
+    async saveResposta() {
+      if (this.respostaSaving) return;
+      if (!this.respostaForm.titulo.trim() || !this.respostaForm.resposta.trim()) {
+        this.respostaFeedback    = 'erro';
+        this.respostaFeedbackMsg = 'Título e resposta são obrigatórios.';
+        setTimeout(() => { this.respostaFeedback = null; }, 3000);
+        return;
+      }
+      this.respostaSaving  = true;
+      this.respostaFeedback = null;
+      try {
+        const url    = this.respostaEditId ? `/api/respostas/${this.respostaEditId}` : '/api/respostas';
+        const method = this.respostaEditId ? 'PUT' : 'POST';
+        const r = await this.authFetch(url, { method, body: JSON.stringify(this.respostaForm) });
+        const j = await r.json();
+        if (j.setup_needed) {
+          this.respostaSetupNeeded = true;
+          this.respostaFeedback    = 'erro';
+          this.respostaFeedbackMsg = 'Tabela não configurada. Execute BOT_SUPABASE_MIGRATION_10.sql no Supabase.';
+        } else if (j.ok) {
+          await this.loadRespostas();
+          this.respostaModal    = false;
+          this.respostaFeedback = 'ok';
+          this.respostaFeedbackMsg = this.respostaEditId ? 'Resposta atualizada!' : 'Resposta criada!';
+        } else {
+          this.respostaFeedback    = 'erro';
+          this.respostaFeedbackMsg = j.error || 'Erro ao salvar.';
+        }
+      } catch (_) {
+        this.respostaFeedback    = 'erro';
+        this.respostaFeedbackMsg = 'Erro de conexão.';
+      } finally {
+        this.respostaSaving = false;
+        setTimeout(() => { this.respostaFeedback = null; }, 3500);
+      }
+    },
+
+    async deleteResposta(id) {
+      if (!confirm('Excluir esta resposta?')) return;
+      try {
+        const r = await this.authFetch(`/api/respostas/${id}`, { method: 'DELETE' });
+        const j = await r.json();
+        if (j.setup_needed) { this.respostaSetupNeeded = true; return; }
+        if (j.ok) await this.loadRespostas();
+      } catch (_) {}
+    },
+
+    async toggleResposta(item) {
+      try {
+        const r = await this.authFetch(`/api/respostas/${item.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ ativo: !item.ativo }),
+        });
+        const j = await r.json();
+        if (j.ok) {
+          const idx = this.respostas.findIndex(r => r.id === item.id);
+          if (idx !== -1) this.respostas[idx] = { ...this.respostas[idx], ativo: !item.ativo };
+        }
+      } catch (_) {}
     },
   };
 }

@@ -14,6 +14,7 @@ import { processMessage } from '../bot/engine';
 import { saveMensagem } from '../services/mensagemService';
 import { checkRateLimit } from '../utils/rateLimiter';
 import { requireAuth } from '../middleware/auth';
+import { sendMessage, invalidateCredCache } from '../providers/messaging';
 
 const router = Router();
 
@@ -702,6 +703,236 @@ router.post('/sessions/:phone/message', async (req, res) => {
       conteudo: text.trim(),
       node:     'HUMANO',
     });
+    // Envia via WhatsApp (best-effort — não falha a requisição se Evolution API não configurado)
+    const sent = await sendMessage(req.params.phone, text.trim(), req.storeId!);
+    res.json({ ok: true, whatsappSent: sent.ok, whatsappError: sent.error });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ── Webhook URL da loja ───────────────────────────────────────────────────────
+router.get('/webhook-url', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('stores')
+      .select('slug')
+      .eq('id', req.storeId!)
+      .single();
+    if (error || !data) return res.status(404).json({ ok: false, error: 'Loja não encontrada' });
+    const protocol   = req.headers['x-forwarded-proto'] || 'https';
+    const host       = req.headers['x-forwarded-host'] || req.get('host');
+    const webhookUrl = `${protocol}://${host}/webhook/${data.slug}`;
+    res.json({ ok: true, webhookUrl, slug: data.slug });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ── Integrations — Evolution API ──────────────────────────────────────────────
+router.get('/integrations/evolution', async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('bot_settings')
+      .select('evolution_url, evolution_instance, evolution_token')
+      .eq('store_id', req.storeId!)
+      .maybeSingle();
+
+    const configured = !!(data?.evolution_url && data?.evolution_instance && data?.evolution_token);
+    // Mascara o token para não expor no frontend
+    const token = (data?.evolution_token as string) || '';
+    const maskedToken = token.length > 4
+      ? '*'.repeat(token.length - 4) + token.slice(-4)
+      : '*'.repeat(token.length);
+
+    res.json({
+      ok: true,
+      data: {
+        evolution_url:      (data?.evolution_url      as string) || '',
+        evolution_instance: (data?.evolution_instance as string) || '',
+        evolution_token_masked: maskedToken,
+        configured,
+      },
+    });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.post('/integrations/evolution', async (req, res) => {
+  const { evolution_url, evolution_instance, evolution_token } = req.body as {
+    evolution_url?: string; evolution_instance?: string; evolution_token?: string;
+  };
+  if (!evolution_url?.trim() || !evolution_instance?.trim() || !evolution_token?.trim()) {
+    return res.status(400).json({ ok: false, error: 'URL, instância e token são obrigatórios.' });
+  }
+  try {
+    const { error } = await supabase
+      .from('bot_settings')
+      .upsert([{
+        store_id:           req.storeId!,
+        evolution_url:      evolution_url.trim().replace(/\/$/, ''),
+        evolution_instance: evolution_instance.trim(),
+        evolution_token:    evolution_token.trim(),
+        updated_at:         new Date().toISOString(),
+      }], { onConflict: 'store_id' });
+    if (error) throw error;
+    invalidateCredCache(req.storeId!);
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.post('/integrations/evolution/test', async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('bot_settings')
+      .select('evolution_url, evolution_instance, evolution_token')
+      .eq('store_id', req.storeId!)
+      .maybeSingle();
+
+    if (!data?.evolution_url || !data?.evolution_instance || !data?.evolution_token) {
+      return res.json({ ok: false, error: 'Salve as credenciais antes de testar.' });
+    }
+
+    const baseUrl  = (data.evolution_url as string).replace(/\/$/, '');
+    const instance = data.evolution_instance as string;
+    const token    = data.evolution_token    as string;
+
+    const testUrl = `${baseUrl}/instance/connectionState/${instance}`;
+    const resp = await fetch(testUrl, {
+      headers: { apikey: token },
+      signal:  AbortSignal.timeout(8_000),
+    });
+
+    if (resp.status === 404) {
+      return res.json({ ok: false, error: `Instância "${instance}" não encontrada no servidor Evolution API.` });
+    }
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => '');
+      return res.json({ ok: false, error: `Evolution API retornou ${resp.status}. Verifique URL e token. ${body.slice(0, 120)}` });
+    }
+
+    const json = await resp.json() as Record<string, unknown>;
+    const state = (json?.instance as Record<string, unknown>)?.state ?? json?.state ?? json?.status ?? 'unknown';
+
+    if (state === 'open' || state === 'ONLINE' || state === 'connected') {
+      return res.json({ ok: true, message: `Instância "${instance}" conectada ao WhatsApp.`, state });
+    }
+    if (state === 'close' || state === 'OFFLINE' || state === 'disconnected') {
+      return res.json({ ok: false, error: `Instância "${instance}" está desconectada (${state}). Escaneie o QR code no Evolution API Manager.`, state });
+    }
+    return res.json({ ok: true, message: `Instância "${instance}" encontrada. Estado: ${state}.`, state });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('TimeoutError') || msg.includes('ETIMEDOUT') || msg.includes('timeout')) {
+      return res.json({ ok: false, error: 'Timeout: Evolution API não respondeu em 8s. Verifique a URL.' });
+    }
+    return res.json({ ok: false, error: msg });
+  }
+});
+
+// ── Respostas Rápidas CRUD ────────────────────────────────────────────────────
+function isMissingTable(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false;
+  return err.code === '42P01' || (err.message ?? '').includes('does not exist');
+}
+
+router.get('/respostas', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('bot_respostas_rapidas')
+      .select('*')
+      .eq('store_id', req.storeId!)
+      .order('prioridade', { ascending: false })
+      .order('criado_em',  { ascending: true });
+    if (isMissingTable(error)) return res.json({ ok: true, data: [], setup_needed: true });
+    if (error) throw error;
+    res.json({ ok: true, data: data || [] });
+  } catch (err: unknown) {
+    res.json({ ok: false, data: [], error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.post('/respostas', async (req, res) => {
+  const { titulo, gatilhos, resposta, ativo, prioridade } = req.body as {
+    titulo?: string; gatilhos?: string | string[];
+    resposta?: string; ativo?: boolean; prioridade?: number;
+  };
+  if (!titulo?.trim() || !resposta?.trim()) {
+    return res.status(400).json({ ok: false, error: 'Título e resposta são obrigatórios.' });
+  }
+  const gatArray = Array.isArray(gatilhos)
+    ? gatilhos.map(g => g.trim()).filter(Boolean)
+    : String(gatilhos || '').split(',').map(g => g.trim()).filter(Boolean);
+
+  try {
+    const { data, error } = await supabase
+      .from('bot_respostas_rapidas')
+      .insert({
+        store_id:   req.storeId!,
+        titulo:     titulo.trim(),
+        gatilhos:   gatArray,
+        resposta:   resposta.trim(),
+        ativo:      ativo !== false,
+        prioridade: Number(prioridade) || 0,
+      })
+      .select('*')
+      .single();
+    if (isMissingTable(error)) {
+      return res.status(503).json({ ok: false, setup_needed: true, error: 'Tabela bot_respostas_rapidas não existe. Execute o SQL de migração.' });
+    }
+    if (error) throw error;
+    res.json({ ok: true, data });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.put('/respostas/:id', async (req, res) => {
+  const { titulo, gatilhos, resposta, ativo, prioridade } = req.body as {
+    titulo?: string; gatilhos?: string | string[];
+    resposta?: string; ativo?: boolean; prioridade?: number;
+  };
+  const gatArray = gatilhos !== undefined
+    ? (Array.isArray(gatilhos)
+        ? gatilhos.map(g => g.trim()).filter(Boolean)
+        : String(gatilhos).split(',').map(g => g.trim()).filter(Boolean))
+    : undefined;
+  const patch: Record<string, unknown> = { atualizado_em: new Date().toISOString() };
+  if (titulo    !== undefined) patch.titulo    = titulo.trim();
+  if (gatArray  !== undefined) patch.gatilhos  = gatArray;
+  if (resposta  !== undefined) patch.resposta  = resposta.trim();
+  if (ativo     !== undefined) patch.ativo     = ativo;
+  if (prioridade !== undefined) patch.prioridade = Number(prioridade) || 0;
+
+  try {
+    const { data, error } = await supabase
+      .from('bot_respostas_rapidas')
+      .update(patch)
+      .eq('id', req.params.id)
+      .eq('store_id', req.storeId!)
+      .select('*')
+      .single();
+    if (isMissingTable(error)) return res.status(503).json({ ok: false, setup_needed: true, error: 'Tabela não encontrada.' });
+    if (error) throw error;
+    if (!data) return res.status(404).json({ ok: false, error: 'Resposta não encontrada.' });
+    res.json({ ok: true, data });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.delete('/respostas/:id', async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('bot_respostas_rapidas')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('store_id', req.storeId!);
+    if (isMissingTable(error)) return res.status(503).json({ ok: false, setup_needed: true });
+    if (error) throw error;
     res.json({ ok: true });
   } catch (err: unknown) {
     res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
