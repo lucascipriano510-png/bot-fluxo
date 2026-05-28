@@ -70,6 +70,12 @@ function FluxoCommand() {
     productFeedback: null,
     productFeedbackMsg: '',
 
+    /* ingestão de catálogo */
+    ingestOpen: false,
+    ingestText: '',
+    ingestItems: [],
+    ingestParsed: false,
+
     /* crm */
     crmSearch: '',
     crmFilter: '',
@@ -601,6 +607,78 @@ function FluxoCommand() {
       const r = await this.authFetch(`/api/products/${id}`, { method: 'DELETE' });
       const j = await r.json();
       if (j.ok) await this.loadProducts();
+    },
+
+    /* ── Motor de Ingestão de Catálogo ──────────────────────────────── */
+    parseIngestText() {
+      const lines = this.ingestText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      this.ingestItems = lines.map(line => {
+        // Detectar preço
+        const priceMatch = line.match(/R?\$\s*(\d+(?:[.,]\d{1,2})?)/i);
+        const price = priceMatch ? parseFloat(priceMatch[1].replace(',', '.')) : null;
+
+        // Extrair nome removendo o trecho de preço
+        let name = line
+          .replace(/\s*[-–]\s*R?\$\s*\d+(?:[.,]\d{1,2})?/gi, '')
+          .replace(/R?\$\s*\d+(?:[.,]\d{1,2})?/gi, '')
+          .trim();
+        if (!name) name = line;
+
+        // Normalizar para comparação (sem acento, minúsculo)
+        const norm     = name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        const lineNorm = line.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+        // Detectar tipo por palavras-chave
+        let type = 'produto_fisico', typeLabel = 'Produto físico';
+
+        if (/orcamento|sob medida|personalizado/.test(lineNorm)) {
+          type = 'orcamento'; typeLabel = 'Orçamento';
+        } else if (/[+]|pacote|combo|plano|inclui|completo/.test(norm)) {
+          type = 'pacote_combo'; typeLabel = 'Oferta composta';
+        } else if (/corte|lavagem|consulta|sessao|instalacao|manicure|pedicure|depilacao|massagem|limpeza|reparo|manutencao|avaliacao|atendimento|pintura|entrega|montagem/.test(norm)) {
+          type = 'servico'; typeLabel = 'Serviço';
+        }
+
+        return {
+          raw: line,
+          name,
+          type,
+          typeLabel,
+          price,
+          composition: type === 'pacote_combo' ? name : null,
+          status: name.length >= 3 ? 'pronto' : 'revisar',
+        };
+      });
+      this.ingestParsed = true;
+    },
+
+    openProductFromIngest(item) {
+      this.productEditId = null;
+      this.productForm = {
+        name:                    item.name,
+        sku:                     '',
+        price:                   item.price || '',
+        promotional_price:       '',
+        category:                '',
+        subcategory:             '',
+        product_type:            '',
+        color:                   '',
+        stock:                   0,
+        image_url:               '',
+        featured:                false,
+        is_active:               true,
+        item_type:               item.type,
+        description:             '',
+        price_type:              item.price ? 'fixo' : (item.type === 'orcamento' ? 'sob_consulta' : 'fixo'),
+        bot_instructions:        '',
+        tags:                    '',
+        duration_minutes:        '',
+        requires_scheduling:     false,
+        service_location:        '',
+        included_items:          item.composition || '',
+        qualification_questions: '',
+      };
+      this.productModal = true;
     },
 
     /* ── CRM ─────────────────────────────────────────────────────────── */

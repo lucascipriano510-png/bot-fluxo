@@ -895,6 +895,57 @@
         <button class="btn btn-green" @click="openProductModal(null)" style="white-space:nowrap">+ Adicionar item</button>
       </div>
 
+      <!-- Motor de Ingestão de Catálogo -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header" style="cursor:pointer;user-select:none;margin-bottom:0" @click="ingestOpen=!ingestOpen">
+          <div>
+            <div class="card-title">📥 Importar lista de itens</div>
+            <div class="card-sub">Cole uma lista de produtos, serviços ou ofertas e veja o preview antes de salvar</div>
+          </div>
+          <span x-text="ingestOpen ? '▲' : '▼'" style="color:var(--mu);font-size:11px;flex-shrink:0"></span>
+        </div>
+
+        <div x-show="ingestOpen" x-transition style="padding:0 22px 22px">
+          <textarea x-model="ingestText" rows="5"
+            placeholder="Cole aqui sua lista de itens, um por linha:&#10;Corte masculino - R$40&#10;Corte + barba + sobrancelha - R$80&#10;Lavagem completa com cera - R$120&#10;Consulta nutricional - R$150&#10;Projeto sob medida - orçamento"
+            style="width:100%;padding:10px 12px;background:var(--card2);border:1px solid var(--border2);border-radius:8px;color:var(--tx);font-size:13px;font-family:var(--font);resize:vertical;outline:none;margin-top:14px"></textarea>
+
+          <div style="display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-accent" @click="parseIngestText()" :disabled="!ingestText.trim()">🔍 Analisar lista</button>
+            <button class="btn btn-ghost" x-show="ingestParsed" @click="ingestText='';ingestItems=[];ingestParsed=false">Limpar</button>
+            <span x-show="ingestParsed" style="font-size:12px;color:var(--mu)" x-text="ingestItems.length + ' item(ns) detectado(s)'"></span>
+          </div>
+
+          <!-- Preview -->
+          <div x-show="ingestParsed && ingestItems.length > 0" style="margin-top:18px">
+            <div style="font-size:11px;font-weight:700;color:var(--mu);margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em">Preview detectado</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <template x-for="(item, idx) in ingestItems" :key="idx">
+                <div class="ingest-item" :class="{'ingest-item-review': item.status==='revisar'}">
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;font-weight:700;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="item.name"></div>
+                    <div x-show="item.composition" style="font-size:11px;color:var(--mu);margin-top:2px">📦 <span x-text="item.composition"></span></div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
+                    <span class="badge-type"
+                      :class="{'badge-type-fisico':item.type==='produto_fisico','badge-type-servico':item.type==='servico','badge-type-combo':item.type==='pacote_combo','badge-type-orcamento':item.type==='orcamento'}"
+                      x-text="item.typeLabel"></span>
+                    <span x-show="item.price" style="font-size:12px;font-weight:700;color:var(--gold)" x-text="'R$ ' + item.price.toFixed(2).replace('.',',')"></span>
+                    <span x-show="!item.price && item.type!=='orcamento'" class="badge badge-gray" style="font-size:10px">sem preço</span>
+                    <span x-show="item.type==='orcamento' && !item.price" class="badge badge-red" style="font-size:10px">a orçar</span>
+                    <span class="badge" :class="item.status==='pronto'?'badge-green':'badge-gold'" x-text="item.status"></span>
+                    <button class="btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" @click="openProductFromIngest(item)">Abrir ↗</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <div style="margin-top:12px;padding:10px 14px;background:var(--card2);border-radius:8px;font-size:12px;color:var(--mu);border:1px solid var(--border)">
+              💡 Clique em <strong>Abrir ↗</strong> para revisar e salvar cada item no formulário. Salvamento em lote estará disponível em próxima versão.
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Stats -->
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-bottom:20px">
         <div class="card" style="padding:14px 18px">

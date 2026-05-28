@@ -1273,6 +1273,20 @@ body {
 .badge-type-combo    { background: rgba(250,204,21,.1);  color: var(--gold); }
 .badge-type-orcamento{ background: rgba(239,68,68,.1);   color: var(--red); }
 
+/* ── Motor de Ingestão ─────────────────────────────── */
+.ingest-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color .15s;
+}
+.ingest-item:hover { border-color: var(--border2); }
+.ingest-item-review { border-left: 3px solid var(--gold); }
+
 /* ── Form hint — contexto por tipo de item ─────────── */
 .form-hint {
   padding: 10px 14px;
