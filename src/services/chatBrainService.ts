@@ -68,16 +68,25 @@ export function handleIntent(
 
     // ── IDENTIDADE DA LOJA ──────────────────────────────────────────────────
     case 'identidade_loja': {
-      const storeName = ctx._storeName || 'nossa loja';
-      const msgLow    = message.toLowerCase();
-      const timeGreet = /bom dia/.test(msgLow) ? 'Bom dia! '
+      const storeName   = ctx._storeName || 'nossa loja';
+      const city        = ctx._city;
+      const state       = ctx._state;
+      const delivery    = ctx._deliveryInfo;
+      const msgLow      = message.toLowerCase();
+      const timeGreet   = /bom dia/.test(msgLow) ? 'Bom dia! '
         : /boa tarde/.test(msgLow) ? 'Boa tarde! '
         : /boa noite/.test(msgLow) ? 'Boa noite! '
         : '';
+
+      // Monta linha de localização e entrega se disponíveis
+      const location     = [city, state].filter(Boolean).join('/');
+      const locationPart = location ? `, de ${location}` : '';
+      const deliveryPart = delivery ? ` ${delivery}.` : '';
+
       reply = timeGreet + pick([
-        `Aqui é a *${storeName}*. Me fala o que você está procurando que eu te ajudo.`,
-        `Você está falando com o assistente da *${storeName}*. O que você está procurando hoje?`,
-        `Aqui é a *${storeName}*. Me conta o que você precisa.`,
+        `Aqui é a *${storeName}*${locationPart}.${deliveryPart} Me fala o que você está procurando que eu te ajudo.`,
+        `Somos a *${storeName}*${locationPart}.${deliveryPart} O que você está procurando hoje?`,
+        `Aqui é a *${storeName}*${locationPart}. Me conta o que você precisa.`,
       ], message);
       break;
     }
@@ -146,13 +155,22 @@ export function handleIntent(
       break;
 
     // ── ENTREGA ─────────────────────────────────────────────────────────────
-    case 'delivery':
-      reply = pick([
-        `Fazemos entregas sim! Me fala sua cidade que te informo o prazo e a melhor opção de envio.`,
-        `Entregamos para todo o Brasil. Qual é sua cidade?`,
-        `Tem entrega sim! Me conta onde você está que te passo as opções disponíveis.`,
-      ], message) + p;
+    case 'delivery': {
+      const delivery = ctx._deliveryInfo;
+      reply = delivery
+        ? pick([
+          `Sim! ${delivery}. Me fala qual item você quer que eu te ajudo.`,
+          `Sim, ${delivery}. Me fala o que você está procurando.`,
+          `${delivery}. Me conta o que você quer que eu te oriento.`,
+        ], message)
+        : pick([
+          `Fazemos entregas sim! Me fala sua cidade que te informo o prazo e a melhor opção de envio.`,
+          `Tem entrega sim! Me conta onde você está que te passo as opções disponíveis.`,
+          `Posso confirmar os detalhes de entrega com a loja. Me fala o que você quer comprar.`,
+        ], message);
+      reply += p;
       break;
+    }
 
     // ── HORÁRIO ──────────────────────────────────────────────────────────────
     case 'hours':

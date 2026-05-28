@@ -104,6 +104,10 @@ function FluxoCommand() {
     reports: null,
     reportsLoading: false,
 
+    /* integracoes — canais */
+    channels: [],
+    channelsLoading: false,
+
     /* integracoes — ia generativa */
     aiConfig: { configured: false, provider: 'gemini', model: 'gemini-1.5-flash', testing: false, feedback: null, feedbackMsg: '' },
 
@@ -234,7 +238,7 @@ function FluxoCommand() {
       if (p === 'relatorios')  this.$nextTick(() => this.loadReports());
       if (p === 'kanban')      this.loadKanban();
       if (p === 'respostas')   this.loadRespostas();
-      if (p === 'integracoes') { this.loadIntegrations(); this.loadAiIntegration(); }
+      if (p === 'integracoes') { this.loadIntegrations(); this.loadAiIntegration(); this.loadChannels(); }
     },
 
     /* ── Helpers ──────────────────────────────────────────────────────────── */
@@ -1050,6 +1054,17 @@ function FluxoCommand() {
     },
 
     /* ── Integrações — IA Generativa ─────────────────────────────────── */
+    async loadChannels() {
+      if (this.channelsLoading) return;
+      this.channelsLoading = true;
+      try {
+        const r = await this.authFetch('/api/channels');
+        const j = await r.json();
+        if (j.ok && Array.isArray(j.channels)) this.channels = j.channels;
+      } catch (_) {}
+      finally { this.channelsLoading = false; }
+    },
+
     async loadAiIntegration() {
       try {
         const r = await this.authFetch('/api/integrations/ai');

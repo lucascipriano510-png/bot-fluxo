@@ -856,6 +856,24 @@ router.post('/integrations/evolution/test', async (req, res) => {
   }
 });
 
+// ── Canais — status de todos os conectores ───────────────────────────────────
+router.get('/channels', async (req, res) => {
+  try {
+    const { getAllChannels } = await import('../services/channelContextService');
+    const { data } = await supabase
+      .from('bot_settings')
+      .select('evolution_url, evolution_instance')
+      .eq('store_id', req.storeId!)
+      .maybeSingle();
+    const evolutionConfigured = !!(data?.evolution_url && data?.evolution_instance);
+    const aiConfigured        = !!(process.env.AI_ASSIST_PROVIDER && process.env.AI_ASSIST_KEY);
+    const channels            = getAllChannels({ evolutionConfigured, aiConfigured });
+    res.json({ ok: true, channels });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
 // ── IA Assist — status e teste ───────────────────────────────────────────────
 router.get('/integrations/ai', (_req, res) => {
   const provider    = process.env.AI_ASSIST_PROVIDER || '';
