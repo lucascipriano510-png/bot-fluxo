@@ -191,14 +191,16 @@ export async function getProductAvailability(storeId: string, productId: string 
   const client = isSiteStore(storeId) ? getSiteClient() : supabase;
   if (!client) return null;
 
+  // Não usar .single() — kit no site client pode ter view que expande para múltiplas linhas
   const q = isSiteStore(storeId)
-    ? (client as SupabaseClient).from('products').select(BOT_SELECT).eq('id', productId).single()
-    : supabase.from('products').select(BOT_SELECT).eq('store_id', storeId).eq('id', productId).single();
+    ? (client as SupabaseClient).from('products').select(BOT_SELECT).eq('id', productId).limit(1)
+    : supabase.from('products').select(BOT_SELECT).eq('store_id', storeId).eq('id', productId).limit(1);
 
-  const { data, error } = await q;
+  const { data: rows, error } = await q;
+  const data = Array.isArray(rows) ? rows[0] : null;
   if (error || !data) {
-    if (error?.code !== 'PGRST116') {
-      console.error(`[InventoryBridge][${storeId}] getProductAvailability error:`, error?.message);
+    if (error && (error as unknown as Record<string,unknown>).code !== 'PGRST116') {
+      console.error(`[InventoryBridge][${storeId}] getProductAvailability error:`, (error as unknown as Record<string,unknown>).message ?? error);
     }
     return null;
   }

@@ -473,39 +473,47 @@ router.post('/products', async (req, res) => {
     } = req.body as Record<string, unknown>;
     if (!String(name || '').trim()) return res.status(400).json({ ok: false, error: 'Nome obrigatório' });
     const resolvedItemType = item_type ? String(item_type) : 'produto_fisico';
+    const isKit      = resolvedItemType === 'pacote_combo';
     const isPhysical = resolvedItemType === 'produto_fisico';
-    const { data, error } = await supabase
+
+    // Normaliza sizes: aceita array (kit/produto) ou null
+    let sizesValue: unknown = sizes || null;
+    if (isKit && !sizesValue) sizesValue = [];
+
+    const { data: rows, error } = await supabase
       .from('products')
       .insert({
-        store_id:               req.storeId!,
-        name:                   String(name).trim(),
-        sku:                    sku ? String(sku).trim() : null,
-        price:                  price != null ? Number(price) : null,
-        promotional_price:      promotional_price ? Number(promotional_price) : null,
-        category:               category ? String(category).trim() : null,
-        subcategory:            subcategory ? String(subcategory).trim() : null,
-        product_type:           product_type ? String(product_type).trim() : null,
-        color:                  color ? String(color).trim() : null,
-        sizes:                  sizes || null,
-        image_url:              image_url ? String(image_url).trim() : null,
-        is_active:              is_active !== false,
-        featured:               featured === true,
-        stock:                  isPhysical ? (Number(stock) || 0) : null,
-        item_type:              resolvedItemType,
-        description:            description ? String(description).trim() : null,
-        price_type:             price_type ? String(price_type) : 'fixo',
-        bot_instructions:       bot_instructions ? String(bot_instructions).trim() : null,
-        tags:                   Array.isArray(tags) ? tags : null,
+        store_id:                req.storeId!,
+        name:                    String(name).trim(),
+        sku:                     sku ? String(sku).trim() : null,
+        price:                   price != null ? Number(price) : null,
+        promotional_price:       promotional_price ? Number(promotional_price) : null,
+        category:                category ? String(category).trim() : null,
+        subcategory:             subcategory ? String(subcategory).trim() : null,
+        product_type:            product_type ? String(product_type).trim() : null,
+        color:                   color ? String(color).trim() : null,
+        sizes:                   sizesValue,
+        image_url:               image_url ? String(image_url).trim() : null,
+        is_active:               is_active !== false,
+        featured:                featured === true,
+        stock:                   isPhysical ? (Number(stock) || 0) : null,
+        item_type:               resolvedItemType,
+        description:             description ? String(description).trim() : null,
+        price_type:              price_type ? String(price_type) : 'fixo',
+        bot_instructions:        bot_instructions ? String(bot_instructions).trim() : null,
+        tags:                    Array.isArray(tags) ? tags : null,
         qualification_questions: qualification_questions ?? null,
-        duration_minutes:       duration_minutes ? Number(duration_minutes) : null,
-        requires_scheduling:    requires_scheduling === true,
-        service_location:       service_location ? String(service_location).trim() : null,
-        included_items:         included_items ? String(included_items).trim() : null,
+        duration_minutes:        duration_minutes ? Number(duration_minutes) : null,
+        requires_scheduling:     requires_scheduling === true,
+        service_location:        service_location ? String(service_location).trim() : null,
+        included_items:          included_items ? String(included_items).trim() : null,
       })
-      .select('*')
-      .single();
+      // Não usar .single() — kit pode ter triggers/views que retornam múltiplas linhas
+      .select('id,store_id,name,sku,price,promotional_price,category,subcategory,product_type,color,sizes,image_url,is_active,featured,stock,item_type,description,price_type,bot_instructions,tags,qualification_questions,duration_minutes,requires_scheduling,service_location,included_items,created_at,updated_at');
     if (error) throw error;
-    res.json({ ok: true, data });
+    const product = Array.isArray(rows) ? rows[0] : null;
+    if (!product) return res.status(500).json({ ok: false, error: 'Produto não retornado após criar.' });
+    res.json({ ok: true, data: product });
   } catch (err: unknown) {
     res.json({ ok: false, error: errMsg(err) });
   }
@@ -523,16 +531,18 @@ router.put('/products/:id', async (req, res) => {
       if (key in req.body) patch[key] = req.body[key];
     }
     if (Object.keys(patch).length === 0) return res.status(400).json({ ok: false, error: 'Nenhum campo enviado' });
-    const { data, error } = await supabase
+
+    // Não usar .single() — kit pode retornar múltiplas linhas em alguns schemas de produção
+    const { data: rows, error } = await supabase
       .from('products')
       .update({ ...patch, updated_at: new Date().toISOString() })
       .eq('id', req.params.id)
       .eq('store_id', req.storeId!)
-      .select('*')
-      .single();
+      .select('id,store_id,name,sku,price,promotional_price,category,subcategory,product_type,color,sizes,image_url,is_active,featured,stock,item_type,description,price_type,bot_instructions,tags,qualification_questions,duration_minutes,requires_scheduling,service_location,included_items,created_at,updated_at');
     if (error) throw error;
-    if (!data) return res.status(404).json({ ok: false, error: 'Produto não encontrado' });
-    res.json({ ok: true, data });
+    const product = Array.isArray(rows) ? rows[0] : null;
+    if (!product) return res.status(404).json({ ok: false, error: 'Produto não encontrado' });
+    res.json({ ok: true, data: product });
   } catch (err: unknown) {
     res.json({ ok: false, error: errMsg(err) });
   }
