@@ -96,6 +96,23 @@ export async function processMessage(
   // em saudações, pedidos de atendente e orçamentos.
   const intentResult = detectIntent(messageText);
 
+  // Mensagem composta: "bom dia, tem camisa preta?" → greeting ganha com score
+  // secundário (0.62). Se há filtro de catálogo claro, executa catálogo diretamente.
+  if (intentResult.intent === 'greeting' && intentResult.confidence < 0.85) {
+    const compoundFilters = detectProductQuery(messageText);
+    if (compoundFilters) {
+      const offerFilters                 = buildOfferFilters(storeId, compoundFilters);
+      const { offers, matched, dropped } = await findOffersWithFallback(offerFilters);
+      if (offers.length > 0) {
+        const reply = formatFallbackResponse(offers, offerFilters, matched, dropped);
+        logInventoryQuery(storeId, session.phone, messageText, compoundFilters, offers.length, reply);
+        await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
+        await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: reply,       node: 'CATALOG' });
+        return { text: reply, nextNode: currentNodeId, context: ctx };
+      }
+    }
+  }
+
   // Intenções que nunca devem acionar busca de catálogo.
   // Regra: qualquer intenção identificada com semântica não-produto vai para
   // brain/AI. Catálogo só roda para busca_item, disponibilidade e unknown.

@@ -69,10 +69,15 @@ export function handleIntent(
     // ── IDENTIDADE DA LOJA ──────────────────────────────────────────────────
     case 'identidade_loja': {
       const storeName = ctx._storeName || 'nossa loja';
-      reply = pick([
-        `Sim, aqui é a *${storeName}*. Me fala o que você está procurando que eu te ajudo.`,
-        `Exato! Você está falando com o assistente da *${storeName}*. O que você está procurando hoje?`,
-        `Sim, você está falando com a *${storeName}*. Me conta o que você precisa.`,
+      const msgLow    = message.toLowerCase();
+      const timeGreet = /bom dia/.test(msgLow) ? 'Bom dia! '
+        : /boa tarde/.test(msgLow) ? 'Boa tarde! '
+        : /boa noite/.test(msgLow) ? 'Boa noite! '
+        : '';
+      reply = timeGreet + pick([
+        `Aqui é a *${storeName}*. Me fala o que você está procurando que eu te ajudo.`,
+        `Você está falando com o assistente da *${storeName}*. O que você está procurando hoje?`,
+        `Aqui é a *${storeName}*. Me conta o que você precisa.`,
       ], message);
       break;
     }

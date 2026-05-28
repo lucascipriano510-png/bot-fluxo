@@ -69,8 +69,12 @@ const INTENT_DEFS: IntentDef[] = [
       /\bvoc[eê]s? (s[aã]o|[ée]) (a |o |da |do )?\b/,
       /\b[ée] (a |o |da |do |de )?(loja|fluxo|outlet|empresa|marca|estabelecimento)\b/,
       /\bs[aã]o (a |o |da |do )?(loja|fluxo|outlet|empresa)\b/,
+      /\b(que|qual) loja [ée]\b/,
+      /\bessa loja [ée]\b/,
       /\bquem [ée] voc[eê]s?\b/,
       /\bquem s[aã]o voc[eê]s?\b/,
+      /\bvoc[eê]s? s[aã]o quem\b/,
+      /\bquem fala\b/,
       /\bo que [ée] isso\b/,
       /\besse (bot|chat|sistema|atendimento) [ée]\b/,
       /\b[ée] (loja|real|oficial|verdade|confi[aá]vel)\b/,
@@ -81,6 +85,8 @@ const INTENT_DEFS: IntentDef[] = [
       /\bonde fica a loja\b/,
       /\bsobre (a loja|voc[eê]s?)\b/,
       /\bfluxo outlet\b/,
+      /\bque loja\b/,
+      /\bqual loja\b/,
     ],
   },
 
@@ -511,11 +517,18 @@ const INTENT_DEFS: IntentDef[] = [
   },
 
   // ── 14. Saudação ─────────────────────────────────────────────
+  // Primary: saudação PURA (mensagem é só a saudação).
+  // Secondary: saudação dentro de mensagem composta — perde para outros intents.
   {
     intent: 'greeting',
     priority: 14,
     primary: [
       /^(oi|ola|hey|ei|opa|salve|e ai|eai|fala)[\s!.?]*$/,
+      /^(bom dia|boa tarde|boa noite)[\s!.?]*$/,
+      /^(tudo bem|tudo bom|como vai|oi tudo)[\s!.?]*$/,
+    ],
+    secondary: [
+      /^(oi|ola|hey|ei|opa|fala)\b/,
       /\bbom dia\b/,
       /\bboa tarde\b/,
       /\bboa noite\b/,
@@ -523,9 +536,6 @@ const INTENT_DEFS: IntentDef[] = [
       /\btudo bom\b/,
       /\bcomo vai\b/,
       /\boi tudo\b/,
-    ],
-    secondary: [
-      /^(oi|ola|hey|ei|opa|fala)\b/,
     ],
   },
 

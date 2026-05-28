@@ -59,10 +59,11 @@ export function createSystemPrompt(ctx: AiAssistContext, intentHint?: string): s
     ctx.paymentInfo   ? `Pagamento: ${ctx.paymentInfo}`        : '',
   ].filter(Boolean).join('\n');
 
-  // Instrução de saudação: só usa quando for realmente uma saudação
+  // Instrução de saudação: espelha saudação de horário se presente na mensagem;
+  // para saudações simples ("oi"), usa greetingMsg configurado; caso contrário, responde direto.
   const greetingRule = isGreeting && ctx.greetingMsg
     ? `Quando cumprimentar, use: "${ctx.greetingMsg}"`
-    : 'NÃO comece a resposta com "Olá", "Oi", "Tudo bem?" ou qualquer saudação. Responda direto ao ponto.';
+    : 'Se a mensagem do cliente contiver "bom dia", "boa tarde" ou "boa noite", comece sua resposta com a mesma saudação. Caso contrário, NÃO comece com saudação — responda direto ao ponto.';
 
   // Instrução para dados ausentes
   const missingDataRule = [
