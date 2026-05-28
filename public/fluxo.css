@@ -1273,6 +1273,20 @@ body {
 .badge-type-combo    { background: rgba(250,204,21,.1);  color: var(--gold); }
 .badge-type-orcamento{ background: rgba(239,68,68,.1);   color: var(--red); }
 
+/* ── Form hint — contexto por tipo de item ─────────── */
+.form-hint {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mu);
+  border: 1px solid var(--border);
+  background: var(--card2);
+}
+.form-hint-servico   { border-left: 3px solid var(--purple); }
+.form-hint-pacote    { border-left: 3px solid var(--gold); }
+.form-hint-orcamento { border-left: 3px solid var(--red); }
+
 /* ═══════════════════════════════════════════════════════════
    WhatsApp-style Simulator
 ════════════════════════════════════════════════════════════ */

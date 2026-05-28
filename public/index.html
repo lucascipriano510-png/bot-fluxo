@@ -741,7 +741,7 @@
       <div x-show="productModal" style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px" @click.self="productModal=false">
         <div class="modal-panel" style="background:var(--card);border:1px solid var(--border2);border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto">
           <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-            <div style="font-size:15px;font-weight:700" x-text="productEditId ? 'Editar item' : 'Novo item do catálogo'"></div>
+            <div style="font-size:15px;font-weight:700" x-text="productEditId ? 'Editar item' : 'Novo item vendável'"></div>
             <button @click="productModal=false" style="background:none;border:none;color:var(--mu);cursor:pointer;font-size:18px;line-height:1">×</button>
           </div>
           <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
@@ -752,9 +752,17 @@
               <select x-model="productForm.item_type" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px">
                 <option value="produto_fisico">Produto físico</option>
                 <option value="servico">Serviço</option>
-                <option value="pacote_combo">Pacote / Combo</option>
+                <option value="pacote_combo">Oferta composta</option>
                 <option value="orcamento">Orçamento</option>
               </select>
+            </div>
+
+            <!-- Banner contextual por tipo -->
+            <div x-show="productForm.item_type!=='produto_fisico'" class="form-hint"
+              :class="{'form-hint-servico':productForm.item_type==='servico','form-hint-pacote':productForm.item_type==='pacote_combo','form-hint-orcamento':productForm.item_type==='orcamento'}">
+              <span x-show="productForm.item_type==='servico'">💡 <strong>Serviço:</strong> descreva o que está incluído, duração e como o bot deve apresentar. Campos de estoque, SKU e variações não são aplicáveis.</span>
+              <span x-show="productForm.item_type==='pacote_combo'">📦 <strong>Oferta composta:</strong> liste o que está incluso no campo abaixo. Se não houver estoque definido, o bot informará que a disponibilidade deve ser confirmada com o atendente.</span>
+              <span x-show="productForm.item_type==='orcamento'">🎯 <strong>Orçamento:</strong> o bot qualificará o cliente com as perguntas definidas abaixo antes de apresentar valor ou encaminhar para atendimento humano.</span>
             </div>
 
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -763,21 +771,35 @@
               <div class="field" style="grid-column:span 2">
                 <label>Nome *</label>
                 <input type="text" x-model="productForm.name"
-                  :placeholder="productForm.item_type==='servico'?'Ex: Corte masculino simples':productForm.item_type==='pacote_combo'?'Ex: Combo casal':productForm.item_type==='orcamento'?'Ex: Projeto sob medida':'Ex: Camiseta branca P'">
+                  :placeholder="productForm.item_type==='servico'?'Ex: Corte masculino simples':productForm.item_type==='pacote_combo'?'Ex: Pacote premium, Plano mensal':productForm.item_type==='orcamento'?'Ex: Projeto sob medida':'Ex: Nome do produto'">
               </div>
 
               <!-- Descrição -->
               <div class="field" style="grid-column:span 2">
                 <label>Descrição</label>
                 <textarea x-model="productForm.description" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;resize:vertical"
-                  :placeholder="productForm.item_type==='servico'?'O que está incluído?':productForm.item_type==='pacote_combo'?'O que vem no combo?':productForm.item_type==='orcamento'?'Como funciona o orçamento?':'Descrição breve do produto'"></textarea>
+                  :placeholder="productForm.item_type==='servico'?'O que está incluído nesse serviço?':productForm.item_type==='pacote_combo'?'O que está incluído nessa oferta?':productForm.item_type==='orcamento'?'Como funciona o orçamento?':'Descrição breve do item'"></textarea>
+              </div>
+
+              <!-- Itens inclusos — oferta composta (destaque imediato) -->
+              <div class="field" x-show="productForm.item_type==='pacote_combo'" style="grid-column:span 2">
+                <label style="color:var(--gold)">O que está incluso nessa oferta? *</label>
+                <textarea x-model="productForm.included_items" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;resize:vertical" placeholder="Ex: corte + barba + sobrancelha  •  lavagem completa + cera + aspiração  •  consulta + retorno + plano alimentar"></textarea>
+                <div style="font-size:11px;color:var(--mu);margin-top:4px">Se não houver estoque definido, o bot informará que a disponibilidade deve ser confirmada com o atendente.</div>
+              </div>
+
+              <!-- Perguntas de qualificação — orçamento (destaque imediato) -->
+              <div class="field" x-show="productForm.item_type==='orcamento'" style="grid-column:span 2">
+                <label style="color:var(--red)">O que o bot deve perguntar antes de apresentar o preço? *</label>
+                <textarea x-model="productForm.qualification_questions" rows="3" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;resize:vertical" placeholder='["Qual o tamanho desejado?","Qual o prazo de entrega?","Qual a cidade?","Qual o objetivo?"]'></textarea>
+                <div style="font-size:11px;color:var(--mu);margin-top:4px">Lista JSON de perguntas. O bot fará cada uma antes de passar o valor final ou encaminhar para atendimento.</div>
               </div>
 
               <!-- Categoria e tipo de preço -->
               <div class="field">
                 <label>Categoria</label>
                 <input type="text" x-model="productForm.category"
-                  :placeholder="productForm.item_type==='servico'?'Ex: Cabelo, Estética':productForm.item_type==='pacote_combo'?'Ex: Combos':'Ex: Camisetas'">
+                  :placeholder="productForm.item_type==='servico'?'Ex: Cabelo, Estética, Automotivo':productForm.item_type==='pacote_combo'?'Ex: Pacotes, Planos':productForm.item_type==='orcamento'?'Ex: Projetos, Sob medida':'Ex: Categoria do produto'">
               </div>
               <div class="field">
                 <label>Tipo de preço</label>
@@ -802,8 +824,8 @@
 
               <!-- Produto físico -->
               <div class="field" x-show="productForm.item_type==='produto_fisico'"><label>SKU</label><input type="text" x-model="productForm.sku" placeholder="Código único"></div>
-              <div class="field" x-show="productForm.item_type==='produto_fisico'"><label>Subcategoria / Marca</label><input type="text" x-model="productForm.subcategory" placeholder="Ex: Lacoste, Nike"></div>
-              <div class="field" x-show="productForm.item_type==='produto_fisico'"><label>Tipo / Material</label><input type="text" x-model="productForm.product_type" placeholder="Ex: malha, jeans"></div>
+              <div class="field" x-show="productForm.item_type==='produto_fisico'"><label>Subcategoria / Marca</label><input type="text" x-model="productForm.subcategory" placeholder="Ex: Marca ou referência"></div>
+              <div class="field" x-show="productForm.item_type==='produto_fisico'"><label>Tipo / Material</label><input type="text" x-model="productForm.product_type" placeholder="Ex: tipo, material ou variação"></div>
               <div class="field" x-show="productForm.item_type==='produto_fisico'"><label>Cor</label><input type="text" x-model="productForm.color" placeholder="Ex: Azul marinho"></div>
               <div class="field" x-show="productForm.item_type==='produto_fisico'"><label>Estoque</label><input type="number" x-model="productForm.stock" placeholder="0"></div>
 
@@ -814,30 +836,18 @@
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" x-model="productForm.requires_scheduling"> Requer agendamento</label>
               </div>
 
-              <!-- Combo -->
-              <div class="field" x-show="productForm.item_type==='pacote_combo'" style="grid-column:span 2">
-                <label>Itens inclusos</label>
-                <textarea x-model="productForm.included_items" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;resize:vertical" placeholder="Ex: 1 corte + 1 barba + sobrancelha"></textarea>
-              </div>
-
-              <!-- Orçamento -->
-              <div class="field" x-show="productForm.item_type==='orcamento'" style="grid-column:span 2">
-                <label>Perguntas de qualificação <span style="font-weight:400;color:var(--mu)">(JSON array)</span></label>
-                <textarea x-model="productForm.qualification_questions" rows="3" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;resize:vertical" placeholder='["Qual o tamanho desejado?","Qual o prazo de entrega?"]'></textarea>
-              </div>
-
               <!-- Instruções para o bot -->
               <div class="field" style="grid-column:span 2">
                 <label>Instruções para o bot <span style="font-weight:400;color:var(--mu)">(opcional)</span></label>
                 <textarea x-model="productForm.bot_instructions" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;resize:vertical"
-                  :placeholder="productForm.item_type==='orcamento'?'Ex: Pedir WhatsApp e informar que consultor entrará em contato':'Ex: Mencionar disponibilidade de tamanhos, destacar promoção'"></textarea>
+                  :placeholder="productForm.item_type==='orcamento'?'Ex: Pedir WhatsApp e informar que consultor entrará em contato':productForm.item_type==='pacote_combo'?'Ex: Destacar o que está incluso e mencionar condições':'Ex: Informações relevantes que o bot deve mencionar ao apresentar esse item'"></textarea>
               </div>
 
               <!-- Tags -->
               <div class="field" style="grid-column:span 2">
                 <label>Tags <span style="font-weight:400;color:var(--mu)">(separadas por vírgula)</span></label>
                 <input type="text" x-model="productForm.tags"
-                  :placeholder="productForm.item_type==='servico'?'Ex: manicure, unhas, gel':productForm.item_type==='orcamento'?'Ex: personalizado, projeto':'Ex: polo, verão, casual'">
+                  :placeholder="productForm.item_type==='servico'?'Ex: manicure, unhas, gel':productForm.item_type==='pacote_combo'?'Ex: pacote, combo, oferta':productForm.item_type==='orcamento'?'Ex: personalizado, projeto':'Ex: promocao, destaque, novidade'">
               </div>
 
               <!-- URL imagem -->
@@ -946,7 +956,7 @@
                     'badge-type-combo':     p.item_type==='pacote_combo',
                     'badge-type-orcamento': p.item_type==='orcamento'
                   }"
-                  x-text="{produto_fisico:'Produto',servico:'Serviço',pacote_combo:'Combo',orcamento:'Orçamento'}[p.item_type||'produto_fisico']">
+                  x-text="{produto_fisico:'Produto',servico:'Serviço',pacote_combo:'Pacote',orcamento:'Orçamento'}[p.item_type||'produto_fisico']">
                 </span>
               </div>
 
