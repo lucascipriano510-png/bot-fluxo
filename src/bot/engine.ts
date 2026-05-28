@@ -96,11 +96,19 @@ export async function processMessage(
   // em saudações, pedidos de atendente e orçamentos.
   const intentResult = detectIntent(messageText);
 
-  // Intenções que nunca devem acionar busca de catálogo
+  // Intenções que nunca devem acionar busca de catálogo.
+  // Regra: qualquer intenção identificada com semântica não-produto vai para
+  // brain/AI. Catálogo só roda para busca_item, disponibilidade e unknown.
   const NON_CATALOG = [
+    // conversacionais
     'greeting', 'thanks', 'farewell',
-    'orcamento', 'compra', 'humano',
     'identidade_loja', 'conversa_geral', 'duvida_operacional',
+    // compra e atendimento
+    'orcamento', 'compra', 'humano',
+    // operacionais — já tratados pelo brain com respostas contextuais
+    'delivery', 'hours', 'location', 'payment', 'exchange',
+    'complaint', 'wholesale', 'gift', 'new_arrivals',
+    'price', 'price_sensitivity', 'size_help', 'catalog',
   ];
 
   if (!NON_CATALOG.includes(intentResult.intent)) {
@@ -108,13 +116,17 @@ export async function processMessage(
     if (rawFilters) {
       const offerFilters                 = buildOfferFilters(storeId, rawFilters);
       const { offers, matched, dropped } = await findOffersWithFallback(offerFilters);
-      const reply                        = formatFallbackResponse(offers, offerFilters, matched, dropped);
-      logInventoryQuery(storeId, session.phone, messageText, rawFilters, offers.length, reply);
 
-      await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
-      await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: reply,       node: 'CATALOG' });
-
-      return { text: reply, nextNode: currentNodeId, context: ctx };
+      // Para intent 'unknown' com catálogo vazio: não retornar erro de catálogo.
+      // Cai no AI Assist ou brain para tratar a mensagem de forma conversacional.
+      if (offers.length > 0 || intentResult.intent !== 'unknown') {
+        const reply = formatFallbackResponse(offers, offerFilters, matched, dropped);
+        logInventoryQuery(storeId, session.phone, messageText, rawFilters, offers.length, reply);
+        await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
+        await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: reply,       node: 'CATALOG' });
+        return { text: reply, nextNode: currentNodeId, context: ctx };
+      }
+      logInventoryQuery(storeId, session.phone, messageText, rawFilters, 0, '(ai/brain fallback)');
     }
   }
 

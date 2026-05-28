@@ -66,8 +66,9 @@ const INTENT_DEFS: IntentDef[] = [
     intent: 'identidade_loja',
     priority: 0,
     primary: [
-      /\bvoc[eê]s? (s[aã]o|[ée]) (a |o )?\b/,
-      /\b[ée] (a |o )?(loja|fluxo|outlet|empresa|marca|estabelecimento)\b/,
+      /\bvoc[eê]s? (s[aã]o|[ée]) (a |o |da |do )?\b/,
+      /\b[ée] (a |o |da |do |de )?(loja|fluxo|outlet|empresa|marca|estabelecimento)\b/,
+      /\bs[aã]o (a |o |da |do )?(loja|fluxo|outlet|empresa)\b/,
       /\bquem [ée] voc[eê]s?\b/,
       /\bquem s[aã]o voc[eê]s?\b/,
       /\bo que [ée] isso\b/,
@@ -79,6 +80,7 @@ const INTENT_DEFS: IntentDef[] = [
       /\bquem voc[eê]s?\b/,
       /\bonde fica a loja\b/,
       /\bsobre (a loja|voc[eê]s?)\b/,
+      /\bfluxo outlet\b/,
     ],
   },
 
