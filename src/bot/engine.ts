@@ -96,7 +96,11 @@ export async function processMessage(
   const intentResult = detectIntent(messageText);
 
   // Intenções que nunca devem acionar busca de catálogo
-  const NON_CATALOG = ['greeting', 'thanks', 'farewell', 'orcamento', 'compra', 'humano'];
+  const NON_CATALOG = [
+    'greeting', 'thanks', 'farewell',
+    'orcamento', 'compra', 'humano',
+    'identidade_loja', 'conversa_geral', 'duvida_operacional',
+  ];
 
   if (!NON_CATALOG.includes(intentResult.intent)) {
     const rawFilters = detectProductQuery(messageText);

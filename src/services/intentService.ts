@@ -6,6 +6,9 @@ export type Intent =
   | 'humano'
   | 'orcamento'
   | 'compra'
+  | 'identidade_loja'
+  | 'conversa_geral'
+  | 'duvida_operacional'
   | 'disponibilidade'
   | 'busca_item'
   | 'delivery'
@@ -57,6 +60,67 @@ function norm(s: string): string {
 }
 
 const INTENT_DEFS: IntentDef[] = [
+
+  // ── 0. Identidade da loja ────────────────────────────────────
+  {
+    intent: 'identidade_loja',
+    priority: 0,
+    primary: [
+      /\bvoc[eê]s? (s[aã]o|[ée]) (a |o )?\b/,
+      /\b[ée] (a |o )?(loja|fluxo|outlet|empresa|marca|estabelecimento)\b/,
+      /\bquem [ée] voc[eê]s?\b/,
+      /\bquem s[aã]o voc[eê]s?\b/,
+      /\bo que [ée] isso\b/,
+      /\besse (bot|chat|sistema|atendimento) [ée]\b/,
+      /\b[ée] (loja|real|oficial|verdade|confi[aá]vel)\b/,
+      /\bda (qual|que) loja\b/,
+    ],
+    secondary: [
+      /\bquem voc[eê]s?\b/,
+      /\bonde fica a loja\b/,
+      /\bsobre (a loja|voc[eê]s?)\b/,
+    ],
+  },
+
+  // ── 0. Conversa geral / Afirmação ────────────────────────────
+  {
+    intent: 'conversa_geral',
+    priority: 0,
+    primary: [
+      /^(beleza|certo|entendi|ok|pode ser|tudo bem|show|perfeito|legal|ótimo|oba|fechado|blz|vlw|tá)[\s!.?]*$/i,
+      /\bme ajuda (a[íi]|aqui)\b/,
+      /\bpreciso de ajuda\b/,
+      /\bn[aã]o sei (por onde|como|o que)\b/,
+      /\bqualquer coisa (pode|basta)\b/,
+      /\bpode me (ajudar|indicar|orientar)\b/,
+    ],
+    secondary: [
+      /\bentendido\b/,
+      /\bok!\b/,
+      /\bcompreendi\b/,
+    ],
+  },
+
+  // ── 0. Dúvida operacional (processo/fluxo geral) ─────────────
+  {
+    intent: 'duvida_operacional',
+    priority: 0,
+    primary: [
+      /\bcomo (compro|comprar)\b/,
+      /\bcomo fa[çc]o (para|pra) (pedir|comprar|fazer pedido)\b/,
+      /\bcomo (funciona|funciona)\b/,
+      /\bcomo funciona (o )?servi[çc]o\b/,
+      /\bcomo (funciona|fa[çc]o|fazer) o pedido\b/,
+      /\bcomo (funciona|fa[çc]o)\b/,
+      /\bme explica como funciona\b/,
+      /\bcomo (fa[çc]o|fa[çc]a) para (contratar|solicitar|agendar)\b/,
+    ],
+    secondary: [
+      /\bcomo funciona\b/,
+      /\bcomo (fa[çc]o|fazer)\b/,
+      /\bpasso a passo\b/,
+    ],
+  },
 
   // ── 0. Atendimento humano ────────────────────────────────────
   {

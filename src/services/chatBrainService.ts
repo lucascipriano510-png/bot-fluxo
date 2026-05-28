@@ -66,6 +66,39 @@ export function handleIntent(
 
   switch (intent) {
 
+    // ── IDENTIDADE DA LOJA ──────────────────────────────────────────────────
+    case 'identidade_loja': {
+      const storeName = ctx._storeName || 'nossa loja';
+      reply = pick([
+        `Sim! Aqui é a *${storeName}*. Me fala o que você está procurando que eu te ajudo. 😊`,
+        `É isso mesmo! Você está falando com o assistente da *${storeName}*. No que posso te ajudar?`,
+        `Correto! Aqui é a *${storeName}*. Me conta o que você precisa.`,
+      ], message);
+      break;
+    }
+
+    // ── CONVERSA GERAL / AFIRMAÇÃO ───────────────────────────────────────────
+    case 'conversa_geral':
+      reply = pick([
+        `Boa! Me fala o que você precisa que eu te ajudo.`,
+        `Pode contar! O que você está buscando?`,
+        `Claro! Me diz o que você precisa: produto, serviço, orçamento ou atendimento?`,
+      ], message) + p;
+      break;
+
+    // ── DÚVIDA OPERACIONAL ───────────────────────────────────────────────────
+    case 'duvida_operacional': {
+      const waLoja = ctx._wa_loja;
+      reply = pick([
+        `Posso te orientar! Me fala o que você precisa — produto, serviço ou pacote — e te mostro como prosseguir.`,
+        `Para te ajudar melhor: você está querendo comprar, solicitar um serviço ou fazer um orçamento?`,
+        waLoja
+          ? `Posso te ajudar aqui mesmo ou te conectar diretamente: ${waLoja}`
+          : `Fico feliz em ajudar! Me conta o que você precisa que eu te oriento.`,
+      ], message) + p;
+      break;
+    }
+
     // ── ATENDIMENTO HUMANO ───────────────────────────────────────────────────
     // Retorna null: flowMap já tem trigger para 'atendente|humano' que navega para SUPORTE
     case 'humano':
