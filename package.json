@@ -7,7 +7,9 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "simulate": "tsx src/simulate.ts"
+    "simulate": "tsx src/simulate.ts",
+    "safe-ship": "node scripts/safe-ship.js",
+    "check:sensitive": "node scripts/check-sensitive-files.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

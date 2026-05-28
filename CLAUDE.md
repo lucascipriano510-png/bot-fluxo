@@ -130,7 +130,48 @@ Claude Code não deve:
 - Resolver problemas por chute.
 - Trocar arquitetura sem discutir.
 
-## 7. Prioridade atual
+## 7. Esteira de execução
+
+O projeto usa uma esteira de execução para acelerar sprints normais sem arriscar banco, auth ou RLS.
+
+### Scripts disponíveis
+
+```bash
+npm run check:sensitive       # verifica arquivos e diff por conteúdo sensível
+npm run safe-ship -- "msg"    # build + check + commit + push controlado
+```
+
+### Regras da esteira
+
+**Modo agressivo (safe-ship liberado):**
+- Mudanças em `public/` — HTML, CSS, JS do painel
+- Mudanças em `src/catalog/` — Motor de Catálogo
+- Mudanças em `src/inventory/` — Mapeadores e tipos
+- Mudanças em `src/bot/` — Engine, fluxo, intenção
+- Mudanças em `src/services/` — Serviços de negócio (não auth)
+- Mudanças em `.claude/agents/` — Subagentes
+- Mudanças em `scripts/` — Scripts utilitários
+
+**Exige confirmação explícita (nunca usar safe-ship diretamente):**
+- Qualquer mudança em Supabase, RLS, auth, migrations
+- Qualquer mudança em `store_id`, `store_users`, `stores`, `invite_codes`
+- Qualquer mudança em webhooks ou variáveis de ambiente
+- Qualquer push para produção ou alteração de domínio
+- Qualquer mudança em dados reais de clientes ou lojas
+
+### Subagentes e quando acionar
+
+| Situação | Subagente |
+|---|---|
+| Risco de banco, RLS, auth, store_id, secret | **security-guardian** |
+| Arquitetura de catálogo, schema de itens | **catalog-engine-architect** |
+| Implementação de produto, UI, bot, catálogo | **product-builder** |
+
+### Comando de sprint
+
+Use `/sprint` para executar tarefas com a sequência: entender → planejar → implementar → build → check → resumir.
+
+## 8. Prioridade atual
 
 A prioridade atual é estabilizar a fundação do Fluxo Command como SaaS seguro e depois evoluir os motores internos.
 
