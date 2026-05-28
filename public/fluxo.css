@@ -97,7 +97,7 @@ body {
   position: fixed;
   top: 0; left: 0; bottom: 0;
   width: var(--sb-w);
-  background: var(--sb);
+  background: linear-gradient(180deg, #0c0c11 0%, var(--sb) 100%);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -116,6 +116,15 @@ body {
   letter-spacing: .08em;
   color: #fff;
   text-shadow: 0 0 24px rgba(99,102,241,.35);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sb-logo-icon {
+  width: 16px; height: 16px;
+  fill: var(--accent-light);
+  flex-shrink: 0;
 }
 
 .sb-logo-sub {
@@ -170,6 +179,49 @@ body {
   text-transform: uppercase;
   color: var(--mu2);
   padding: 12px 12px 4px;
+}
+
+/* ── Sidebar user section ──────────────────────────── */
+.sb-user {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sb-user-avatar {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-light);
+  flex-shrink: 0;
+}
+
+.sb-user-info { flex: 1; min-width: 0; }
+
+.sb-user-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tx);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sb-user-email {
+  font-size: 10px;
+  color: var(--mu2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
 }
 
 .sb-status {
@@ -248,7 +300,7 @@ body {
 }
 
 .hdr-title h1 {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   line-height: 1;
 }
@@ -301,7 +353,7 @@ body {
 }
 
 .hdr-avatar {
-  width: 30px; height: 30px;
+  width: 32px; height: 32px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--gold), #f59e0b);
   display: flex;
@@ -311,6 +363,7 @@ body {
   font-weight: 800;
   color: #000;
   cursor: pointer;
+  box-shadow: 0 0 0 2px rgba(250,204,21,.25);
 }
 
 /* ── Metric Cards ──────────────────────────────────── */
@@ -560,10 +613,10 @@ body {
   overflow: hidden;
 }
 .prod-img-ph {
-  font-size: 44px;
+  font-size: 40px;
   font-weight: 900;
   color: var(--mu2);
-  opacity: 0.18;
+  opacity: 0.22;
   letter-spacing: -0.04em;
   user-select: none;
 }
@@ -891,7 +944,7 @@ body {
   transition: all .2s;
 }
 
-.int-card:hover { border-color: var(--border2); }
+.int-card:hover { border-color: var(--border2); box-shadow: var(--shadow-md); }
 
 .int-logo {
   width: 44px; height: 44px;

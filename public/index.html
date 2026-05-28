@@ -52,8 +52,9 @@
                style="padding-right:2.8rem;"
                @keydown.enter="login()">
         <button @click="showPwd = !showPwd" type="button"
-                style="position:absolute;right:.7rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#8b8fa8;font-size:.85rem;padding:0;line-height:1;">
-          <span x-text="showPwd ? '🙈' : '👁️'"></span>
+                style="position:absolute;right:.7rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#8b8fa8;padding:0;line-height:0;display:flex;align-items:center;">
+          <svg x-show="!showPwd" viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg x-show="showPwd" viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
         </button>
       </div>
     </div>
@@ -110,7 +111,10 @@
 ═══════════════════════════════════════════════ -->
 <aside class="cmd-sidebar" :class="{ open: sidebarOpen }">
   <div class="sb-logo">
-    <div class="sb-logo-name">⚡ FLUXO COMMAND</div>
+    <div class="sb-logo-name">
+      <svg class="sb-logo-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      FLUXO COMMAND
+    </div>
     <div class="sb-logo-sub">Bot &amp; Sales OS</div>
   </div>
 
@@ -174,6 +178,15 @@
     </div>
   </nav>
 
+  <!-- User section -->
+  <div class="sb-user">
+    <div class="sb-user-avatar" x-text="(authUser?.email || 'U').charAt(0).toUpperCase()"></div>
+    <div class="sb-user-info">
+      <div class="sb-user-name" x-text="cfg.nome_loja || 'Minha loja'"></div>
+      <div class="sb-user-email" x-text="authUser?.email || ''"></div>
+    </div>
+  </div>
+
   <!-- Bot status -->
   <div class="sb-status">
     <div class="sb-status-top">
@@ -222,12 +235,8 @@
     </div>
 
     <div class="hdr-actions">
-      <button class="btn btn-ghost" @click="navigate('simulador')">
-        <svg style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        Testar Bot
-      </button>
       <div class="badge-env">Produção</div>
-      <div class="hdr-avatar" :title="cfg.nome_loja || 'Loja'" x-text="(cfg.nome_loja || 'L').slice(0,2).toUpperCase()"></div>
+      <div class="hdr-avatar" :title="authUser?.email || cfg.nome_loja || 'Loja'" x-text="(cfg.nome_loja || 'L').slice(0,2).toUpperCase()"></div>
       <button class="btn btn-ghost" @click="logout()" title="Sair da conta"
               style="padding:.4rem .7rem;opacity:.7;gap:.3rem;">
         <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -518,15 +527,17 @@
               <div style="font-size:11px;color:var(--mu)" x-text="atendHumano ? '🟡 Humano ativo' : ('Nó: ' + (currentConv?.node || 'INICIO'))"></div>
             </div>
             <div style="margin-left:auto;display:flex;gap:8px">
-              <button class="btn" style="font-size:11px;padding:5px 10px"
+              <button class="btn" style="font-size:11px;padding:5px 10px;gap:5px"
                 @click="assumeConv()" :disabled="!atendPhone || atendHumano"
                 :style="atendHumano ? 'opacity:.4' : ''">
-                👤 Assumir
+                <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                Assumir
               </button>
-              <button class="btn btn-green" style="font-size:11px;padding:5px 10px"
+              <button class="btn btn-green" style="font-size:11px;padding:5px 10px;gap:5px"
                 @click="releaseConv()" :disabled="!atendPhone || !atendHumano"
                 :style="!atendHumano ? 'opacity:.4' : ''">
-                🤖 Devolver ao bot
+                <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Devolver ao bot
               </button>
             </div>
           </div>
@@ -575,11 +586,13 @@
           </div>
           <div style="margin-top:18px;display:flex;flex-direction:column;gap:8px">
             <a x-show="currentConv?.phone" :href="'https://wa.me/' + (currentConv?.phone||'').replace(/\D/g,'')" target="_blank"
-              class="btn btn-green" style="justify-content:center;text-decoration:none">
-              📱 Abrir no WhatsApp
+              class="btn btn-green" style="justify-content:center;text-decoration:none;gap:6px">
+              <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.06 6.06l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              Abrir no WhatsApp
             </a>
-            <button class="btn" style="justify-content:center" @click="navigate('leads'); $nextTick(() => { const l = leads.find(x=>x.phone===atendPhone); if(l) selectCrmLead(l); })">
-              📋 Ver no CRM
+            <button class="btn" style="justify-content:center;gap:6px" @click="navigate('leads'); $nextTick(() => { const l = leads.find(x=>x.phone===atendPhone); if(l) selectCrmLead(l); })">
+              <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Ver no CRM
             </button>
           </div>
         </div>
@@ -653,7 +666,10 @@
                   <div style="font-size:15px;font-weight:700" x-text="crmLead.nome || crmLead.phone"></div>
                   <div style="font-size:12px;color:var(--mu)" x-text="crmLead.phone"></div>
                 </div>
-                <a :href="crmWhatsApp(crmLead.phone)" target="_blank" class="btn btn-green" style="font-size:11px;padding:6px 12px;text-decoration:none">📱 WhatsApp</a>
+                <a :href="crmWhatsApp(crmLead.phone)" target="_blank" class="btn btn-green" style="font-size:11px;padding:6px 12px;text-decoration:none;gap:5px">
+                  <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.06 6.06l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                  WhatsApp
+                </a>
               </div>
 
               <!-- form -->
@@ -972,8 +988,13 @@
 
               <!-- CRUD actions -->
               <div style="display:flex;gap:6px;margin-top:10px">
-                <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:10px;padding:5px 0" @click="openProductModal(p)">✏️ Editar</button>
-                <button style="flex:0;padding:5px 10px;background:var(--red2);border:1px solid rgba(239,68,68,.2);border-radius:7px;color:#ef4444;font-size:10px;cursor:pointer" @click="deleteProduct(p.id)">🗑️</button>
+                <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:10px;padding:5px 0;gap:4px" @click="openProductModal(p)">
+                  <svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  Editar
+                </button>
+                <button style="flex:0;padding:5px 10px;background:var(--red2);border:1px solid rgba(239,68,68,.2);border-radius:7px;color:#ef4444;cursor:pointer;display:flex;align-items:center" @click="confirm('Deletar este produto?') && deleteProduct(p.id)">
+                  <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
               </div>
             </div>
           </div>
@@ -1094,32 +1115,44 @@
     <div x-show="page === 'integracoes'" class="page-section">
       <div class="int-grid">
         <div class="int-card">
-          <div class="int-logo" style="background:#25D366;font-size:22px">📱</div>
+          <div class="int-logo" style="background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.2)">
+            <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:#25D366;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
           <div><div class="int-name">WhatsApp / Evolution API</div><div class="int-desc">Conecte seu número para envio e recebimento de mensagens reais.</div></div>
           <div style="display:flex;align-items:center;justify-content:space-between"><span class="badge badge-gold">Pendente</span><button class="btn btn-green" style="font-size:11px;padding:6px 12px">Configurar</button></div>
         </div>
         <div class="int-card">
-          <div class="int-logo" style="background:#1C1C1E;border:1px solid var(--border);font-size:22px">🗄️</div>
+          <div class="int-logo" style="background:var(--card2);border:1px solid var(--border)">
+            <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:var(--mu);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          </div>
           <div><div class="int-name">Banco de dados</div><div class="int-desc">Banco de dados conectado. Sessões, leads e mensagens sendo gravados automaticamente.</div></div>
           <div style="display:flex;align-items:center;justify-content:space-between"><span class="badge badge-green">Conectado</span><button class="btn" style="font-size:11px;padding:6px 12px">Testar</button></div>
         </div>
         <div class="int-card">
-          <div class="int-logo" style="background:#1a1a2e;font-size:22px">⚡</div>
+          <div class="int-logo" style="background:var(--accent-bg);border:1px solid var(--accent-border)">
+            <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:var(--accent-light);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
           <div><div class="int-name">Motor do bot</div><div class="int-desc">Motor de atendimento automático online e respondendo normalmente.</div></div>
           <div style="display:flex;align-items:center;justify-content:space-between"><span class="badge badge-green">Online</span><button class="btn" style="font-size:11px;padding:6px 12px" @click="navigate('simulador')">Testar bot</button></div>
         </div>
         <div class="int-card">
-          <div class="int-logo" style="background:#111;font-size:22px">🛍️</div>
-          <div><div class="int-name" x-text="(cfg.nome_loja || 'Loja') + ' — Catálogo'"></div><div class="int-desc">Leitura do catálogo de produtos via Supabase do site (read-only).</div></div>
+          <div class="int-logo" style="background:var(--card2);border:1px solid var(--border)">
+            <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:var(--mu);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          </div>
+          <div><div class="int-name" x-text="(cfg.nome_loja || 'Loja') + ' — Catálogo'"></div><div class="int-desc">Leitura do catálogo de produtos da loja (somente visualização).</div></div>
           <div><span class="badge badge-green">Conectado</span></div>
         </div>
         <div class="int-card" style="opacity:.5">
-          <div class="int-logo" style="background:#1877F2;font-size:22px">📊</div>
+          <div class="int-logo" style="background:rgba(24,119,242,.1);border:1px solid rgba(24,119,242,.2)">
+            <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:#1877F2;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          </div>
           <div><div class="int-name">Meta Ads</div><div class="int-desc">Integração com pixel e conversões em breve.</div></div>
           <div><span class="badge badge-gray">Em breve</span></div>
         </div>
         <div class="int-card" style="opacity:.5">
-          <div class="int-logo" style="background:#111;font-size:22px">🤖</div>
+          <div class="int-logo" style="background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.2)">
+            <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:var(--purple);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          </div>
           <div><div class="int-name">IA Generativa</div><div class="int-desc">Respostas inteligentes com Claude ou GPT em breve.</div></div>
           <div><span class="badge badge-gray">Em breve</span></div>
         </div>
