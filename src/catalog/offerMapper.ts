@@ -7,6 +7,14 @@
 import { BotProduct } from '../inventory/inventoryTypes';
 import { BusinessOffer, OfferType, AvailabilityType } from './offerTypes';
 
+// Kit sem stockQuantity não pode afirmar disponibilidade ilimitada — requer confirmação manual.
+function kitAvailability(product: BotProduct): AvailabilityType {
+  if (product.stockQuantity !== undefined && product.stockQuantity !== null) {
+    return 'stock';
+  }
+  return 'manual';
+}
+
 export function botProductToOffer(product: BotProduct): BusinessOffer {
   const offerType: OfferType =
     product.itemType === 'servico'      ? 'service'        :
@@ -15,9 +23,9 @@ export function botProductToOffer(product: BotProduct): BusinessOffer {
     'physical_product';
 
   const availabilityType: AvailabilityType =
-    product.itemType === 'servico'      ? 'unlimited' :
-    product.itemType === 'pacote_combo' ? 'unlimited' :
-    product.itemType === 'orcamento'    ? 'manual'    :
+    product.itemType === 'servico'      ? 'unlimited'              :
+    product.itemType === 'pacote_combo' ? kitAvailability(product) :
+    product.itemType === 'orcamento'    ? 'manual'                 :
     'stock';
 
   const attributes: Record<string, unknown> = {};
