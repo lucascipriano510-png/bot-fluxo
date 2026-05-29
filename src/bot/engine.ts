@@ -165,16 +165,23 @@ export async function processMessage(
   // cai no brain fixo sem impacto de performance (só lê env vars).
   const AI_ASSIST_INTENTS = new Set(['conversa_geral', 'identidade_loja', 'duvida_operacional', 'unknown']);
   if (AI_ASSIST_INTENTS.has(intentResult.intent)) {
+    const site = runtimeKnowledge.websiteSensor;
     const aiCtx: AiAssistContext = {
-      storeName:    ctx._storeName      || 'nossa loja',
-      businessType: ctx._businessType   || undefined,
-      city:         ctx._city           || undefined,
-      storePhone:   ctx._wa_loja        || undefined,
-      openingHours: ctx._openingHours   || undefined,
-      deliveryInfo: ctx._deliveryInfo   || undefined,
-      paymentInfo:  ctx._paymentInfo    || undefined,
-      // greetingMsg: passado apenas quando intent for saudação
-      greetingMsg: intentResult.intent === 'greeting' ? (ctx._saudacao || undefined) : undefined,
+      storeName:       ctx._storeName    || 'nossa loja',
+      businessType:    ctx._businessType || undefined,
+      city:            ctx._city         || undefined,
+      storePhone:      ctx._wa_loja      || undefined,
+      openingHours:    ctx._openingHours || undefined,
+      deliveryInfo:    ctx._deliveryInfo || undefined,
+      paymentInfo:     ctx._paymentInfo  || undefined,
+      greetingMsg:     intentResult.intent === 'greeting' ? (ctx._saudacao || undefined) : undefined,
+      // Site Sensor — só inclui quando scan foi executado
+      siteUrl:         site?.websiteUrl        || undefined,
+      siteTitle:       site?.extracted?.storeName || undefined,
+      siteDescription: site?.rawSummary
+        ? site.rawSummary.split('\n').find(l => l.startsWith('Descrição:'))?.replace('Descrição: ', '')
+        : undefined,
+      siteSummary:     site?.rawSummary        || undefined,
     };
     const aiReply = await aiAssist(messageText, aiCtx, intentResult.intent);
     if (aiReply) {

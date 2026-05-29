@@ -21,15 +21,20 @@ export interface StoreVoiceProfile {
 
 // ── Contexto seguro que a IA pode usar ──────────────────────────────────────
 export interface AiAssistContext {
-  storeName:     string;
-  businessType?: string;   // ex: "outlet de roupas", "barbearia", "lava-jato"
-  city?:         string;   // ex: "Uberaba"
-  storePhone?:   string;
-  openingHours?: string;   // ex: "09:00 às 18:00"
-  deliveryInfo?: string;   // ex: "Entregamos para todo o Brasil"
-  paymentInfo?:  string;   // ex: "Pix, cartão, boleto"
-  greetingMsg?:  string;   // usado APENAS quando intent = greeting
-  voiceProfile?: StoreVoiceProfile;
+  storeName:       string;
+  businessType?:   string;
+  city?:           string;
+  storePhone?:     string;
+  openingHours?:   string;
+  deliveryInfo?:   string;
+  paymentInfo?:    string;
+  greetingMsg?:    string;
+  // Site Sensor — alimentado após scan controlado
+  siteUrl?:        string;
+  siteTitle?:      string;
+  siteDescription?: string;
+  siteSummary?:    string;
+  voiceProfile?:   StoreVoiceProfile;
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
@@ -51,13 +56,16 @@ export function createSystemPrompt(ctx: AiAssistContext, intentHint?: string): s
   // Dados disponíveis da loja — só inclui o que existe
   const storeData = [
     `Loja: ${storeName}`,
-    ctx.businessType  ? `Tipo de negócio: ${ctx.businessType}` : '',
-    ctx.city          ? `Cidade: ${ctx.city}`                  : '',
-    ctx.storePhone    ? `WhatsApp: ${ctx.storePhone}`          : '',
-    ctx.openingHours  ? `Horário: ${ctx.openingHours}`         : '',
-    ctx.deliveryInfo  ? `Entrega: ${ctx.deliveryInfo}`         : '',
-    ctx.paymentInfo   ? `Pagamento: ${ctx.paymentInfo}`        : '',
-    ctx.paymentInfo   ? `Pagamento: ${ctx.paymentInfo}`        : '',
+    ctx.businessType   ? `Tipo de negócio: ${ctx.businessType}`  : '',
+    ctx.city           ? `Cidade: ${ctx.city}`                   : '',
+    ctx.storePhone     ? `WhatsApp: ${ctx.storePhone}`           : '',
+    ctx.openingHours   ? `Horário: ${ctx.openingHours}`          : '',
+    ctx.deliveryInfo   ? `Entrega: ${ctx.deliveryInfo}`          : '',
+    ctx.paymentInfo    ? `Pagamento: ${ctx.paymentInfo}`         : '',
+    ctx.siteUrl        ? `Site: ${ctx.siteUrl}`                  : '',
+    ctx.siteTitle      ? `Título do site: ${ctx.siteTitle}`      : '',
+    ctx.siteDescription ? `Descrição do site: ${ctx.siteDescription}` : '',
+    ctx.siteSummary    ? `Conteúdo do site (resumo):\n${ctx.siteSummary.slice(0, 800)}` : '',
   ].filter(Boolean).join('\n');
 
   // Instrução de saudação: espelha saudação de horário se presente na mensagem;

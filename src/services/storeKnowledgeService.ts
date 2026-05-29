@@ -57,6 +57,7 @@ export interface WebsiteSensor {
     faqs?:             string[];
     commercialCalls?:  string[];
   };
+  rawSummary?: string;
   note: string;
 }
 
@@ -152,12 +153,13 @@ export interface StoreKnowledgeBase {
 // ── Runtime context (leve, para cada mensagem) ───────────────────────────────
 
 export interface RuntimeKnowledgeContext {
-  storeName:    string;
-  identity:     StoreKnowledgeBase['identity'];
-  commercial:   StoreKnowledgeBase['commercial'];
-  voice:        StoreKnowledgeBase['voice'];
-  catalog:      StoreKnowledgeBase['catalog'];
-  gaps:         string[];
+  storeName:      string;
+  identity:       StoreKnowledgeBase['identity'];
+  commercial:     StoreKnowledgeBase['commercial'];
+  voice:          StoreKnowledgeBase['voice'];
+  catalog:        StoreKnowledgeBase['catalog'];
+  websiteSensor?: WebsiteSensor;
+  gaps:           string[];
   // Retorna true se há dados confiáveis sobre o tópico
   safeToAnswer: (topic: string) => boolean;
 }
@@ -397,12 +399,13 @@ export async function buildRuntimeKnowledgeContext(storeId: string): Promise<Run
   const kb = await getStoreKnowledge(storeId);
 
   return {
-    storeName:  kb.identity.storeName || 'nossa loja',
-    identity:   kb.identity,
-    commercial: kb.commercial,
-    voice:      kb.voice,
-    catalog:    kb.catalog,
-    gaps:       kb.knowledgeGaps.map(g => g.field),
+    storeName:     kb.identity.storeName || 'nossa loja',
+    identity:      kb.identity,
+    commercial:    kb.commercial,
+    voice:         kb.voice,
+    catalog:       kb.catalog,
+    websiteSensor: kb.websiteSensor.status === 'connected' ? kb.websiteSensor : undefined,
+    gaps:          kb.knowledgeGaps.map(g => g.field),
     safeToAnswer: (topic: string) => !kb.knowledgeGaps.some(g => g.field === topic),
   };
 }
