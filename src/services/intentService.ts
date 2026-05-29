@@ -7,6 +7,7 @@ export type Intent =
   | 'orcamento'
   | 'compra'
   | 'identidade_loja'
+  | 'store_site'
   | 'conversa_geral'
   | 'duvida_operacional'
   | 'disponibilidade'
@@ -60,6 +61,28 @@ function norm(s: string): string {
 }
 
 const INTENT_DEFS: IntentDef[] = [
+
+  // ── 0. Site da loja ──────────────────────────────────────────
+  {
+    intent: 'store_site',
+    priority: 0,
+    primary: [
+      /\bqual [ée] o site\b/,
+      /\bqual (o )?site\b/,
+      /\bsite (de voc[eê]s?|da loja|de vcs)\b/,
+      /\bmanda (o )?(site|link (do site|da loja))\b/,
+      /\blink (do site|do cat[aá]logo|da loja)\b/,
+      /\btem site\b/,
+      /\bsite pra (ver|comprar|olhar)\b/,
+      /\bcat[aá]logo (online|virtual|digital)\b/,
+      /\bonde vejo (as pe[cç][ae]s|os produtos|o cat[aá]logo) online\b/,
+    ],
+    secondary: [
+      /\bsite\b/,
+      /\blink\b/,
+      /\bcat[aá]logo online\b/,
+    ],
+  },
 
   // ── 0. Identidade da loja ────────────────────────────────────
   {

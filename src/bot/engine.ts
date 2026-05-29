@@ -92,16 +92,20 @@ export async function processMessage(
     _wa_loja:      storeCtx.whatsappNumber,
     _saudacao:     rtSettings.saudacao,
     // Identity knowledge
-    _city:         runtimeKnowledge.identity.city         || '',
-    _state:        runtimeKnowledge.identity.state        || '',
-    _instagram:    runtimeKnowledge.identity.instagram    || '',
-    _businessType: runtimeKnowledge.identity.businessType || '',
+    _city:          runtimeKnowledge.identity.city         || '',
+    _state:         runtimeKnowledge.identity.state        || '',
+    _instagram:     runtimeKnowledge.identity.instagram    || '',
+    _businessType:  runtimeKnowledge.identity.businessType || '',
     // Commercial knowledge
-    _deliveryInfo: runtimeKnowledge.commercial.deliveryInfo  || '',
-    _paymentInfo:  runtimeKnowledge.commercial.paymentInfo   || '',
-    _openingHours: runtimeKnowledge.commercial.openingHours  || '',
+    _deliveryInfo:  runtimeKnowledge.commercial.deliveryInfo  || '',
+    _paymentInfo:   runtimeKnowledge.commercial.paymentInfo   || '',
+    _openingHours:  runtimeKnowledge.commercial.openingHours  || '',
+    _siteUrl:       runtimeKnowledge.commercial.siteUrl       || '',
+    _catalogUrl:    runtimeKnowledge.commercial.catalogUrl    || '',
+    _returnPolicy:  runtimeKnowledge.commercial.returnPolicy  || '',
+    _discountRules: runtimeKnowledge.commercial.discountRules || '',
     // Voice
-    _salesTone:    runtimeKnowledge.voice.salesTone || '',
+    _salesTone:     runtimeKnowledge.voice.salesTone || '',
   };
 
   // ── PRÉ-CHECAGEM 4: Roteamento por intenção + catálogo ──────────────────
@@ -163,7 +167,7 @@ export async function processMessage(
   // ── PRÉ-CHECAGEM 5: Camada de IA Assist (para intents conversacionais) ────
   // Roda antes do brain fixo. Se IA não estiver configurada, retorna null e
   // cai no brain fixo sem impacto de performance (só lê env vars).
-  const AI_ASSIST_INTENTS = new Set(['conversa_geral', 'identidade_loja', 'duvida_operacional', 'unknown']);
+  const AI_ASSIST_INTENTS = new Set(['conversa_geral', 'identidade_loja', 'store_site', 'duvida_operacional', 'unknown']);
   if (AI_ASSIST_INTENTS.has(intentResult.intent)) {
     const site = runtimeKnowledge.websiteSensor;
     const aiCtx: AiAssistContext = {
@@ -175,8 +179,9 @@ export async function processMessage(
       deliveryInfo:    ctx._deliveryInfo || undefined,
       paymentInfo:     ctx._paymentInfo  || undefined,
       greetingMsg:     intentResult.intent === 'greeting' ? (ctx._saudacao || undefined) : undefined,
-      // Site Sensor — só inclui quando scan foi executado
-      siteUrl:         site?.websiteUrl        || undefined,
+      // Site URL do perfil (sempre disponível se configurado)
+      siteUrl:         ctx._siteUrl  || site?.websiteUrl || undefined,
+      // Site Sensor — dados ricos só quando scan foi executado
       siteTitle:       site?.extracted?.storeName || undefined,
       siteDescription: site?.rawSummary
         ? site.rawSummary.split('\n').find(l => l.startsWith('Descrição:'))?.replace('Descrição: ', '')

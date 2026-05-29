@@ -66,6 +66,25 @@ export function handleIntent(
 
   switch (intent) {
 
+    // ── SITE DA LOJA ─────────────────────────────────────────────────────────
+    case 'store_site': {
+      const siteUrl    = ctx._siteUrl;
+      const catalogUrl = ctx._catalogUrl;
+      if (siteUrl) {
+        const catPart = catalogUrl && catalogUrl !== siteUrl
+          ? `\nCatálogo: *${catalogUrl}*`
+          : '';
+        reply = `Nosso site é *${siteUrl}*.${catPart} Você pode olhar as peças por lá e, se quiser, eu te ajudo a escolher por aqui também! 😊`;
+      } else {
+        reply = pick([
+          `O link do site ainda não está cadastrado. Me fala o que você procura que eu te ajudo aqui mesmo!`,
+          `Ainda não tenho o link do site disponível. Me conta o que você quer que eu te direciono!`,
+        ], message);
+      }
+      reply += p;
+      break;
+    }
+
     // ── IDENTIDADE DA LOJA ──────────────────────────────────────────────────
     case 'identidade_loja': {
       const storeName = ctx._storeName || 'nossa loja';
@@ -111,14 +130,18 @@ export function handleIntent(
 
     // ── DÚVIDA OPERACIONAL ───────────────────────────────────────────────────
     case 'duvida_operacional': {
-      const waLoja = ctx._wa_loja;
-      reply = pick([
-        `Posso te orientar! Me fala o que você precisa — produto, serviço ou pacote — e te mostro como prosseguir.`,
-        `Para te ajudar melhor: você está querendo comprar, solicitar um serviço ou fazer um orçamento?`,
-        waLoja
-          ? `Posso te ajudar aqui mesmo ou te conectar diretamente: ${waLoja}`
-          : `Fico feliz em ajudar! Me conta o que você precisa que eu te oriento.`,
-      ], message) + p;
+      const waLoja  = ctx._wa_loja;
+      const siteUrl = ctx._siteUrl;
+      reply = siteUrl
+        ? `Você pode escolher suas peças no site *${siteUrl}* ou me pedir aqui mesmo. Encontrou o que quer? 👇`
+        : pick([
+          `Posso te orientar! Me fala o que você precisa — produto, serviço ou pacote — e te mostro como prosseguir.`,
+          `Para te ajudar melhor: você está querendo comprar, solicitar um serviço ou fazer um orçamento?`,
+          waLoja
+            ? `Posso te ajudar aqui mesmo ou te conectar diretamente: ${waLoja}`
+            : `Fico feliz em ajudar! Me conta o que você precisa que eu te oriento.`,
+        ], message);
+      reply += p;
       break;
     }
 
@@ -212,22 +235,35 @@ export function handleIntent(
     }
 
     // ── TROCA / DEVOLUÇÃO ────────────────────────────────────────────────────
-    case 'exchange':
-      reply = pick([
-        `Pode trocar sim! Para saber as condições exatas, posso te conectar com um atendente agora. Quer?`,
-        `Temos política de troca. Me fala o que aconteceu que eu te direciono pro atendente responsável.`,
-        `Sem problema! Me conta a situação que eu te ajudo a resolver ou chamo um atendente.`,
-      ], message) + p;
+    case 'exchange': {
+      const returnPolicy = ctx._returnPolicy;
+      reply = returnPolicy
+        ? `${returnPolicy} Me conta o que aconteceu que eu te direciono.`
+        : pick([
+          `Pode trocar sim! Para saber as condições exatas, posso te conectar com um atendente agora. Quer?`,
+          `Temos política de troca. Me fala o que aconteceu que eu te direciono pro atendente responsável.`,
+          `Sem problema! Me conta a situação que eu te ajudo a resolver ou chamo um atendente.`,
+        ], message);
+      reply += p;
       break;
+    }
 
     // ── PAGAMENTO ────────────────────────────────────────────────────────────
-    case 'payment':
-      reply = pick([
-        `Aceitamos as principais formas de pagamento. Para confirmar as opções disponíveis, posso chamar um atendente.`,
-        `Tem várias formas de pagamento disponíveis. Me fala o que você precisa que te informo.`,
-        `Para detalhes sobre pagamento, posso te conectar com um atendente agora. Quer?`,
-      ], message) + p;
+    case 'payment': {
+      const paymentInfo = ctx._paymentInfo;
+      reply = paymentInfo
+        ? pick([
+          `Aceitamos: *${paymentInfo}*. Me fala o que você quer comprar que eu te ajudo!`,
+          `Formas de pagamento: ${paymentInfo}. O que você está procurando?`,
+        ], message)
+        : pick([
+          `Aceitamos as principais formas de pagamento. Para confirmar as opções disponíveis, posso chamar um atendente.`,
+          `Tem várias formas de pagamento disponíveis. Me fala o que você precisa que te informo.`,
+          `Para detalhes sobre pagamento, posso te conectar com um atendente agora. Quer?`,
+        ], message);
+      reply += p;
       break;
+    }
 
     // ── CATÁLOGO / LINK ──────────────────────────────────────────────────────
     case 'catalog':
