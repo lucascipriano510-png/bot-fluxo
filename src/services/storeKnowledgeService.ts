@@ -14,6 +14,7 @@
 
 import { getBusinessProfile } from './storeProfileService';
 import { getRuntimeSettings, BotSettings } from './settingsService';
+import type { SiteScanResult } from './siteScanService';
 
 // ── Source types ─────────────────────────────────────────────────────────────
 
@@ -170,8 +171,13 @@ function normalizeInstagram(handle: string): string {
 
 // ── Cache (60s TTL) ──────────────────────────────────────────────────────────
 
-const _cache = new Map<string, { data: StoreKnowledgeBase; expiresAt: number }>();
-const TTL_MS = 60_000;
+const _cache    = new Map<string, { data: StoreKnowledgeBase; expiresAt: number }>();
+const TTL_MS    = 60_000;
+const _scanCache = new Map<string, SiteScanResult>();
+
+export function updateSiteScan(storeId: string, result: SiteScanResult): void {
+  _scanCache.set(storeId, result);
+}
 
 // ── Construção das fontes ────────────────────────────────────────────────────
 
@@ -328,14 +334,31 @@ export async function getStoreKnowledge(storeId: string): Promise<StoreKnowledge
 
     catalog: { available: true, confidence: 0.95 },
 
-    websiteSensor: {
-      websiteUrl:  profile.siteUrl || undefined,
-      catalogUrl:  profile.catalogUrl || undefined,
-      status:      profile.siteUrl ? 'pending_scan' : 'unavailable',
-      note:        profile.siteUrl
-        ? 'Site configurado. Crawler controlado ainda não executado.'
-        : 'Configure o site em Configurações → Perfil da Loja.',
-    },
+    websiteSensor: (() => {
+      const scan = _scanCache.get(storeId);
+      if (scan) {
+        return {
+          websiteUrl:  profile.siteUrl || undefined,
+          catalogUrl:  profile.catalogUrl || undefined,
+          status:      'connected' as const,
+          lastScanAt:  scan.scannedAt,
+          extracted: {
+            storeName:  scan.title,
+            importantLinks: scan.internalLinks,
+          },
+          rawSummary: scan.rawSummary,
+          note:        `Sincronizado em ${new Date(scan.scannedAt).toLocaleString('pt-BR')}. ${scan.title ? 'Título: ' + scan.title : ''}`,
+        };
+      }
+      return {
+        websiteUrl:  profile.siteUrl || undefined,
+        catalogUrl:  profile.catalogUrl || undefined,
+        status:      profile.siteUrl ? 'pending_scan' as const : 'unavailable' as const,
+        note:        profile.siteUrl
+          ? 'Site configurado. Clique em "Analisar site" para sincronizar.'
+          : 'Configure o site em Configurações → Perfil da Loja.',
+      };
+    })(),
 
     instagramSensor: {
       instagramHandle:  profile.instagram ? normalizeInstagram(profile.instagram) : undefined,

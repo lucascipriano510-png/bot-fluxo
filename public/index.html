@@ -1569,22 +1569,34 @@
             </div>
 
             <!-- Site -->
-            <div class="int-card" :style="knowledge.websiteSensor.status === 'unavailable' ? 'opacity:.55' : ''">
-              <div class="int-logo" style="background:var(--card2);border:1px solid var(--border)">
-                <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:none;stroke:var(--mu);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            <div class="int-card" style="flex-direction:column;align-items:stretch;gap:10px" :style="knowledge.websiteSensor.status === 'unavailable' ? 'opacity:.55' : ''">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div class="int-logo" style="background:var(--card2);border:1px solid var(--border)">
+                  <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:none;stroke:var(--mu);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                </div>
+                <div style="flex:1;min-width:0">
+                  <div class="int-name">Site da loja</div>
+                  <div class="int-desc" x-text="knowledge.websiteSensor.note"></div>
+                </div>
+                <span class="badge"
+                  :class="{
+                    'badge-green': knowledge.websiteSensor.status==='connected',
+                    'badge-gold':  knowledge.websiteSensor.status==='pending_scan' || knowledge.websiteSensor.status==='pending',
+                    'badge-gray':  knowledge.websiteSensor.status==='unavailable' || knowledge.websiteSensor.status==='error'
+                  }"
+                  x-text="{'connected':'Sincronizado','pending_scan':'Configurado','pending':'Pendente','unavailable':'Inativo','error':'Erro'}[knowledge.websiteSensor.status]||'Inativo'">
+                </span>
               </div>
-              <div style="flex:1;min-width:0">
-                <div class="int-name">Site da loja</div>
-                <div class="int-desc" x-text="knowledge.websiteSensor.websiteUrl ? (knowledge.websiteSensor.websiteUrl + ' — ' + knowledge.websiteSensor.note) : knowledge.websiteSensor.note"></div>
+              <!-- Botão Analisar site -->
+              <div x-show="knowledge.websiteSensor.status === 'pending_scan' || knowledge.websiteSensor.status === 'connected'">
+                <button class="btn" style="font-size:11px;padding:5px 12px;width:100%;justify-content:center"
+                  @click="scanSite()" :disabled="siteScanLoading">
+                  <span x-text="siteScanLoading ? 'Analisando...' : (knowledge.websiteSensor.status==='connected' ? 'Re-analisar site' : 'Analisar site')"></span>
+                </button>
+                <div x-show="siteScanSummary" style="margin-top:8px;font-size:11px;color:var(--mu);background:var(--card2);border-radius:6px;padding:8px 10px;line-height:1.5"
+                  x-text="siteScanSummary"></div>
+                <div x-show="siteScanError" style="margin-top:6px;font-size:11px;color:var(--red)" x-text="siteScanError"></div>
               </div>
-              <span class="badge"
-                :class="{
-                  'badge-green': knowledge.websiteSensor.status==='connected',
-                  'badge-gold':  knowledge.websiteSensor.status==='pending_scan' || knowledge.websiteSensor.status==='pending',
-                  'badge-gray':  knowledge.websiteSensor.status==='unavailable' || knowledge.websiteSensor.status==='error'
-                }"
-                x-text="{'connected':'Conectado','pending_scan':'Configurado','pending':'Pendente','unavailable':'Inativo','error':'Erro'}[knowledge.websiteSensor.status]||'Inativo'">
-              </span>
             </div>
 
             <!-- Instagram -->

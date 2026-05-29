@@ -105,8 +105,11 @@ function FluxoCommand() {
     reportsLoading: false,
 
     /* integracoes — inteligência da loja */
-    knowledge: null,
+    knowledge:       null,
     knowledgeLoading: false,
+    siteScanLoading:  false,
+    siteScanSummary:  '',
+    siteScanError:    '',
 
     /* integracoes — canais */
     channels: [],
@@ -1116,6 +1119,33 @@ function FluxoCommand() {
         if (j.ok) this.knowledge = j.knowledge;
       } catch (_) {}
       finally { this.knowledgeLoading = false; }
+    },
+
+    async scanSite() {
+      if (this.siteScanLoading) return;
+      this.siteScanLoading = true;
+      this.siteScanSummary = '';
+      this.siteScanError   = '';
+      try {
+        const r = await this.authFetch('/api/knowledge/site/scan', { method: 'POST' });
+        const j = await r.json();
+        if (j.ok && j.result) {
+          const res = j.result;
+          const parts = [];
+          if (res.title)           parts.push(`Título: ${res.title}`);
+          if (res.metaDescription) parts.push(`Descrição: ${res.metaDescription}`);
+          if (res.headings?.length) parts.push(`Seções encontradas: ${res.headings.slice(0,5).join(', ')}`);
+          if (res.internalLinks?.length) parts.push(`Links internos: ${res.internalLinks.length}`);
+          this.siteScanSummary = parts.join(' · ') || 'Site analisado com sucesso.';
+          await this.loadKnowledge();
+        } else {
+          this.siteScanError = j.error || 'Erro ao analisar site.';
+        }
+      } catch (_) {
+        this.siteScanError = 'Erro de conexão ao analisar site.';
+      } finally {
+        this.siteScanLoading = false;
+      }
     },
 
     async loadChannels() {

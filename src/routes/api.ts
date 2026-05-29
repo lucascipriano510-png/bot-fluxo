@@ -870,6 +870,25 @@ router.get('/knowledge', async (req, res) => {
   }
 });
 
+// ── Site scan — escaneia homepage da loja configurada ────────────────────────
+router.post('/knowledge/site/scan', async (req, res) => {
+  try {
+    const settings = await getRuntimeSettings(req.storeId!);
+    const siteUrl  = settings.site_url;
+    if (!siteUrl) {
+      return res.json({ ok: false, error: 'site_url não configurado. Defina em Configurações → Perfil da Loja.' });
+    }
+    const { scanSite }                       = await import('../services/siteScanService');
+    const { updateSiteScan, clearKnowledgeCache } = await import('../services/storeKnowledgeService');
+    const result = await scanSite(siteUrl);
+    updateSiteScan(req.storeId!, result);
+    clearKnowledgeCache(req.storeId!);
+    res.json({ ok: true, result });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
 // ── Canais — status de todos os conectores ───────────────────────────────────
 router.get('/channels', async (req, res) => {
   try {
