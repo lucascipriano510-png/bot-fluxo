@@ -432,8 +432,14 @@ async function loadKnownBrands(storeId: string): Promise<string[]> {
 // ── Fuzzy correction — corrige typos de marca contra o catálogo real ──────────
 async function fuzzyCorrectBrand(storeId: string, input: string): Promise<string> {
   const norm = normalizeText(input);
+  // Threshold proporcional: curtas (≤4) e médias (5-6) aceitam 1 erro;
+  // longas (≥7) não fazem fuzzy — marcas como "lacoste" são específicas demais.
+  const threshold = norm.length <= 4 ? 1 : norm.length <= 6 ? 1 : 0;
+  if (threshold === 0) {
+    console.log(`[InventoryBridge] fuzzy brand: "${norm}" — palavra longa, sem correção fuzzy`);
+    return norm;
+  }
   const brands = await loadKnownBrands(storeId);
-  const threshold = norm.length <= 5 ? 1 : 2;
   let best = norm, bestDist = threshold + 1;
   for (const brand of brands) {
     const d = levenshtein(norm, brand);
@@ -470,9 +476,36 @@ const PT_STOP = new Set([
   'como','onde','qual','quais','quanto','quanta',
   'ate','aqui','ali','bem','muito','pouco',
   'novo','nova','bom','boa','top','legal','certo','certa',
+  // Termos de preço e pagamento — nunca são nomes de produto
+  'valor','preco','custa','custo','pagar','pagamento',
+  'forma','formas','parcelar','parcela','desconto','promocao','oferta',
+  'barato','caro','salgado',
+  // Termos de entrega
+  'entrega','frete','envio','enviar','prazo','correios','motoboy',
+  'entregar','receber','chegou','chegar',
+  // Termos de troca / pós-venda
+  'troca','trocar','devolver','devolucao','garantia','defeito',
+  // Termos de contato / loja
+  'site','instagram','whatsapp','zap','contato','atendente','vendedor',
+  'loja','horario','horarios','aberto','fecha','abre','funciona',
+  // Termos de catálogo / visual
+  'catalogo','imagem','imagens','link',
+  // Qualificadores genéricos
+  'melhor','bonito','bonita',
 ]);
 
+// Padrões que indicam pergunta comercial sem produto específico — retornam null imediatamente
+const PRICE_ONLY_PATTERNS = [
+  /^qual [ée] o (valor|pre[çc]o)[^?]*\?*$/i,
+  /^quanto (custa|[ée]|fica|ta|tá)[^?]*\?*$/i,
+  /^(tem|qual|como)[^?]*(desconto|promo[çc][aã]o|oferta)[^?]*\?*$/i,
+];
+
 export function detectProductQuery(message: string): BotProductSearchFilters | null {
+  for (const re of PRICE_ONLY_PATTERNS) {
+    if (re.test(message.trim())) return null;
+  }
+
   const norm = normalizeText(message);
   const filters: BotProductSearchFilters = {};
 
