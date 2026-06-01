@@ -149,6 +149,7 @@ function FluxoCommand() {
     atendSending: false,
     atendLead: null,
     atendHumano: false,
+    atendLoading: false,
     viewedConvs: new Set(),
     _inboxPoller: null,
 
@@ -414,7 +415,7 @@ function FluxoCommand() {
                 text: m.conteudo,
                 time: this.fmtTime(m.criado_em || m.created_at),
               }));
-              this.$nextTick(() => this.scrollChat());
+              this.scrollChat();
             }
           } catch (_) {}
         }
@@ -663,10 +664,20 @@ function FluxoCommand() {
     },
 
     scrollChat() {
-      const el = document.getElementById('sim-messages');
-      if (el) el.scrollTop = el.scrollHeight;
-      const el2 = document.getElementById('atend-messages');
-      if (el2) el2.scrollTop = el2.scrollHeight;
+      this.$nextTick(() => {
+        this.$nextTick(() => {
+          const el = document.getElementById('atend-messages');
+          if (el) {
+            el.scrollTop = el.scrollHeight;
+            requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+          }
+          const el2 = document.getElementById('sim-messages');
+          if (el2) {
+            el2.scrollTop = el2.scrollHeight;
+            requestAnimationFrame(() => { el2.scrollTop = el2.scrollHeight; });
+          }
+        });
+      });
     },
 
     /* ── Produtos CRUD ──────────────────────────────────────────────────── */
@@ -979,8 +990,8 @@ function FluxoCommand() {
 
     crmWhatsApp(phone) {
       let n = (phone || '').replace(/\D/g, '');
-      if (n.length <= 11 && !n.startsWith('55')) n = '55' + n;
-      return `https://wa.me/${n}`;
+      if (n && !n.startsWith('55')) n = '55' + n;
+      return n ? `https://wa.me/${n}` : '#';
     },
 
     async convertLead(id) {
@@ -1135,9 +1146,10 @@ function FluxoCommand() {
     async selectConv(conv) {
       if (!this.viewedConvs) this.viewedConvs = new Set();
       this.viewedConvs.add(conv.id);
-      this.selectedConv  = conv.id;
+      this.selectedConv  = String(conv.id);
       this.atendPhone    = conv.phone;
       this.atendMessages = [];
+      this.atendLoading  = true;
       this.atendHumano   = conv.humano_ativo || false;
       this.atendLead     = this.leads.find(l => l.phone === conv.phone) || null;
       if (!this.atendLead) {
@@ -1161,9 +1173,14 @@ function FluxoCommand() {
             text: m.conteudo,
             time: this.fmtTime(m.criado_em || m.created_at),
           }));
-          this.$nextTick(() => this.scrollChat());
+          this.atendLoading = false;
+          this.scrollChat();
+        } else {
+          this.atendLoading = false;
         }
-      } catch (_) {}
+      } catch (_) {
+        this.atendLoading = false;
+      }
     },
 
     async assumeConv() {
@@ -1192,7 +1209,7 @@ function FluxoCommand() {
         const j = await r.json();
         if (j.ok) {
           this.atendMessages.push({ from: 'bot', text: sent, time: this.timeNow() });
-          this.$nextTick(() => this.scrollChat());
+          this.scrollChat();
           if (!j.whatsappSent && j.whatsappError) {
             console.warn('[Inbox] Mensagem salva mas WhatsApp não enviou:', j.whatsappError);
           }

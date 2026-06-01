@@ -525,7 +525,7 @@
             Nenhuma conversa ainda.<br>Aguardando a primeira mensagem do WhatsApp.
           </div>
           <template x-for="c in conversations" :key="c.id">
-            <div class="conv-item" :class="{ selected: selectedConv === c.id }" style="margin:4px 6px;border-radius:8px" @click="selectConv(c)">
+            <div class="conv-item" :class="{ selected: String(selectedConv) === String(c.id) }" style="margin:4px 6px;border-radius:8px" @click="selectConv(c)">
               <div class="conv-avatar" x-text="c.avatar || c.name?.charAt(0)"></div>
               <div class="conv-info">
                 <div class="conv-name" x-text="c.name || c.phone"></div>
@@ -574,9 +574,20 @@
                 <div class="bubble-time" x-text="m.time"></div>
               </div>
             </template>
-            <div x-show="currentConvMessages.length === 0" class="empty" style="padding:40px 20px">
+            <!-- Carregando -->
+            <div x-show="atendLoading" style="display:flex;align-items:center;justify-content:center;flex:1;color:var(--mu);font-size:13px;gap:8px;padding:40px 20px">
+              <svg style="width:16px;height:16px;animation:spin 1s linear infinite" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+              Carregando mensagens...
+            </div>
+            <!-- Sem conversa selecionada -->
+            <div x-show="!atendLoading && !atendPhone" class="empty" style="padding:40px 20px">
               <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              <p x-text="atendPhone ? 'Sem mensagens registradas.' : 'Selecione uma conversa.'"></p>
+              <p>Selecione uma conversa.</p>
+            </div>
+            <!-- Conversa selecionada mas sem mensagens -->
+            <div x-show="!atendLoading && atendPhone && currentConvMessages.length === 0" class="empty" style="padding:40px 20px">
+              <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <p>Sem mensagens registradas.</p>
             </div>
           </div>
 
@@ -610,7 +621,7 @@
             </div>
           </div>
           <div style="margin-top:18px;display:flex;flex-direction:column;gap:8px">
-            <a x-show="currentConv?.phone" :href="'https://wa.me/' + (currentConv?.phone||'').replace(/\D/g,'')" target="_blank"
+            <a x-show="currentConv?.phone" :href="(() => { let n = (currentConv?.phone||'').replace(/\D/g,''); if(n && !n.startsWith('55')) n='55'+n; return n ? 'https://wa.me/'+n : '#'; })()" target="_blank"
               class="btn btn-green" style="justify-content:center;text-decoration:none;gap:6px">
               <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.06 6.06l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
               Abrir no WhatsApp

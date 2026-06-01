@@ -1248,6 +1248,8 @@ body {
   animation: shimmer 1.4s infinite;
 }
 
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* ── Toast slide-in ────────────────────────────────── */
 @keyframes toastIn {
   from { opacity: 0; transform: translateY(12px); }
