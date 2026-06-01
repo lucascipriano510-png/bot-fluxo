@@ -1,4 +1,5 @@
 import { FLOW_MAP, NodeId } from './flowMap';
+import { supabase } from '../lib/supabase';
 import { BotSession, BotResponse } from '../types';
 import { updateSession } from '../services/sessionService';
 import { saveMensagem, fetchHistorico } from '../services/mensagemService';
@@ -23,6 +24,26 @@ import { aiAssist, AiAssistContext } from '../services/aiAssistService';
 import { buildRuntimeKnowledgeContext } from '../services/storeKnowledgeService';
 import { getRuntimeSettings } from '../services/settingsService';
 
+// ── Cache de respostas rápidas por store (TTL 30s) ────────────────────────────
+const _rrCache = new Map<string, { data: Array<{ gatilhos: string[]; resposta: string; prioridade: number }>; expiresAt: number }>();
+
+async function getRespostasRapidas(storeId: string) {
+  const now    = Date.now();
+  const cached = _rrCache.get(storeId);
+  if (cached && now < cached.expiresAt) return cached.data;
+
+  const { data } = await supabase
+    .from('bot_respostas_rapidas')
+    .select('gatilhos, resposta, prioridade')
+    .eq('store_id', storeId)
+    .eq('ativo', true)
+    .order('prioridade', { ascending: false });
+
+  const result = (data || []) as Array<{ gatilhos: string[]; resposta: string; prioridade: number }>;
+  _rrCache.set(storeId, { data: result, expiresAt: now + 30_000 });
+  return result;
+}
+
 function estimateValue(_ctx: Record<string, string>): number {
   return 100;
 }
@@ -42,6 +63,12 @@ export async function processMessage(
   // ── PRÉ-CHECAGEM 0: Bot ativo ─────────────────────────────────────────────
   const rtSettings = await getRuntimeSettings(storeId);
   if (!rtSettings.bot_ativo) {
+    return { text: '', nextNode: session.current_node || 'INICIO', context: session.context };
+  }
+
+  // ── PRÉ-CHECAGEM 0b: Humano ativo — bot silencioso ────────────────────────
+  if (session.humano_ativo === true) {
+    await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: 'HUMANO' });
     return { text: '', nextNode: session.current_node || 'INICIO', context: session.context };
   }
 
@@ -100,13 +127,29 @@ export async function processMessage(
     _deliveryInfo:  runtimeKnowledge.commercial.deliveryInfo  || '',
     _paymentInfo:   runtimeKnowledge.commercial.paymentInfo   || '',
     _openingHours:  runtimeKnowledge.commercial.openingHours  || '',
-    _siteUrl:       runtimeKnowledge.commercial.siteUrl       || '',
+    _siteUrl:       runtimeKnowledge.commercial.siteUrl || runtimeKnowledge.websiteSensor?.websiteUrl || '',
     _catalogUrl:    runtimeKnowledge.commercial.catalogUrl    || '',
     _returnPolicy:  runtimeKnowledge.commercial.returnPolicy  || '',
     _discountRules: runtimeKnowledge.commercial.discountRules || '',
     // Voice
     _salesTone:     runtimeKnowledge.voice.salesTone || '',
   };
+
+  // ── PRÉ-CHECAGEM 3b: Respostas Rápidas ───────────────────────────────────
+  const respostasRapidas = await getRespostasRapidas(storeId);
+  if (respostasRapidas.length > 0) {
+    const msgNorm = messageText.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+    for (const rr of respostasRapidas) {
+      const matched = (rr.gatilhos || []).some(g =>
+        msgNorm.includes(g.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''))
+      );
+      if (matched) {
+        await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
+        await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: rr.resposta, node: 'RESPOSTA_RAPIDA' });
+        return { text: rr.resposta, nextNode: currentNodeId, context: ctx };
+      }
+    }
+  }
 
   // ── PRÉ-CHECAGEM 4: Roteamento por intenção + catálogo ──────────────────
   // Detecta intenção antes de buscar catálogo para evitar buscas desnecessárias

@@ -5,6 +5,7 @@ export interface BotSession {
   nome?: string;
   current_node: string;
   context: Record<string, string>;
+  humano_ativo?: boolean;
   criado_em?: string;
   atualizado_em?: string;
 }
@@ -35,6 +36,7 @@ export interface BotLead {
   proxima_acao?: string;
   valor_potencial?: number;
   status: 'novo' | 'qualificado' | 'encaminhado' | 'concluido';
+  kanban_stage?: string;
   context?: Record<string, string>;
   qualificado_em?: string;
   atualizado_em?: string;

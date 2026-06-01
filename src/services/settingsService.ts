@@ -46,6 +46,10 @@ export interface BotSettings {
   sales_instructions?: string;
   return_policy?:      string;
   discount_rules?:     string;
+  // Resultado do último scan do site (persiste entre deploys)
+  site_scan_summary?:  string;
+  site_scan_title?:    string;
+  site_scan_at?:       string;
 }
 
 const DEFAULTS: BotSettings = {
@@ -90,6 +94,9 @@ function mergeDefaults(row: Record<string, unknown>): BotSettings {
     sales_instructions: (row.sales_instructions as string | undefined) ?? undefined,
     return_policy:      (row.return_policy      as string | undefined) ?? undefined,
     discount_rules:     (row.discount_rules     as string | undefined) ?? undefined,
+    site_scan_summary:  (row.site_scan_summary  as string | undefined) ?? undefined,
+    site_scan_title:    (row.site_scan_title    as string | undefined) ?? undefined,
+    site_scan_at:       (row.site_scan_at       as string | undefined) ?? undefined,
   };
 }
 

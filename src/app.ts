@@ -48,8 +48,10 @@ app.post('/webhook/:storeSlug', resolveStoreBySlug, async (req, res) => {
     const storeId = req.storeId!;
     const session = await getOrCreateSession(storeId, parsed.phone);
     const response = await processMessage(session, parsed.text);
-    if (TYPING_DELAY_MS > 0) await sleep(TYPING_DELAY_MS + Math.random() * 400);
-    await sendMessage(parsed.phone, response.text, storeId);
+    if (response.text) {
+      if (TYPING_DELAY_MS > 0) await sleep(TYPING_DELAY_MS + Math.random() * 400);
+      await sendMessage(parsed.phone, response.text, storeId);
+    }
     return res.json({ ok: true, nextNode: response.nextNode });
   } catch (err) {
     console.error('[webhook/:storeSlug]', err);
@@ -74,8 +76,10 @@ app.post('/webhook', async (req, res) => {
     const storeCtx = await getStoreContext();
     const session  = await getOrCreateSession(storeCtx.storeId, parsed.phone);
     const response = await processMessage(session, parsed.text);
-    if (TYPING_DELAY_MS > 0) await sleep(TYPING_DELAY_MS + Math.random() * 400);
-    await sendMessage(parsed.phone, response.text, storeCtx.storeId);
+    if (response.text) {
+      if (TYPING_DELAY_MS > 0) await sleep(TYPING_DELAY_MS + Math.random() * 400);
+      await sendMessage(parsed.phone, response.text, storeCtx.storeId);
+    }
     return res.json({ ok: true, nextNode: response.nextNode });
   } catch (err) {
     console.error('[webhook]', err);

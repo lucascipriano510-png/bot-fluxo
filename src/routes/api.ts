@@ -883,6 +883,12 @@ router.post('/knowledge/site/scan', async (req, res) => {
     const result = await scanSite(siteUrl);
     updateSiteScan(req.storeId!, result);
     clearKnowledgeCache(req.storeId!);
+    // Persiste resumo no banco para sobreviver a deploys e cold starts
+    await saveSettings(req.storeId!, {
+      site_scan_summary: result.rawSummary.slice(0, 2000),
+      site_scan_title:   result.title || '',
+      site_scan_at:      result.scannedAt,
+    });
     res.json({ ok: true, result });
   } catch (err: unknown) {
     res.json({ ok: false, error: errMsg(err) });

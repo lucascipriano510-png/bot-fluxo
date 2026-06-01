@@ -18,6 +18,7 @@ export async function registerLead(lead: Omit<BotLead, 'id' | 'qualificado_em'>)
         proxima_acao:     lead.proxima_acao,
         valor_potencial:  lead.valor_potencial,
         status:           lead.status || 'qualificado',
+        kanban_stage:     lead.kanban_stage || (lead.status_comercial === 'QUENTE' ? 'interessado' : 'novo'),
         context:          lead.context || {},
         atualizado_em:    new Date().toISOString(),
       }],

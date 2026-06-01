@@ -352,6 +352,18 @@ export async function getStoreKnowledge(storeId: string): Promise<StoreKnowledge
           note:        `Sincronizado em ${new Date(scan.scannedAt).toLocaleString('pt-BR')}. ${scan.title ? 'Título: ' + scan.title : ''}`,
         };
       }
+      // Fallback: dados persistidos no banco (sobrevive a deploys e cold starts)
+      if (settings.site_scan_at && settings.site_scan_summary) {
+        return {
+          websiteUrl:  profile.siteUrl || undefined,
+          catalogUrl:  profile.catalogUrl || undefined,
+          status:      'connected' as const,
+          lastScanAt:  settings.site_scan_at,
+          extracted:   { storeName: settings.site_scan_title || undefined },
+          rawSummary:  settings.site_scan_summary,
+          note:        `Dados do último scan (${new Date(settings.site_scan_at).toLocaleString('pt-BR')}).`,
+        };
+      }
       return {
         websiteUrl:  profile.siteUrl || undefined,
         catalogUrl:  profile.catalogUrl || undefined,
@@ -404,7 +416,7 @@ export async function buildRuntimeKnowledgeContext(storeId: string): Promise<Run
     commercial:    kb.commercial,
     voice:         kb.voice,
     catalog:       kb.catalog,
-    websiteSensor: kb.websiteSensor.status === 'connected' ? kb.websiteSensor : undefined,
+    websiteSensor: kb.websiteSensor,
     gaps:          kb.knowledgeGaps.map(g => g.field),
     safeToAnswer: (topic: string) => !kb.knowledgeGaps.some(g => g.field === topic),
   };
