@@ -38,6 +38,7 @@ export interface AiAssistContext {
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
   storeCategories?:     string[];
   segmentInstructions?: string;
+  storeBrain?:          string;
 }
 
 // ── Guardrails rígidos — nunca removíveis ────────────────────────────────────
@@ -142,6 +143,8 @@ export function createSystemPrompt(ctx: AiAssistContext, intentHint?: string): s
     ? `\nINSTRUÇÕES DO SEGMENTO:\n${ctx.segmentInstructions}`
     : '';
 
+  const brainSection = ctx.storeBrain ? `\n${ctx.storeBrain}` : '';
+
   const intentInstruction = intentHint && INTENT_INSTRUCTIONS[intentHint]
     ? `\nCONTEXTO DA MENSAGEM ATUAL:\n${INTENT_INSTRUCTIONS[intentHint]}`
     : '';
@@ -152,6 +155,7 @@ export function createSystemPrompt(ctx: AiAssistContext, intentHint?: string): s
     'DADOS DA LOJA:',
     storeData,
     segmentSection,
+    brainSection,
     '',
     'REGRAS DE RESPOSTA (OBRIGATÓRIAS):',
     `- ${greetingRule}`,

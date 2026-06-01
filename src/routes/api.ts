@@ -15,6 +15,8 @@ import { saveMensagem } from '../services/mensagemService';
 import { checkRateLimit } from '../utils/rateLimiter';
 import { requireAuth } from '../middleware/auth';
 import { sendMessage, invalidateCredCache } from '../providers/messaging';
+import { runStoreAnalysis } from '../services/analysisService';
+import { recordConversion } from '../services/storeBrainService';
 
 const router = Router();
 
@@ -392,6 +394,8 @@ router.post('/leads/:id/convert', async (req, res) => {
       .eq('id', req.params.id)
       .eq('store_id', req.storeId!);
     if (error) throw error;
+    const { data: converted } = await supabase.from('bot_leads').select('phone').eq('id', req.params.id).single();
+    if (converted?.phone) recordConversion(req.storeId!, converted.phone, 'human_converted').catch(() => {});
     res.json({ ok: true });
   } catch (err: unknown) {
     res.json({ ok: false, error: errMsg(err) });
@@ -1152,6 +1156,61 @@ router.delete('/respostas/:id', async (req, res) => {
       .eq('store_id', req.storeId!);
     if (isMissingTable(error)) return res.status(503).json({ ok: false, setup_needed: true });
     if (error) throw error;
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
+// ── Brain da loja ─────────────────────────────────────────────────────────────
+router.get('/brain', async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('store_brain')
+      .select('*')
+      .eq('store_id', req.storeId!)
+      .single();
+    res.json({ ok: true, data: data || null });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
+router.post('/brain/analyze', async (req, res) => {
+  try {
+    const result = await runStoreAnalysis(req.storeId!);
+    res.json(result);
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
+router.post('/brain/cron', async (req, res) => {
+  const secret = req.headers['x-cron-secret'];
+  if (secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  }
+  try {
+    const { data: stores } = await supabase
+      .from('stores')
+      .select('id')
+      .in('status', ['active', 'trial']);
+    const results = [];
+    for (const store of (stores || [])) {
+      const result = await runStoreAnalysis(store.id);
+      results.push({ storeId: store.id, ...result });
+    }
+    res.json({ ok: true, results });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
+router.post('/brain/conversion', async (req, res) => {
+  const { phone, type } = req.body as { phone?: string; type?: string };
+  if (!phone) return res.status(400).json({ ok: false, error: 'phone obrigatório' });
+  try {
+    await recordConversion(req.storeId!, phone, (type as 'bot_converted' | 'human_converted') || 'bot_converted');
     res.json({ ok: true });
   } catch (err: unknown) {
     res.json({ ok: false, error: errMsg(err) });

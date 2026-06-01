@@ -155,6 +155,12 @@ function FluxoCommand() {
     /* follow-up */
     followupToday: [],
 
+    /* brain / análise */
+    brain: null,
+    analysisRunning: false,
+    analysisFeedback: null,
+    analysisFeedbackMsg: '',
+
     /* settings */
     cfg: {
       nome_loja:          '',
@@ -387,6 +393,7 @@ function FluxoCommand() {
         this.loadSettings(),
         this.loadReports(),
         this.loadFollowupToday(),
+        this.loadBrain(),
       ]);
       if (this.page === 'kanban')      this.loadKanban();
       if (this.page === 'relatorios')  this.loadReports();
@@ -526,6 +533,38 @@ function FluxoCommand() {
         const j = await r.json();
         if (j.ok && Array.isArray(j.data)) this.followupToday = j.data;
       } catch (_) {}
+    },
+
+    async loadBrain() {
+      try {
+        const r = await this.authFetch('/api/brain');
+        const j = await r.json();
+        if (j.ok && j.data) this.brain = j.data;
+      } catch (_) {}
+    },
+
+    async runAnalysis() {
+      if (this.analysisRunning) return;
+      this.analysisRunning = true;
+      this.analysisFeedback = null;
+      try {
+        const r = await this.authFetch('/api/brain/analyze', { method: 'POST' });
+        const j = await r.json();
+        if (j.ok) {
+          this.analysisFeedback = 'ok';
+          this.analysisFeedbackMsg = `✅ ${j.conversationsAnalyzed} conversas analisadas. Brain atualizado!`;
+          await this.loadBrain();
+        } else {
+          this.analysisFeedback = 'erro';
+          this.analysisFeedbackMsg = j.error || 'Erro na análise.';
+        }
+      } catch (_) {
+        this.analysisFeedback = 'erro';
+        this.analysisFeedbackMsg = 'Erro de conexão.';
+      } finally {
+        this.analysisRunning = false;
+        setTimeout(() => { this.analysisFeedback = null; }, 5000);
+      }
     },
 
     async loadProducts() {

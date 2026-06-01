@@ -22,6 +22,7 @@ import {
 import { detectIntent } from '../services/intentService';
 import { handleIntent } from '../services/chatBrainService';
 import { aiAssist, AiAssistContext, buildSegmentInstructions } from '../services/aiAssistService';
+import { getStoreBrain, buildBrainContext, StoreBrain } from '../services/storeBrainService';
 import { buildRuntimeKnowledgeContext } from '../services/storeKnowledgeService';
 import { getRuntimeSettings } from '../services/settingsService';
 
@@ -250,6 +251,10 @@ export async function processMessage(
     'complaint', 'price_sensitivity', 'gift', 'wholesale', 'new_arrivals', 'catalog', 'busca_item',
   ]);
   if (AI_ASSIST_INTENTS.has(intentResult.intent)) {
+    // Carrega brain da loja (cacheado 5min)
+    const brain    = await getStoreBrain(storeId).catch(() => ({} as StoreBrain));
+    const brainCtx = buildBrainContext(brain);
+
     // Busca histórico da sessão para dar memória conversacional à IA
     const rawHistory = await fetchHistorico(storeId, session.phone, 8);
     const mappedHistory = rawHistory
@@ -296,6 +301,7 @@ export async function processMessage(
       conversationHistory:  conversationHistory.length > 0 ? conversationHistory : undefined,
       storeCategories:      storeCategories5.length > 0 ? storeCategories5 : undefined,
       segmentInstructions:  buildSegmentInstructions(ctx._businessType, storeCategories5),
+      storeBrain:           brainCtx || undefined,
     };
     const aiReply = await aiAssist(messageText, aiCtx, intentResult.intent);
     if (aiReply) {
@@ -312,6 +318,8 @@ export async function processMessage(
     if (brainResult.usedFallback) {
       const site = runtimeKnowledge.websiteSensor;
       const storeCategories6 = await loadStoreCategories(storeId).catch(() => [] as string[]);
+      const brain6    = await getStoreBrain(storeId).catch(() => ({} as StoreBrain));
+      const brainCtx6 = buildBrainContext(brain6);
       const aiCtx: AiAssistContext = {
         storeName:       ctx._storeName    || 'nossa loja',
         businessType:    ctx._businessType || undefined,
@@ -328,6 +336,7 @@ export async function processMessage(
         siteSummary:         site?.rawSummary || undefined,
         storeCategories:     storeCategories6.length > 0 ? storeCategories6 : undefined,
         segmentInstructions: buildSegmentInstructions(ctx._businessType, storeCategories6),
+        storeBrain:          brainCtx6 || undefined,
       };
       const aiFallbackReply = await aiAssist(messageText, aiCtx, intentResult.intent);
       if (aiFallbackReply) {
