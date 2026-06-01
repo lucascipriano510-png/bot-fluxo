@@ -293,6 +293,27 @@
         </div>
       </div>
 
+      <!-- Follow-up do dia -->
+      <div x-show="followupToday.length > 0"
+        style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:12px;padding:16px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:700;color:#f59e0b;margin-bottom:10px">
+          🔔 Follow-up pendente hoje — <span x-text="followupToday.length"></span> lead(s)
+        </div>
+        <template x-for="lead in followupToday.slice(0,5)" :key="lead.id">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+            <div>
+              <div style="font-size:13px;font-weight:600" x-text="lead.nome || lead.phone"></div>
+              <div style="font-size:11px;color:var(--mu)" x-text="lead.interesse || '—'"></div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <a :href="crmWhatsApp(lead.phone)" target="_blank" class="btn btn-green" style="font-size:11px;padding:4px 10px">WhatsApp</a>
+              <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" @click="navigate('leads'); $nextTick(() => { const l = leads.find(x=>x.id===lead.id); if(l) selectCrmLead(l); })">CRM</button>
+              <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" @click="followupDone(lead.id, 3)">✓ Feito</button>
+            </div>
+          </div>
+        </template>
+      </div>
+
       <!-- Bot Control + Recent -->
       <div class="grid-3-1 mb-6">
         <div class="card">
@@ -511,7 +532,8 @@
                 <div class="conv-msg" x-text="c.msg || c.node"></div>
                 <div style="display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap">
                   <span class="badge" style="font-size:10px" :class="tagColor(c.tag || 'novo')" x-text="c.tag || 'novo'"></span>
-                  <span x-show="c.humano_ativo" style="background:var(--gold,#f59e0b);color:#000;border-radius:4px;font-size:9px;font-weight:700;padding:1px 5px;letter-spacing:0.3px">HUMANO</span>
+                  <span x-show="c.humano_ativo" style="background:#f59e0b;color:#000;border-radius:4px;font-size:9px;font-weight:700;padding:1px 5px;letter-spacing:.3px;flex-shrink:0">HUMANO</span>
+                  <span x-show="c.unread > 0 && !c.humano_ativo" style="background:#22c55e;color:#000;border-radius:10px;font-size:9px;font-weight:700;padding:2px 6px;flex-shrink:0">NOVO</span>
                 </div>
               </div>
               <div class="conv-meta">
@@ -597,6 +619,11 @@
               <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
               Ver no CRM
             </button>
+            <div style="display:flex;gap:6px;margin-top:2px" x-show="atendLead && !atendLead._fromSession">
+              <button class="btn btn-green" style="flex:1;justify-content:center;font-size:11px" @click="convertLead(atendLead.id)">✅ Convertido</button>
+              <button class="btn" style="flex:1;justify-content:center;font-size:11px;background:rgba(239,68,68,.15);color:#ef4444;border-color:#ef4444" @click="loseLead(atendLead.id)">❌ Perdido</button>
+            </div>
+            <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:11px;margin-top:4px" x-show="atendLead && !atendLead._fromSession" @click="addNoteLead(atendLead.id)">📝 Adicionar nota</button>
           </div>
         </div>
       </div>
@@ -703,10 +730,17 @@
               </div>
 
               <!-- save bar -->
-              <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">
-                <button class="btn btn-green" style="padding:10px 28px;font-weight:700" @click="saveCrmLead()" :disabled="crmSaving">
-                  <span x-text="crmSaving ? 'Salvando...' : 'Salvar alterações'"></span>
-                </button>
+              <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;gap:8px;flex-wrap:wrap" x-show="crmLead && crmLead.status !== 'concluido'">
+                  <button class="btn btn-green" style="flex:1;justify-content:center;font-size:12px" @click="convertLead(crmLead.id)">✅ Convertido</button>
+                  <button class="btn" style="flex:1;justify-content:center;font-size:12px;background:rgba(239,68,68,.15);color:#ef4444;border-color:#ef4444" @click="loseLead(crmLead.id)">❌ Perdido</button>
+                  <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:12px" @click="addNoteLead(crmLead.id)" x-show="crmLead">📝 Nota</button>
+                </div>
+                <div style="display:flex;justify-content:flex-end">
+                  <button class="btn btn-green" style="padding:10px 28px;font-weight:700" @click="saveCrmLead()" :disabled="crmSaving">
+                    <span x-text="crmSaving ? 'Salvando...' : 'Salvar alterações'"></span>
+                  </button>
+                </div>
               </div>
             </div>
           </template>

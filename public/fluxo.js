@@ -152,6 +152,9 @@ function FluxoCommand() {
     viewedConvs: new Set(),
     _inboxPoller: null,
 
+    /* follow-up */
+    followupToday: [],
+
     /* settings */
     cfg: {
       nome_loja:          '',
@@ -368,28 +371,6 @@ function FluxoCommand() {
       if (!this.authUser) return; // mostra tela de login
 
       await this._loadPanelData();
-      this._inboxPoller = setInterval(async () => {
-        if (this.page !== 'atendimentos') return;
-        await this.loadSessions();
-        await this.loadLeads();
-        if (this.atendPhone) {
-          try {
-            const r = await this.authFetch('/api/messages/' + this.atendPhone);
-            const j = await r.json();
-            if (j.ok && Array.isArray(j.data)) {
-              const newMsgs = j.data.map(m => ({
-                from: m.direcao === 'saida' ? 'bot' : 'user',
-                text: m.conteudo,
-                time: this.fmtTime(m.criado_em),
-              }));
-              if (newMsgs.length !== this.atendMessages.length) {
-                this.atendMessages = newMsgs;
-                this.$nextTick(() => this.scrollChat());
-              }
-            }
-          } catch (_) {}
-        }
-      }, 10000);
       if (this.page === 'relatorios') {
         await this.$nextTick();
         this.initCharts();
@@ -404,11 +385,33 @@ function FluxoCommand() {
         this.loadSessions(),
         this.loadProducts(),
         this.loadSettings(),
+        this.loadReports(),
+        this.loadFollowupToday(),
       ]);
       if (this.page === 'kanban')      this.loadKanban();
       if (this.page === 'relatorios')  this.loadReports();
       if (this.page === 'respostas')   this.loadRespostas();
       if (this.page === 'integracoes') this.loadIntegrations();
+      if (this._inboxPoller) clearInterval(this._inboxPoller);
+      this._inboxPoller = setInterval(async () => {
+        if (this.page !== 'atendimentos') return;
+        await this.loadSessions();
+        await this.loadLeads();
+        if (this.atendPhone) {
+          try {
+            const r = await this.authFetch('/api/messages/' + this.atendPhone);
+            const j = await r.json();
+            if (j.ok && Array.isArray(j.data) && j.data.length !== this.atendMessages.length) {
+              this.atendMessages = j.data.map(m => ({
+                from: m.direcao === 'saida' ? 'bot' : 'user',
+                text: m.conteudo,
+                time: this.fmtTime(m.criado_em || m.created_at),
+              }));
+              this.$nextTick(() => this.scrollChat());
+            }
+          } catch (_) {}
+        }
+      }, 12000);
     },
 
     async _checkStoreStatus() {
@@ -517,6 +520,14 @@ function FluxoCommand() {
       } catch (_) {}
     },
 
+    async loadFollowupToday() {
+      try {
+        const r = await this.authFetch('/api/recovery/today');
+        const j = await r.json();
+        if (j.ok && Array.isArray(j.data)) this.followupToday = j.data;
+      } catch (_) {}
+    },
+
     async loadProducts() {
       this.productsLoading = true;
       try {
@@ -538,14 +549,16 @@ function FluxoCommand() {
             id:           s.id,
             name:         s.nome || s.phone,
             phone:        s.phone,
-            msg:          s.last_msg || `Nó: ${s.current_node}`,
+            msg:          s.last_msg
+                            ? (s.last_msg.length > 55 ? s.last_msg.slice(0, 55) + '…' : s.last_msg)
+                            : `Nó: ${s.current_node}`,
             time:         this.fmtTime(s.atualizado_em),
-            unread:       (!this.viewedConvs.has(s.id) && new Date(s.atualizado_em).getTime() > fiveMinAgo) ? 1 : 0,
-            tag:          'novo',
+            unread:       (!this.viewedConvs?.has(s.id) && new Date(s.atualizado_em).getTime() > fiveMinAgo) ? 1 : 0,
+            tag:          s.status_comercial || 'novo',
             node:         s.current_node,
             avatar:       (s.nome || s.phone).charAt(0).toUpperCase(),
             humano_ativo: s.humano_ativo || false,
-            context:      s.context,
+            context:      s.context || {},
           }));
         }
       } catch (_) {}
@@ -881,7 +894,7 @@ function FluxoCommand() {
           this.crmMessages = (j.data.messages || []).map(m => ({
             from: m.direcao === 'saida' ? 'bot' : 'user',
             text: m.conteudo,
-            time: this.fmtTime(m.criado_em),
+            time: this.fmtTime(m.criado_em || m.created_at),
           }));
         }
       } catch (_) {}
@@ -926,8 +939,95 @@ function FluxoCommand() {
     },
 
     crmWhatsApp(phone) {
-      const n = (phone || '').replace(/\D/g, '');
+      let n = (phone || '').replace(/\D/g, '');
+      if (n.length <= 11 && !n.startsWith('55')) n = '55' + n;
       return `https://wa.me/${n}`;
+    },
+
+    async convertLead(id) {
+      if (!id || !confirm('Marcar como CONVERTIDO (venda fechada)?')) return;
+      try {
+        const r = await this.authFetch(`/api/leads/${id}/convert`, { method: 'POST' });
+        const j = await r.json();
+        if (j.ok) {
+          await this.loadLeads();
+          if (this.page === 'kanban') this.loadKanban();
+          if (this.crmLead?.id === id) this.crmLead.status = 'concluido';
+          this.crmFeedback = 'ok';
+          this.crmFeedbackMsg = '🎉 Lead convertido!';
+        } else {
+          this.crmFeedback = 'erro';
+          this.crmFeedbackMsg = this.apiErr(j.error);
+        }
+      } catch (_) {
+        this.crmFeedback = 'erro';
+        this.crmFeedbackMsg = 'Erro de conexão.';
+      } finally {
+        setTimeout(() => { this.crmFeedback = null; }, 3000);
+      }
+    },
+
+    async loseLead(id) {
+      const motivo = prompt('Motivo da perda (opcional):');
+      if (motivo === null) return;
+      try {
+        const r = await this.authFetch(`/api/leads/${id}/lose`, { method: 'POST', body: JSON.stringify({ motivo }) });
+        const j = await r.json();
+        if (j.ok) {
+          await this.loadLeads();
+          if (this.page === 'kanban') this.loadKanban();
+          this.crmFeedback = 'ok';
+          this.crmFeedbackMsg = 'Lead marcado como perdido.';
+        } else {
+          this.crmFeedback = 'erro';
+          this.crmFeedbackMsg = this.apiErr(j.error);
+        }
+      } catch (_) {
+        this.crmFeedback = 'erro';
+        this.crmFeedbackMsg = 'Erro de conexão.';
+      } finally {
+        setTimeout(() => { this.crmFeedback = null; }, 3000);
+      }
+    },
+
+    async addNoteLead(id) {
+      const text = prompt('Adicionar nota:');
+      if (!text?.trim()) return;
+      try {
+        const r = await this.authFetch(`/api/leads/${id}/note`, { method: 'POST', body: JSON.stringify({ text }) });
+        const j = await r.json();
+        if (j.ok) {
+          if (this.crmLead?.id === id) {
+            const ts = new Date().toLocaleString('pt-BR');
+            this.crmLead.notes = this.crmLead.notes
+              ? `${this.crmLead.notes}\n[${ts}] ${text}`
+              : `[${ts}] ${text}`;
+          }
+          this.crmFeedback = 'ok';
+          this.crmFeedbackMsg = 'Nota adicionada.';
+        } else {
+          this.crmFeedback = 'erro';
+          this.crmFeedbackMsg = this.apiErr(j.error);
+        }
+      } catch (_) {
+        this.crmFeedback = 'erro';
+        this.crmFeedbackMsg = 'Erro de conexão.';
+      } finally {
+        setTimeout(() => { this.crmFeedback = null; }, 3000);
+      }
+    },
+
+    async followupDone(id, dias = 3) {
+      try {
+        const r = await this.authFetch(`/api/leads/${id}/followup-done`, { method: 'POST', body: JSON.stringify({ dias }) });
+        const j = await r.json();
+        if (j.ok) {
+          this.followupToday = this.followupToday.filter(l => l.id !== id);
+          this.crmFeedback = 'ok';
+          this.crmFeedbackMsg = `Follow-up reagendado para ${dias} dias.`;
+        }
+      } catch (_) {}
+      finally { setTimeout(() => { this.crmFeedback = null; }, 3000); }
     },
 
     /* ── Kanban ──────────────────────────────────────────────────────── */
@@ -994,6 +1094,7 @@ function FluxoCommand() {
 
     /* ── Atendimentos ────────────────────────────────────────────────── */
     async selectConv(conv) {
+      if (!this.viewedConvs) this.viewedConvs = new Set();
       this.viewedConvs.add(conv.id);
       this.selectedConv  = conv.id;
       this.atendPhone    = conv.phone;
@@ -1001,18 +1102,15 @@ function FluxoCommand() {
       this.atendHumano   = conv.humano_ativo || false;
       this.atendLead     = this.leads.find(l => l.phone === conv.phone) || null;
       if (!this.atendLead) {
-        const ctxRaw = conv.context;
-        const ctx = typeof ctxRaw === 'string' ? JSON.parse(ctxRaw || '{}') : (ctxRaw || {});
-        const sessionData = {
-          phone:            conv.phone,
-          nome:             ctx.nome || ctx._nome || null,
-          interesse:        ctx.interesse || ctx._interesse || null,
-          cidade:           ctx.cidade || ctx._cidade || null,
-          status_comercial: null,
-          valor_potencial:  ctx.ultimo_preco_visto ? Number(ctx.ultimo_preco_visto) : null,
-        };
-        if (sessionData.nome || sessionData.interesse) {
-          this.atendLead = sessionData;
+        const ctx = (typeof conv.context === 'string')
+          ? (() => { try { return JSON.parse(conv.context); } catch { return {}; } })()
+          : (conv.context || {});
+        const nome      = ctx.nome      || ctx._nome      || null;
+        const interesse = ctx.interesse || ctx._interesse || null;
+        const cidade    = ctx.cidade    || ctx._cidade    || null;
+        const preco     = ctx.ultimo_preco_visto ? Number(ctx.ultimo_preco_visto) : null;
+        if (nome || interesse || cidade) {
+          this.atendLead = { phone: conv.phone, nome, interesse, cidade, status_comercial: null, valor_potencial: preco, _fromSession: true };
         }
       }
       try {
@@ -1022,7 +1120,7 @@ function FluxoCommand() {
           this.atendMessages = j.data.map(m => ({
             from: m.direcao === 'saida' ? 'bot' : 'user',
             text: m.conteudo,
-            time: this.fmtTime(m.criado_em),
+            time: this.fmtTime(m.criado_em || m.created_at),
           }));
           this.$nextTick(() => this.scrollChat());
         }
@@ -1056,8 +1154,17 @@ function FluxoCommand() {
         if (j.ok) {
           this.atendMessages.push({ from: 'bot', text: sent, time: this.timeNow() });
           this.$nextTick(() => this.scrollChat());
+          if (!j.whatsappSent && j.whatsappError) {
+            console.warn('[Inbox] Mensagem salva mas WhatsApp não enviou:', j.whatsappError);
+          }
+        } else {
+          alert('Erro ao enviar: ' + (j.error || 'Tente novamente.'));
+          this.atendReply = sent;
         }
-      } catch (_) {}
+      } catch (_) {
+        alert('Erro de conexão ao enviar mensagem.');
+        this.atendReply = sent;
+      }
       finally { this.atendSending = false; }
     },
 

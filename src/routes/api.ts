@@ -365,6 +365,94 @@ router.get('/recovery', async (req, res) => {
   }
 });
 
+router.get('/recovery/today', async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const { data, error } = await supabase
+      .from('bot_leads')
+      .select('*')
+      .eq('store_id', req.storeId!)
+      .lte('proxima_acao', today)
+      .order('proxima_acao', { ascending: true })
+      .limit(20);
+    if (error) throw error;
+    const filtered = (data || []).filter(l => l.status !== 'concluido' && l.status !== 'perdido');
+    res.json({ ok: true, data: filtered });
+  } catch (err: unknown) {
+    res.json({ ok: false, data: [], error: errMsg(err) });
+  }
+});
+
+// ── Lead actions ──────────────────────────────────────────────────────────────
+router.post('/leads/:id/convert', async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('bot_leads')
+      .update({ status: 'concluido', status_comercial: 'CONVERTIDO', kanban_stage: 'finalizado', atualizado_em: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .eq('store_id', req.storeId!);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
+router.post('/leads/:id/lose', async (req, res) => {
+  const { motivo } = req.body as { motivo?: string };
+  try {
+    const { data: lead } = await supabase.from('bot_leads').select('notes').eq('id', req.params.id).eq('store_id', req.storeId!).single();
+    const ts = new Date().toISOString().slice(0, 10);
+    const notaPerda = motivo?.trim() ? `[${ts}] Perdido: ${motivo.trim()}` : `[${ts}] Marcado como perdido`;
+    const newNotes = lead?.notes ? `${lead.notes}\n${notaPerda}` : notaPerda;
+    const { error } = await supabase
+      .from('bot_leads')
+      .update({ status: 'perdido', status_comercial: 'FRIO', notes: newNotes, atualizado_em: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .eq('store_id', req.storeId!);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
+router.post('/leads/:id/note', async (req, res) => {
+  const { text } = req.body as { text?: string };
+  if (!text?.trim()) return res.status(400).json({ ok: false, error: 'Texto obrigatório' });
+  try {
+    const { data: lead } = await supabase.from('bot_leads').select('notes').eq('id', req.params.id).eq('store_id', req.storeId!).single();
+    const ts = new Date().toLocaleString('pt-BR');
+    const newNotes = lead?.notes ? `${lead.notes}\n[${ts}] ${text.trim()}` : `[${ts}] ${text.trim()}`;
+    const { error } = await supabase
+      .from('bot_leads')
+      .update({ notes: newNotes, atualizado_em: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .eq('store_id', req.storeId!);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
+router.post('/leads/:id/followup-done', async (req, res) => {
+  const { dias = 3 } = req.body as { dias?: number };
+  const nextDate = new Date();
+  nextDate.setDate(nextDate.getDate() + Number(dias));
+  try {
+    const { error } = await supabase
+      .from('bot_leads')
+      .update({ proxima_acao: nextDate.toISOString().slice(0, 10), atualizado_em: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .eq('store_id', req.storeId!);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
 // ── Flow (effective) ──────────────────────────────────────────────────────────
 router.get('/flow', async (req, res) => {
   try {
