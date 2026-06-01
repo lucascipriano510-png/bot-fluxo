@@ -12,6 +12,7 @@ import { getStoreById } from '../services/storeService';
 import {
   detectProductQuery,
   logInventoryQuery,
+  loadStoreCategories,
 } from '../inventory/inventoryBridge';
 import {
   findOffersWithFallback,
@@ -20,7 +21,7 @@ import {
 } from '../catalog/catalogBridge';
 import { detectIntent } from '../services/intentService';
 import { handleIntent } from '../services/chatBrainService';
-import { aiAssist, AiAssistContext } from '../services/aiAssistService';
+import { aiAssist, AiAssistContext, buildSegmentInstructions } from '../services/aiAssistService';
 import { buildRuntimeKnowledgeContext } from '../services/storeKnowledgeService';
 import { getRuntimeSettings } from '../services/settingsService';
 
@@ -165,7 +166,7 @@ export async function processMessage(
   // Mensagem composta: "bom dia, tem camisa preta?" → greeting ganha com score
   // secundário (0.62). Se há filtro de catálogo claro, executa catálogo diretamente.
   if (intentResult.intent === 'greeting' && intentResult.confidence < 0.85) {
-    const compoundFilters = detectProductQuery(messageText);
+    const compoundFilters = await detectProductQuery(messageText, storeId);
     if (compoundFilters) {
       const offerFilters                 = buildOfferFilters(storeId, compoundFilters);
       const { offers, matched, dropped } = await findOffersWithFallback(offerFilters);
@@ -197,7 +198,7 @@ export async function processMessage(
   ];
 
   if (!NON_CATALOG.includes(intentResult.intent)) {
-    const rawFilters = detectProductQuery(messageText);
+    const rawFilters = await detectProductQuery(messageText, storeId);
     if (rawFilters) {
       const offerFilters                 = buildOfferFilters(storeId, rawFilters);
       const { offers, matched, dropped } = await findOffersWithFallback(offerFilters);
@@ -250,6 +251,7 @@ export async function processMessage(
     console.log(`[aiAssist] history=${conversationHistory.length} turns loaded`);
 
     const site = runtimeKnowledge.websiteSensor;
+    const storeCategories5 = await loadStoreCategories(storeId).catch(() => [] as string[]);
     const aiCtx: AiAssistContext = {
       storeName:       ctx._storeName    || 'nossa loja',
       businessType:    ctx._businessType || undefined,
@@ -266,8 +268,10 @@ export async function processMessage(
       siteDescription: site?.rawSummary
         ? site.rawSummary.split('\n').find(l => l.startsWith('Descrição:'))?.replace('Descrição: ', '')
         : undefined,
-      siteSummary:     site?.rawSummary        || undefined,
-      conversationHistory: conversationHistory.length > 0 ? conversationHistory : undefined,
+      siteSummary:          site?.rawSummary        || undefined,
+      conversationHistory:  conversationHistory.length > 0 ? conversationHistory : undefined,
+      storeCategories:      storeCategories5.length > 0 ? storeCategories5 : undefined,
+      segmentInstructions:  buildSegmentInstructions(ctx._businessType, storeCategories5),
     };
     const aiReply = await aiAssist(messageText, aiCtx, intentResult.intent);
     if (aiReply) {
@@ -283,6 +287,7 @@ export async function processMessage(
     // Brain sinalizou que não tem dado estruturado — deixa a IA assumir se disponível
     if (brainResult.usedFallback) {
       const site = runtimeKnowledge.websiteSensor;
+      const storeCategories6 = await loadStoreCategories(storeId).catch(() => [] as string[]);
       const aiCtx: AiAssistContext = {
         storeName:       ctx._storeName    || 'nossa loja',
         businessType:    ctx._businessType || undefined,
@@ -296,7 +301,9 @@ export async function processMessage(
         siteDescription: site?.rawSummary
           ? site.rawSummary.split('\n').find(l => l.startsWith('Descrição:'))?.replace('Descrição: ', '')
           : undefined,
-        siteSummary:     site?.rawSummary || undefined,
+        siteSummary:         site?.rawSummary || undefined,
+        storeCategories:     storeCategories6.length > 0 ? storeCategories6 : undefined,
+        segmentInstructions: buildSegmentInstructions(ctx._businessType, storeCategories6),
       };
       const aiFallbackReply = await aiAssist(messageText, aiCtx, intentResult.intent);
       if (aiFallbackReply) {

@@ -139,7 +139,7 @@ export async function searchProducts(storeId: string, query: string): Promise<Bo
 // 2. getProductsByCategory — busca por categoria
 // ─────────────────────────────────────────────────────────────────────────────
 export async function getProductsByCategory(storeId: string, category: string): Promise<BotProduct[]> {
-  const terms = buildCategoryFilter(category);
+  const terms = await buildDynamicCategoryFilter(storeId, category);
   qlog('getProductsByCategory', { storeId, category, terms });
 
   if (!isSiteStore(storeId)) {
@@ -232,7 +232,10 @@ export async function getProductForBotContext(storeId: string, filters: BotProdu
 
     let q = client.from('products').select(BOT_SELECT).gt('stock', 0).order('featured', { ascending: false });
     if (filters.query)        q = q.ilike('name', `%${filters.query}%`);
-    if (filters.category)     q = q.in('category', buildCategoryFilter(filters.category));
+    if (filters.category) {
+      const catTerms = await buildDynamicCategoryFilter(storeId, filters.category);
+      q = q.in('category', catTerms);
+    }
     if (correctedSub)         q = q.or(`subcategory.ilike.%${correctedSub}%,name.ilike.%${correctedSub}%`);
     if (filters.maxPrice)     q = q.lte('price', filters.maxPrice);
     if (filters.featuredOnly) q = q.eq('featured', true);
@@ -244,7 +247,10 @@ export async function getProductForBotContext(storeId: string, filters: BotProdu
   } else {
     let q = supabase.from('products').select(BOT_SELECT_FULL).eq('store_id', storeId).order('featured', { ascending: false });
     if (filters.query)        q = q.or(`name.ilike.%${filters.query}%,description.ilike.%${filters.query}%`);
-    if (filters.category)     q = q.in('category', buildCategoryFilter(filters.category));
+    if (filters.category) {
+      const catTerms = await buildDynamicCategoryFilter(storeId, filters.category);
+      q = q.in('category', catTerms);
+    }
     if (correctedSub)         q = q.or(`subcategory.ilike.%${correctedSub}%,name.ilike.%${correctedSub}%`);
     if (filters.maxPrice)     q = q.lte('price', filters.maxPrice);
     if (filters.featuredOnly) q = q.eq('featured', true);
@@ -451,6 +457,92 @@ async function fuzzyCorrectBrand(storeId: string, input: string): Promise<string
   return best;
 }
 
+// ── Categorias reais da loja — carregadas do banco, cacheadas 5 min ──────────
+export async function loadStoreCategories(storeId: string): Promise<string[]> {
+  const KEY = `meta:categories:${storeId}`;
+  const cached = cacheGet<string[]>(KEY);
+  if (cached) return cached;
+
+  let data: Array<Record<string, unknown>> | null = null;
+  if (isSiteStore(storeId)) {
+    const client = getSiteClient();
+    if (!client) return [];
+    const res = await client.from('products').select('category');
+    data = res.data;
+  } else {
+    const res = await supabase
+      .from('products')
+      .select('category')
+      .eq('store_id', storeId)
+      .eq('is_active', true);
+    data = res.data;
+  }
+
+  const categories = [
+    ...new Set(
+      (data || [])
+        .map(r => r.category as string)
+        .filter(Boolean)
+        .map(c => c.trim()),
+    ),
+  ];
+  cacheSet(KEY, categories);
+  return categories;
+}
+
+// ── Tags únicas da loja — vocabulário expandido para detecção ────────────────
+async function loadStoreTags(storeId: string): Promise<string[]> {
+  const KEY = `meta:tags:${storeId}`;
+  const cached = cacheGet<string[]>(KEY);
+  if (cached) return cached;
+
+  let data: Array<Record<string, unknown>> | null = null;
+  if (isSiteStore(storeId)) {
+    const client = getSiteClient();
+    if (!client) return [];
+    const res = await client.from('products').select('tags').limit(500);
+    data = res.data;
+  } else {
+    const res = await supabase
+      .from('products')
+      .select('tags')
+      .eq('store_id', storeId)
+      .eq('is_active', true)
+      .limit(500);
+    data = res.data;
+  }
+
+  const allTags = (data || [])
+    .flatMap(r => (Array.isArray(r.tags) ? r.tags as string[] : []))
+    .filter(Boolean)
+    .map(t => normalizeText(t));
+
+  const unique = [...new Set(allTags)];
+  cacheSet(KEY, unique);
+  return unique;
+}
+
+// ── Filtro de categoria dinâmico — usa categorias reais do banco ──────────────
+async function buildDynamicCategoryFilter(storeId: string, rawText: string): Promise<string[]> {
+  if (isSiteStore(storeId)) {
+    return buildCategoryFilter(rawText);
+  }
+
+  const norm = normalizeText(rawText);
+  const categories = await loadStoreCategories(storeId);
+
+  const directMatch = categories.find(c => normalizeText(c) === norm);
+  if (directMatch) return [directMatch];
+
+  const partialMatches = categories.filter(c => {
+    const normCat = normalizeText(c);
+    return normCat.includes(norm) || norm.includes(normCat);
+  });
+  if (partialMatches.length > 0) return partialMatches;
+
+  return [rawText.trim().toUpperCase()];
+}
+
 const PRICE_PATTERN = /\bate\s*r?\$?\s*(\d+(?:[.,]\d{1,2})?)/;
 
 // Palavras PT que não são marcas nem categorias — usadas para extrair a marca residual
@@ -494,70 +586,117 @@ const PT_STOP = new Set([
   'melhor','bonito','bonita',
 ]);
 
-// Padrões que indicam pergunta comercial sem produto específico — retornam null imediatamente
-const PRICE_ONLY_PATTERNS = [
-  /^qual [ée] o (valor|pre[çc]o)[^?]*\?*$/i,
-  /^quanto (custa|[ée]|fica|ta|tá)[^?]*\?*$/i,
-  /^(tem|qual|como)[^?]*(desconto|promo[çc][aã]o|oferta)[^?]*\?*$/i,
-];
-
-export function detectProductQuery(message: string): BotProductSearchFilters | null {
-  for (const re of PRICE_ONLY_PATTERNS) {
+export async function detectProductQuery(
+  message: string,
+  storeId?: string,
+): Promise<BotProductSearchFilters | null> {
+  // ── GUARDA: perguntas puramente comerciais — nunca são produto ────────────
+  const COMMERCIAL_ONLY = [
+    /^qual [ée] o (valor|pre[çc]o|site|instagram|whatsapp)[^?]*\?*$/i,
+    /^quanto (custa|[ée]|fica|ta|tá)[^?]*\?*$/i,
+    /^(tem|qual|como)[^?]*(desconto|promo[çc][aã]o|oferta|frete|entrega)[^?]*\?*$/i,
+    /^(qual|manda|me passa)[^?]*(site|instagram|link|contato|numero|telefone)[^?]*\?*$/i,
+  ];
+  for (const re of COMMERCIAL_ONLY) {
     if (re.test(message.trim())) return null;
   }
 
   const norm = normalizeText(message);
   const filters: BotProductSearchFilters = {};
 
-  for (const [re, cat] of CATEGORY_PATTERNS) {
-    if (re.test(norm)) { filters.category = cat; break; }
-  }
-
+  // ── CAMADA 1: Tamanho ─────────────────────────────────────────────────────
   for (const re of SIZE_PATTERNS) {
     const m = norm.match(re);
     if (m) { filters.size = normalizeSize(m[0]); break; }
   }
 
+  // ── CAMADA 2: Cor ─────────────────────────────────────────────────────────
   for (const re of COLOR_PATTERNS) {
     const m = norm.match(re);
     if (m) { filters.color = m[0]; break; }
   }
 
+  // ── CAMADA 3: Preço máximo ────────────────────────────────────────────────
   const priceMatch = norm.match(PRICE_PATTERN);
   if (priceMatch) {
     filters.maxPrice = parseFloat(priceMatch[1].replace(',', '.'));
   }
 
-  const hasFilter = filters.category || filters.size || filters.color || filters.maxPrice;
-  if (!hasFilter) {
-    // Universal catalog fallback: no structural filter found but message has meaningful terms.
-    // Enables bot to search services, combos and quotes by free text.
-    const meaningfulWords = norm
-      .split(/\s+/)
-      .filter(w => w.length >= 4 && !PT_STOP.has(w));
-    if (meaningfulWords.length >= 1) {
-      return { query: message.trim() };
+  // ── CAMADA 4: Categoria — dinâmica se storeId disponível, regex se não ────
+  let detectedCategory: string | undefined;
+
+  if (storeId) {
+    const storeCategories = await loadStoreCategories(storeId);
+    for (const cat of storeCategories) {
+      const normCat = normalizeText(cat);
+      const re = new RegExp(`\\b${normCat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+      if (re.test(norm)) { detectedCategory = cat; break; }
     }
-    return null;
+
+    if (!detectedCategory) {
+      const storeTags = await loadStoreTags(storeId);
+      const words = norm.split(/\s+/).filter(w => w.length >= 3);
+      const matchedTag = words.find(w => storeTags.includes(w));
+      if (matchedTag) filters.query = matchedTag;
+    }
   }
 
-  // Extrai marca/subcategoria removendo os padrões já capturados e stop words
-  let residual = norm;
-  for (const [re] of CATEGORY_PATTERNS) residual = residual.replace(re, ' ');
-  for (const re of SIZE_PATTERNS)       residual = residual.replace(re, ' ');
-  for (const re of COLOR_PATTERNS)      residual = residual.replace(re, ' ');
-  residual = residual.replace(PRICE_PATTERN, ' ');
-
-  const brandWords = residual
-    .split(/\W+/)
-    .filter(w => w.length >= 3 && !PT_STOP.has(w));
-
-  if (brandWords.length > 0) {
-    // Última palavra residual — em PT a marca vem DEPOIS da categoria ("camisa da Lacoste")
-    filters.subcategory = brandWords[brandWords.length - 1];
+  if (!detectedCategory) {
+    for (const [re, cat] of CATEGORY_PATTERNS) {
+      if (re.test(norm)) { detectedCategory = cat; break; }
+    }
   }
 
-  return filters;
+  if (detectedCategory) {
+    filters.category = normalizeText(detectedCategory);
+  }
+
+  // ── CAMADA 5: Subcategoria/marca ──────────────────────────────────────────
+  const hasStructuralFilter = filters.category || filters.size || filters.color || filters.maxPrice;
+
+  if (hasStructuralFilter) {
+    let residual = norm;
+    if (detectedCategory) {
+      const normCat = normalizeText(detectedCategory);
+      residual = residual.replace(new RegExp(`\\b${normCat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g'), ' ');
+    }
+    for (const [re] of CATEGORY_PATTERNS) residual = residual.replace(re, ' ');
+    for (const re of SIZE_PATTERNS)       residual = residual.replace(re, ' ');
+    for (const re of COLOR_PATTERNS)      residual = residual.replace(re, ' ');
+    residual = residual.replace(PRICE_PATTERN, ' ');
+
+    const brandWords = residual
+      .split(/\W+/)
+      .filter(w => w.length >= 3 && !PT_STOP.has(w));
+
+    if (brandWords.length > 0) {
+      filters.subcategory = brandWords[brandWords.length - 1];
+    }
+
+    return filters;
+  }
+
+  // ── CAMADA 6: Busca livre ─────────────────────────────────────────────────
+  const COMMERCIAL_TERMS = new Set([
+    'valor','preco','custa','custo','quanto','pagar','pagamento',
+    'forma','formas','parcelar','parcela','desconto','promocao','oferta',
+    'barato','caro','salgado','entrega','frete','envio','enviar','prazo',
+    'correios','motoboy','entregar','receber','chegou','chegar','troca',
+    'trocar','devolver','devolucao','garantia','defeito','site','instagram',
+    'whatsapp','zap','contato','atendente','vendedor','loja','horario',
+    'horarios','aberto','fecha','abre','funciona','catalogo','foto','fotos',
+    'imagem','imagens','ver','mostra','manda','link',
+  ]);
+
+  const meaningfulWords = norm
+    .split(/\s+/)
+    .filter(w => w.length >= 4 && !PT_STOP.has(w) && !COMMERCIAL_TERMS.has(w));
+
+  if (meaningfulWords.length >= 1) {
+    return { query: message.trim() };
+  }
+
+  return null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

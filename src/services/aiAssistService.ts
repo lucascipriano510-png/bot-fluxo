@@ -34,8 +34,10 @@ export interface AiAssistContext {
   siteTitle?:      string;
   siteDescription?: string;
   siteSummary?:    string;
-  voiceProfile?:   StoreVoiceProfile;
+  voiceProfile?:        StoreVoiceProfile;
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  storeCategories?:     string[];
+  segmentInstructions?: string;
 }
 
 // ── Guardrails rígidos — nunca removíveis ────────────────────────────────────
@@ -47,6 +49,44 @@ GUARDRAILS (NUNCA VIOLAR):
 - Para perguntas de produto ou serviço específico, direcione para o catálogo ou atendente.
 - Nunca confirme disponibilidade sem dado real.
 `.trim();
+
+// ── Instruções por segmento de negócio ──────────────────────────────────────
+export function buildSegmentInstructions(
+  businessType?: string,
+  categories?: string[],
+): string {
+  const catList = categories && categories.length > 0
+    ? `\nO catálogo desta loja inclui: ${categories.slice(0, 15).join(', ')}.`
+    : '';
+
+  const type = (businessType || '').toLowerCase();
+
+  if (type.includes('barbearia') || type.includes('salao') || type.includes('cabelo')) {
+    return `Você é assistente de uma barbearia/salão. Quando o cliente perguntar sobre serviços, colete: qual serviço deseja, preferência de profissional (se houver), e melhor data/período. Nunca confirme disponibilidade de horário sem o operador verificar.${catList}`;
+  }
+  if (type.includes('lava') || type.includes('lavagem') || type.includes('automotiv')) {
+    return `Você é assistente de um lava-jato/serviço automotivo. Colete: tipo de veículo, serviço desejado, e disponibilidade de data. Nunca confirme preço sem o operador verificar.${catList}`;
+  }
+  if (type.includes('clinica') || type.includes('medic') || type.includes('saude') || type.includes('odonto')) {
+    return `Você é assistente de uma clínica/serviço de saúde. Seja atencioso e empático. Colete: tipo de consulta/serviço, preferência de data e período. Nunca forneça diagnósticos ou informações médicas. Sempre encaminhe para o profissional.${catList}`;
+  }
+  if (type.includes('pet') || type.includes('animal') || type.includes('veterinar')) {
+    return `Você é assistente de um pet shop/clínica veterinária. Colete: tipo de animal, raça/porte quando relevante, serviço ou produto desejado. Quando for consulta veterinária, nunca forneça diagnósticos.${catList}`;
+  }
+  if (type.includes('agendamento') || type.includes('agenda') || type.includes('horario')) {
+    return `Você é assistente de agendamento. Quando o cliente quiser marcar, colete: serviço desejado, data preferida, período (manhã/tarde/noite). Nunca confirme horário disponível sem o operador verificar.${catList}`;
+  }
+  if (type.includes('servico') || type.includes('serviço') || type.includes('orcamento') || type.includes('orçamento')) {
+    return `Você é assistente de uma empresa de serviços. Quando o cliente pedir orçamento, colete: descrição do serviço, prazo desejado, e qualquer especificação relevante. Nunca confirme preço sem o operador avaliar.${catList}`;
+  }
+  if (type.includes('roupa') || type.includes('moda') || type.includes('outlet') || type.includes('varejo') || type.includes('loja')) {
+    return `Você é assistente de uma loja de moda/varejo. Quando o cliente perguntar sobre produto, colete: categoria de interesse, tamanho que usa, e estilo preferido. Nunca confirme estoque sem verificar no catálogo.${catList}`;
+  }
+
+  return catList
+    ? `Você é assistente desta empresa.${catList} Quando o cliente perguntar sobre produtos ou serviços, use essa lista para orientar a conversa.`
+    : '';
+}
 
 // ── Instruções por intent — só incluídas quando relevante ───────────────────
 const INTENT_INSTRUCTIONS: Record<string, string> = {
@@ -98,6 +138,10 @@ export function createSystemPrompt(ctx: AiAssistContext, intentHint?: string): s
     ctx.paymentInfo  ? '' : 'Se perguntarem sobre pagamento: "Posso confirmar as formas de pagamento disponíveis. Quer que eu chame um atendente?"',
   ].filter(Boolean).join('\n');
 
+  const segmentSection = ctx.segmentInstructions
+    ? `\nINSTRUÇÕES DO SEGMENTO:\n${ctx.segmentInstructions}`
+    : '';
+
   const intentInstruction = intentHint && INTENT_INSTRUCTIONS[intentHint]
     ? `\nCONTEXTO DA MENSAGEM ATUAL:\n${INTENT_INSTRUCTIONS[intentHint]}`
     : '';
@@ -107,6 +151,7 @@ export function createSystemPrompt(ctx: AiAssistContext, intentHint?: string): s
     '',
     'DADOS DA LOJA:',
     storeData,
+    segmentSection,
     '',
     'REGRAS DE RESPOSTA (OBRIGATÓRIAS):',
     `- ${greetingRule}`,
