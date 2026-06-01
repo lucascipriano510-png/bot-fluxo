@@ -111,7 +111,13 @@ export async function processMessage(
   // ── PRÉ-CHECAGEM 4: Roteamento por intenção + catálogo ──────────────────
   // Detecta intenção antes de buscar catálogo para evitar buscas desnecessárias
   // em saudações, pedidos de atendente e orçamentos.
-  const intentResult = detectIntent(messageText);
+  let intentResult = detectIntent(messageText);
+
+  // Mensagens longas (> 4 palavras) com confidence baixa são ambíguas — a IA
+  // resolve melhor que regex com score único de secondary hit (0.62).
+  if (intentResult.confidence < 0.75 && messageText.trim().split(/\s+/).length > 4) {
+    intentResult = { intent: 'unknown', confidence: 0 };
+  }
 
   // Mensagem composta: "bom dia, tem camisa preta?" → greeting ganha com score
   // secundário (0.62). Se há filtro de catálogo claro, executa catálogo diretamente.
@@ -137,12 +143,14 @@ export async function processMessage(
     // conversacionais
     'greeting', 'thanks', 'farewell',
     'identidade_loja', 'conversa_geral', 'duvida_operacional',
+    // site e catálogo online
+    'store_site', 'catalog',
     // compra e atendimento
     'orcamento', 'compra', 'humano',
     // operacionais — já tratados pelo brain com respostas contextuais
     'delivery', 'hours', 'location', 'payment', 'exchange',
     'complaint', 'wholesale', 'gift', 'new_arrivals',
-    'price', 'price_sensitivity', 'size_help', 'catalog',
+    'price', 'price_sensitivity', 'size_help',
   ];
 
   if (!NON_CATALOG.includes(intentResult.intent)) {
@@ -151,9 +159,9 @@ export async function processMessage(
       const offerFilters                 = buildOfferFilters(storeId, rawFilters);
       const { offers, matched, dropped } = await findOffersWithFallback(offerFilters);
 
-      // Para intent 'unknown' com catálogo vazio: não retornar erro de catálogo.
-      // Cai no AI Assist ou brain para tratar a mensagem de forma conversacional.
-      if (offers.length > 0 || intentResult.intent !== 'unknown') {
+      // Só retornar resultado de catálogo quando há ofertas — catálogo vazio
+      // sempre cai para AI Assist ou brain para tratar de forma conversacional.
+      if (offers.length > 0) {
         const reply = formatFallbackResponse(offers, offerFilters, matched, dropped);
         logInventoryQuery(storeId, session.phone, messageText, rawFilters, offers.length, reply);
         await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
@@ -167,7 +175,12 @@ export async function processMessage(
   // ── PRÉ-CHECAGEM 5: Camada de IA Assist (para intents conversacionais) ────
   // Roda antes do brain fixo. Se IA não estiver configurada, retorna null e
   // cai no brain fixo sem impacto de performance (só lê env vars).
-  const AI_ASSIST_INTENTS = new Set(['conversa_geral', 'identidade_loja', 'store_site', 'duvida_operacional', 'unknown']);
+  const AI_ASSIST_INTENTS = new Set([
+    // conversacionais originais
+    'conversa_geral', 'identidade_loja', 'store_site', 'duvida_operacional', 'unknown',
+    // intents que ganham com linguagem adaptada
+    'complaint', 'price_sensitivity', 'gift', 'wholesale', 'new_arrivals', 'catalog', 'busca_item',
+  ]);
   if (AI_ASSIST_INTENTS.has(intentResult.intent)) {
     // Busca histórico da sessão para dar memória conversacional à IA
     const rawHistory = await fetchHistorico(storeId, session.phone, 8);
@@ -224,6 +237,32 @@ export async function processMessage(
   // ── PRÉ-CHECAGEM 6: Brain fixo (fallback quando IA não está configurada) ──
   const brainResult = handleIntent(messageText, intentResult, ctx, currentNodeId);
   if (brainResult) {
+    // Brain sinalizou que não tem dado estruturado — deixa a IA assumir se disponível
+    if (brainResult.usedFallback) {
+      const site = runtimeKnowledge.websiteSensor;
+      const aiCtx: AiAssistContext = {
+        storeName:       ctx._storeName    || 'nossa loja',
+        businessType:    ctx._businessType || undefined,
+        city:            ctx._city         || undefined,
+        storePhone:      ctx._wa_loja      || undefined,
+        openingHours:    ctx._openingHours || undefined,
+        deliveryInfo:    ctx._deliveryInfo || undefined,
+        paymentInfo:     ctx._paymentInfo  || undefined,
+        siteUrl:         ctx._siteUrl  || site?.websiteUrl || undefined,
+        siteTitle:       site?.extracted?.storeName || undefined,
+        siteDescription: site?.rawSummary
+          ? site.rawSummary.split('\n').find(l => l.startsWith('Descrição:'))?.replace('Descrição: ', '')
+          : undefined,
+        siteSummary:     site?.rawSummary || undefined,
+      };
+      const aiFallbackReply = await aiAssist(messageText, aiCtx, intentResult.intent);
+      if (aiFallbackReply) {
+        await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText,        node: currentNodeId });
+        await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: aiFallbackReply,    node: 'AI_ASSIST' });
+        return { text: aiFallbackReply, nextNode: currentNodeId, context: ctx, detectedIntent: intentResult.intent, confidence: intentResult.confidence };
+      }
+    }
+
     await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText,      node: currentNodeId });
     await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: brainResult.reply, node: 'BRAIN' });
     return {

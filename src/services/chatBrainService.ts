@@ -16,6 +16,7 @@ export interface BrainResult {
   reply:           string;
   detectedIntent:  Intent;
   confidence:      number;
+  usedFallback?:   boolean;
 }
 
 // Questão pendente para cada nó de captura.
@@ -189,41 +190,32 @@ export function handleIntent(
     // ── ENTREGA ─────────────────────────────────────────────────────────────
     case 'delivery': {
       const delivery = ctx._deliveryInfo;
-      reply = delivery
-        ? pick([
-          `Sim! ${delivery}. Me fala qual item você quer que eu te ajudo.`,
-          `Sim, ${delivery}. Me fala o que você está procurando.`,
-          `${delivery}. Me conta o que você quer que eu te oriento.`,
-        ], message)
-        : pick([
-          `Fazemos entregas sim! Me fala sua cidade que te informo o prazo e a melhor opção de envio.`,
-          `Tem entrega sim! Me conta onde você está que te passo as opções disponíveis.`,
-          `Posso confirmar os detalhes de entrega com a loja. Me fala o que você quer comprar.`,
-        ], message);
-      reply += p;
+      if (!delivery) return { reply: '', detectedIntent: intent, confidence, usedFallback: true };
+      reply = pick([
+        `Sim! ${delivery}. Me fala qual item você quer que eu te ajudo.`,
+        `Sim, ${delivery}. Me fala o que você está procurando.`,
+        `${delivery}. Me conta o que você quer que eu te oriento.`,
+      ], message) + p;
       break;
     }
 
     // ── HORÁRIO ──────────────────────────────────────────────────────────────
     case 'hours': {
       const hours = ctx._openingHours;
-      reply = hours
-        ? pick([
-          `Funcionamos das ${hours}. Me fala o que você precisa!`,
-          `Nosso horário é ${hours}. O que você está procurando?`,
-          `Estamos disponíveis das ${hours}. No que posso te ajudar?`,
-        ], message)
-        : pick([
-          `Preciso confirmar o horário com a loja. Posso te conectar com um atendente agora. Quer?`,
-          `O horário pode variar. Me deixa chamar um atendente que te confirma certinho.`,
-        ], message);
-      reply += p;
+      if (!hours) return { reply: '', detectedIntent: intent, confidence, usedFallback: true };
+      reply = pick([
+        `Funcionamos das ${hours}. Me fala o que você precisa!`,
+        `Nosso horário é ${hours}. O que você está procurando?`,
+        `Estamos disponíveis das ${hours}. No que posso te ajudar?`,
+      ], message) + p;
       break;
     }
 
     // ── LOCALIZAÇÃO ──────────────────────────────────────────────────────────
     case 'location': {
       const waLoja = ctx._wa_loja;
+      const city   = ctx._city;
+      if (!waLoja && !city) return { reply: '', detectedIntent: intent, confidence, usedFallback: true };
       reply = pick([
         waLoja
           ? `Para o endereço exato, posso te conectar direto no WhatsApp da loja: ${waLoja}`
@@ -237,31 +229,19 @@ export function handleIntent(
     // ── TROCA / DEVOLUÇÃO ────────────────────────────────────────────────────
     case 'exchange': {
       const returnPolicy = ctx._returnPolicy;
-      reply = returnPolicy
-        ? `${returnPolicy} Me conta o que aconteceu que eu te direciono.`
-        : pick([
-          `Pode trocar sim! Para saber as condições exatas, posso te conectar com um atendente agora. Quer?`,
-          `Temos política de troca. Me fala o que aconteceu que eu te direciono pro atendente responsável.`,
-          `Sem problema! Me conta a situação que eu te ajudo a resolver ou chamo um atendente.`,
-        ], message);
-      reply += p;
+      if (!returnPolicy) return { reply: '', detectedIntent: intent, confidence, usedFallback: true };
+      reply = `${returnPolicy} Me conta o que aconteceu que eu te direciono.` + p;
       break;
     }
 
     // ── PAGAMENTO ────────────────────────────────────────────────────────────
     case 'payment': {
       const paymentInfo = ctx._paymentInfo;
-      reply = paymentInfo
-        ? pick([
-          `Aceitamos: *${paymentInfo}*. Me fala o que você quer comprar que eu te ajudo!`,
-          `Formas de pagamento: ${paymentInfo}. O que você está procurando?`,
-        ], message)
-        : pick([
-          `Aceitamos as principais formas de pagamento. Para confirmar as opções disponíveis, posso chamar um atendente.`,
-          `Tem várias formas de pagamento disponíveis. Me fala o que você precisa que te informo.`,
-          `Para detalhes sobre pagamento, posso te conectar com um atendente agora. Quer?`,
-        ], message);
-      reply += p;
+      if (!paymentInfo) return { reply: '', detectedIntent: intent, confidence, usedFallback: true };
+      reply = pick([
+        `Aceitamos: *${paymentInfo}*. Me fala o que você quer comprar que eu te ajudo!`,
+        `Formas de pagamento: ${paymentInfo}. O que você está procurando?`,
+      ], message) + p;
       break;
     }
 

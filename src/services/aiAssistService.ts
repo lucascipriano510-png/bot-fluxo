@@ -48,6 +48,23 @@ GUARDRAILS (NUNCA VIOLAR):
 - Nunca confirme disponibilidade sem dado real.
 `.trim();
 
+// ── Instruções por intent — só incluídas quando relevante ───────────────────
+const INTENT_INSTRUCTIONS: Record<string, string> = {
+  complaint:         'O cliente está com um problema ou reclamação. Responda com empatia genuína. Peça para descrever o que aconteceu. Ofereça encaminhar para atendente se necessário. Nunca minimize o problema.',
+  price_sensitivity: 'O cliente achou caro. Não entre em conflito. Reconheça a preocupação com preço. Pergunte qual é o orçamento disponível. Se souber de opções mais em conta pelo histórico, mencione.',
+  gift:              'O cliente quer dar um presente. Conduza uma mini-consultoria: pergunte estilo, tamanho e faixa de preço da pessoa que vai receber. Use o que sabe da conversa para personalizar.',
+  wholesale:         'O cliente quer comprar em atacado ou revender. Colete: produto de interesse, quantidade estimada e prazo. Informe que vai conectar com o time comercial.',
+  new_arrivals:      'O cliente quer ver novidades. Se souber o que ele buscou antes pelo histórico, mencione que pode mostrar itens relacionados. Caso contrário, pergunte a categoria de interesse.',
+  catalog:           'O cliente quer ver o catálogo ou os produtos. Pergunte o que ele está procurando de forma natural. Use o histórico para não repetir perguntas já feitas.',
+  busca_item:        'O cliente está buscando um item ou serviço específico. Pergunte o que ele está procurando de forma natural. Use o histórico para não repetir perguntas já feitas.',
+  delivery:          'O cliente perguntou sobre entrega mas não há informação cadastrada. Pergunte a cidade do cliente e informe que vai confirmar as opções de envio.',
+  hours:             'O cliente perguntou sobre horário mas não há informação cadastrada. Peça para aguardar e ofereça conectar com um atendente para confirmar.',
+  payment:           'O cliente perguntou sobre pagamento mas não há informação cadastrada. Pergunte o que ele quer comprar e informe que vai confirmar as formas de pagamento disponíveis.',
+  exchange:          'O cliente perguntou sobre troca ou devolução mas não há política cadastrada. Peça para descrever a situação e ofereça conectar com um atendente.',
+  location:          'O cliente perguntou sobre o endereço mas não há localização cadastrada. Ofereça conectar com um atendente para passar o endereço exato.',
+  store_site:        'O cliente quer o link do site. Se siteUrl estiver disponível no contexto, compartilhe e ofereça ajuda por aqui também. Se não estiver, informe que vai confirmar e ofereça ajuda direta.',
+};
+
 // ── Monta system prompt seguro e contextualizado ────────────────────────────
 export function createSystemPrompt(ctx: AiAssistContext, intentHint?: string): string {
   const storeName    = ctx.storeName || 'nossa loja';
@@ -81,6 +98,10 @@ export function createSystemPrompt(ctx: AiAssistContext, intentHint?: string): s
     ctx.paymentInfo  ? '' : 'Se perguntarem sobre pagamento: "Posso confirmar as formas de pagamento disponíveis. Quer que eu chame um atendente?"',
   ].filter(Boolean).join('\n');
 
+  const intentInstruction = intentHint && INTENT_INSTRUCTIONS[intentHint]
+    ? `\nCONTEXTO DA MENSAGEM ATUAL:\n${INTENT_INSTRUCTIONS[intentHint]}`
+    : '';
+
   return [
     `Você é o assistente de vendas da loja ${storeName}.`,
     '',
@@ -93,6 +114,7 @@ export function createSystemPrompt(ctx: AiAssistContext, intentHint?: string): s
     '- Máximo 2 linhas. Seja direto, comercial e humano.',
     '- NUNCA use expressões como "não tenho essa informação" ou "não sei". Em vez disso, ofereça ajuda.',
     missingDataRule ? `- ${missingDataRule.replace(/\n/g, '\n- ')}` : '',
+    intentInstruction,
     '',
     GUARDRAILS,
   ].filter(s => s !== '').join('\n');
