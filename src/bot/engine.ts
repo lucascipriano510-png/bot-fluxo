@@ -180,6 +180,30 @@ export async function processMessage(
     }
   }
 
+  // Mensagem composta produto + preço: "tem camisa Lacoste G? qual o valor?"
+  // price é detectado como intent principal, mas a mensagem também contém
+  // filtros de produto. Executa catálogo primeiro e responde com produto + preço.
+  if (intentResult.intent === 'price' || intentResult.intent === 'price_sensitivity') {
+    const priceProductFilters = await detectProductQuery(messageText, storeId);
+    const hasProductFilter = priceProductFilters && (
+      priceProductFilters.category ||
+      priceProductFilters.size ||
+      priceProductFilters.subcategory
+    );
+    if (hasProductFilter) {
+      const offerFilters = buildOfferFilters(storeId, priceProductFilters!);
+      const { offers, matched, dropped } = await findOffersWithFallback(offerFilters);
+      if (offers.length > 0) {
+        const reply = formatFallbackResponse(offers, offerFilters, matched, dropped);
+        logInventoryQuery(storeId, session.phone, messageText, priceProductFilters, offers.length, reply);
+        await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
+        await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: reply,       node: 'CATALOG' });
+        return { text: reply, nextNode: currentNodeId, context: ctx };
+      }
+      logInventoryQuery(storeId, session.phone, messageText, priceProductFilters, 0, '(price+product fallback to brain/ai)');
+    }
+  }
+
   // Intenções que nunca devem acionar busca de catálogo.
   // Regra: qualquer intenção identificada com semântica não-produto vai para
   // brain/AI. Catálogo só roda para busca_item, disponibilidade e unknown.
