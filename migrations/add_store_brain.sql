@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS store_brain (
 
 ALTER TABLE store_brain ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "store_brain_owner" ON store_brain
-  USING (store_id IN (SELECT id FROM stores WHERE owner_id = auth.uid()));
+  USING (store_id = ((auth.jwt()->'app_metadata'->>'store_id')::uuid));
 
 -- Eventos de conversão: captura o que levou a uma venda
 CREATE TABLE IF NOT EXISTS store_conversion_events (
@@ -39,4 +39,5 @@ CREATE TABLE IF NOT EXISTS store_conversion_events (
 
 ALTER TABLE store_conversion_events ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "conversion_events_owner" ON store_conversion_events
-  USING (store_id IN (SELECT id FROM stores WHERE owner_id = auth.uid()));
+  USING      (store_id = ((auth.jwt()->'app_metadata'->>'store_id')::uuid))
+  WITH CHECK (store_id = ((auth.jwt()->'app_metadata'->>'store_id')::uuid));
