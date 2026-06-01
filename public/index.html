@@ -682,6 +682,7 @@
                 </div>
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
                   <span class="badge" :class="statusColor(l.status_comercial)" style="font-size:9px" x-text="l.status_comercial"></span>
+                  <span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;color:#000" :style="`background:${scoreColor(l.conversion_score||0)}`" x-text="l.conversion_score || 0"></span>
                   <span style="font-size:10px;color:var(--mu2)" x-text="fmtTime(l.atualizado_em)"></span>
                 </div>
               </div>
@@ -702,15 +703,40 @@
             <div style="display:flex;flex-direction:column;height:100%">
               <!-- header -->
               <div style="padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px">
-                <div class="ficha-avatar" style="width:44px;height:44px;font-size:17px;flex-shrink:0" x-text="(crmLead.nome||crmLead.phone).charAt(0).toUpperCase()"></div>
+                <!-- Score ring -->
+                <div style="position:relative;width:48px;height:48px;flex-shrink:0" x-show="crmLead.conversion_score !== undefined">
+                  <svg viewBox="0 0 36 36" style="width:48px;height:48px;transform:rotate(-90deg)">
+                    <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="3"/>
+                    <circle cx="18" cy="18" r="15" fill="none" :stroke="scoreColor(crmLead.conversion_score||0)" stroke-width="3"
+                      :stroke-dasharray="`${(crmLead.conversion_score||0) * 0.94} 94`" stroke-linecap="round"/>
+                  </svg>
+                  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700" x-text="crmLead.conversion_score || 0"></div>
+                </div>
                 <div style="flex:1">
                   <div style="font-size:15px;font-weight:700" x-text="crmLead.nome || crmLead.phone"></div>
                   <div style="font-size:12px;color:var(--mu)" x-text="crmLead.phone"></div>
+                  <div style="font-size:11px;font-weight:600;margin-top:2px" :style="`color:${scoreColor(crmLead.conversion_score||0)}`" x-text="scoreLabel(crmLead.conversion_score||0) + ' · score ' + (crmLead.conversion_score||0)"></div>
                 </div>
                 <a :href="crmWhatsApp(crmLead.phone)" target="_blank" class="btn btn-green" style="font-size:11px;padding:6px 12px;text-decoration:none;gap:5px">
                   <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.06 6.06l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                   WhatsApp
                 </a>
+              </div>
+
+              <!-- resumo métricas -->
+              <div style="display:flex;gap:12px;padding:10px 20px;background:var(--card2);border-bottom:1px solid var(--border)">
+                <div style="flex:1;text-align:center">
+                  <div style="font-size:16px;font-weight:700;color:var(--gold)" x-text="crmLead.total_purchases || 0"></div>
+                  <div style="font-size:10px;color:var(--mu)">Compras</div>
+                </div>
+                <div style="flex:1;text-align:center">
+                  <div style="font-size:16px;font-weight:700;color:var(--green)" x-text="fmtBRL(crmLead.lifetime_value || 0)"></div>
+                  <div style="font-size:10px;color:var(--mu)">Total gasto</div>
+                </div>
+                <div style="flex:1;text-align:center">
+                  <div style="font-size:16px;font-weight:700" x-text="crmMessages.length"></div>
+                  <div style="font-size:10px;color:var(--mu)">Mensagens</div>
+                </div>
               </div>
 
               <!-- form -->
@@ -757,18 +783,54 @@
           </template>
         </div>
 
-        <!-- Right: message history -->
+        <!-- Right: timeline / mensagens / compras -->
         <div class="crm-history">
-          <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--mu2);text-transform:uppercase;letter-spacing:.05em">
-            Histórico de mensagens
+          <!-- abas -->
+          <div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;gap:4px">
+            <button @click="crmHistoryTab='timeline'" :class="crmHistoryTab==='timeline'?'btn btn-green':'btn btn-ghost'" style="font-size:10px;padding:4px 10px;flex:1">Timeline</button>
+            <button @click="crmHistoryTab='messages'" :class="crmHistoryTab==='messages'?'btn btn-green':'btn btn-ghost'" style="font-size:10px;padding:4px 10px;flex:1">Mensagens</button>
+            <button @click="crmHistoryTab='purchases'" :class="crmHistoryTab==='purchases'?'btn btn-green':'btn btn-ghost'" style="font-size:10px;padding:4px 10px;flex:1">Compras</button>
           </div>
-          <div style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px">
+
+          <!-- Timeline -->
+          <div x-show="crmHistoryTab==='timeline'" style="flex:1;overflow-y:auto;padding:14px">
+            <div x-show="!crmLead" style="text-align:center;padding:32px 0;color:var(--mu);font-size:12px">Selecione um lead.</div>
+            <div x-show="crmLead && crmTimeline.length === 0" style="text-align:center;padding:32px 0;color:var(--mu);font-size:12px">Sem eventos.</div>
+            <template x-for="(ev, i) in crmTimeline" :key="i">
+              <div style="display:flex;gap:10px;padding:8px 0">
+                <div style="font-size:18px;flex-shrink:0" x-text="ev.icon"></div>
+                <div style="flex:1;border-left:2px solid var(--border);padding-left:10px;padding-bottom:6px">
+                  <div style="font-size:12px;font-weight:600" x-text="ev.title"></div>
+                  <div x-show="ev.detail" style="font-size:11px;color:var(--mu)" x-text="ev.detail"></div>
+                  <div style="font-size:10px;color:var(--mu2);margin-top:2px" x-text="fmtTime(ev.at)"></div>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <!-- Mensagens -->
+          <div x-show="crmHistoryTab==='messages'" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px">
             <div x-show="!crmLead" style="text-align:center;padding:32px 0;color:var(--mu);font-size:12px">Selecione um lead.</div>
             <div x-show="crmLead && crmMessages.length === 0" style="text-align:center;padding:32px 0;color:var(--mu);font-size:12px">Sem mensagens registradas.</div>
             <template x-for="(m, i) in crmMessages" :key="i">
               <div :class="m.from === 'bot' ? 'bubble bubble-bot' : 'bubble bubble-user'" style="font-size:12px;max-width:90%">
                 <span style="white-space:pre-wrap" x-text="m.text"></span>
                 <div class="bubble-time" x-text="m.time"></div>
+              </div>
+            </template>
+          </div>
+
+          <!-- Compras -->
+          <div x-show="crmHistoryTab==='purchases'" style="flex:1;overflow-y:auto;padding:14px">
+            <button class="btn btn-green" style="width:100%;justify-content:center;font-size:11px;margin-bottom:10px" @click="addPurchase(crmLead.id)" x-show="crmLead">+ Registrar compra</button>
+            <div x-show="crmLead && crmPurchases.length === 0" style="text-align:center;padding:24px 0;color:var(--mu);font-size:12px">Nenhuma compra registrada.</div>
+            <template x-for="(p, i) in crmPurchases" :key="i">
+              <div style="background:var(--card2);border-radius:8px;padding:10px;margin-bottom:8px">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <div style="font-size:12px;font-weight:600" x-text="p.produto || 'Produto'"></div>
+                  <div style="font-size:12px;font-weight:700;color:var(--green)" x-text="fmtBRL(p.valor || 0)"></div>
+                </div>
+                <div style="font-size:10px;color:var(--mu);margin-top:2px" x-text="fmtTime(p.data_compra)"></div>
               </div>
             </template>
           </div>

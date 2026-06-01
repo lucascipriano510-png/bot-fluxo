@@ -17,6 +17,7 @@ import { requireAuth } from '../middleware/auth';
 import { sendMessage, invalidateCredCache } from '../providers/messaging';
 import { runStoreAnalysis } from '../services/analysisService';
 import { recordConversion } from '../services/storeBrainService';
+import { updateLeadScore, calculateLeadScore } from '../services/leadScoreService';
 
 const router = Router();
 
@@ -394,8 +395,26 @@ router.post('/leads/:id/convert', async (req, res) => {
       .eq('id', req.params.id)
       .eq('store_id', req.storeId!);
     if (error) throw error;
-    const { data: converted } = await supabase.from('bot_leads').select('phone').eq('id', req.params.id).single();
-    if (converted?.phone) recordConversion(req.storeId!, converted.phone, 'human_converted').catch(() => {});
+    const { data: convLead } = await supabase
+      .from('bot_leads')
+      .select('phone, interesse, valor_potencial, total_purchases, lifetime_value')
+      .eq('id', req.params.id)
+      .single();
+    if (convLead) {
+      await supabase.from('lead_purchases').insert({
+        store_id:    req.storeId!,
+        lead_id:     req.params.id,
+        phone:       convLead.phone,
+        produto:     convLead.interesse || 'Venda',
+        valor:       convLead.valor_potencial || null,
+        data_compra: new Date().toISOString(),
+      });
+      await supabase.from('bot_leads').update({
+        total_purchases: (convLead.total_purchases || 0) + 1,
+        lifetime_value:  Number(convLead.lifetime_value || 0) + Number(convLead.valor_potencial || 0),
+      }).eq('id', req.params.id).eq('store_id', req.storeId!);
+      if (convLead.phone) recordConversion(req.storeId!, convLead.phone, 'human_converted').catch(() => {});
+    }
     res.json({ ok: true });
   } catch (err: unknown) {
     res.json({ ok: false, error: errMsg(err) });
@@ -695,6 +714,9 @@ router.get('/leads/:id', async (req, res) => {
       .eq('store_id', req.storeId!)
       .single();
     if (error || !lead) return res.status(404).json({ ok: false, error: 'Lead não encontrado' });
+    if (lead.conversion_score === null || lead.conversion_score === undefined) {
+      lead.conversion_score = calculateLeadScore(lead);
+    }
     const { data: messages } = await supabase
       .from('bot_mensagens')
       .select('*')
@@ -1156,6 +1178,102 @@ router.delete('/respostas/:id', async (req, res) => {
       .eq('store_id', req.storeId!);
     if (isMissingTable(error)) return res.status(503).json({ ok: false, setup_needed: true });
     if (error) throw error;
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
+// ── Lead timeline ─────────────────────────────────────────────────────────────
+router.get('/leads/:id/timeline', async (req, res) => {
+  try {
+    const { data: lead } = await supabase
+      .from('bot_leads').select('*').eq('id', req.params.id).eq('store_id', req.storeId!).single();
+    if (!lead) return res.status(404).json({ ok: false, error: 'Lead não encontrado' });
+
+    const events: Array<{ type: string; title: string; detail?: string; at: string; icon: string }> = [];
+
+    if (lead.first_contact_at || lead.qualificado_em || lead.criado_em) {
+      events.push({
+        type: 'contact', title: 'Primeiro contato',
+        detail: lead.origem ? `Via ${lead.origem}` : undefined,
+        at: lead.first_contact_at || lead.qualificado_em || lead.criado_em, icon: '👋',
+      });
+    }
+
+    const { data: msgs } = await supabase
+      .from('bot_mensagens').select('conteudo, direcao, criado_em, node')
+      .eq('store_id', req.storeId!).eq('phone', lead.phone)
+      .order('criado_em', { ascending: true }).limit(100);
+
+    const totalMsgs  = (msgs || []).length;
+    const clientMsgs = (msgs || []).filter((m: { direcao: string }) => m.direcao === 'entrada').length;
+    if (totalMsgs > 0) {
+      events.push({
+        type: 'conversation', title: `${totalMsgs} mensagens trocadas`,
+        detail: `${clientMsgs} do cliente`, at: (msgs as Array<{ criado_em: string }>)[0].criado_em, icon: '💬',
+      });
+    }
+
+    const { data: purchases } = await supabase
+      .from('lead_purchases').select('*').eq('store_id', req.storeId!).eq('lead_id', req.params.id)
+      .order('data_compra', { ascending: false });
+    for (const p of (purchases || [])) {
+      events.push({
+        type: 'purchase', title: `Compra: ${p.produto || 'Produto'}`,
+        detail: p.valor ? `R$ ${Number(p.valor).toFixed(2)}` : undefined,
+        at: p.data_compra, icon: '🛒',
+      });
+    }
+
+    if (lead.status === 'concluido') {
+      events.push({
+        type: 'converted', title: 'Lead finalizado',
+        detail: lead.kanban_stage === 'finalizado' ? 'Convertido ✅' : 'Encerrado',
+        at: lead.atualizado_em, icon: lead.kanban_stage === 'finalizado' ? '🎉' : '🔚',
+      });
+    }
+
+    events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+    res.json({ ok: true, data: events });
+  } catch (err: unknown) {
+    res.json({ ok: false, data: [], error: errMsg(err) });
+  }
+});
+
+// ── Lead purchases ────────────────────────────────────────────────────────────
+router.get('/leads/:id/purchases', async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('lead_purchases').select('*').eq('store_id', req.storeId!).eq('lead_id', req.params.id)
+      .order('data_compra', { ascending: false });
+    res.json({ ok: true, data: data || [] });
+  } catch (err: unknown) {
+    res.json({ ok: false, data: [], error: errMsg(err) });
+  }
+});
+
+router.post('/leads/:id/purchases', async (req, res) => {
+  const { produto, valor, notes } = req.body as { produto?: string; valor?: number; notes?: string };
+  try {
+    const { data: lead } = await supabase
+      .from('bot_leads').select('phone, total_purchases, lifetime_value')
+      .eq('id', req.params.id).eq('store_id', req.storeId!).single();
+    if (!lead) return res.status(404).json({ ok: false, error: 'Lead não encontrado' });
+
+    const { error } = await supabase.from('lead_purchases').insert({
+      store_id: req.storeId!, lead_id: req.params.id, phone: lead.phone,
+      produto: produto || null, valor: valor || null, notes: notes || null,
+      data_compra: new Date().toISOString(),
+    });
+    if (error) throw error;
+
+    await supabase.from('bot_leads').update({
+      total_purchases: (lead.total_purchases || 0) + 1,
+      lifetime_value:  Number(lead.lifetime_value || 0) + Number(valor || 0),
+    }).eq('id', req.params.id).eq('store_id', req.storeId!);
+
+    await updateLeadScore(req.storeId!, req.params.id);
     res.json({ ok: true });
   } catch (err: unknown) {
     res.json({ ok: false, error: errMsg(err) });

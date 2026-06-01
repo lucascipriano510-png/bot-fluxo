@@ -86,6 +86,9 @@ function FluxoCommand() {
     crmSaving: false,
     crmFeedback: null,
     crmFeedbackMsg: '',
+    crmTimeline: [],
+    crmPurchases: [],
+    crmHistoryTab: 'timeline',
 
     /* kanban */
     kanban: [
@@ -936,6 +939,8 @@ function FluxoCommand() {
     async selectCrmLead(lead) {
       this.crmLead     = { ...lead };
       this.crmMessages = [];
+      this.crmTimeline = [];
+      this.crmPurchases = [];
       try {
         const r = await this.authFetch(`/api/leads/${lead.id}`);
         const j = await r.json();
@@ -948,6 +953,8 @@ function FluxoCommand() {
           }));
         }
       } catch (_) {}
+      this.loadLeadTimeline(lead.id);
+      this.loadLeadPurchases(lead.id);
     },
 
     async saveCrmLead() {
@@ -986,6 +993,58 @@ function FluxoCommand() {
         this.crmSaving = false;
         setTimeout(() => { this.crmFeedback = null; }, 3000);
       }
+    },
+
+    async loadLeadTimeline(leadId) {
+      try {
+        const r = await this.authFetch(`/api/leads/${leadId}/timeline`);
+        const j = await r.json();
+        if (j.ok && Array.isArray(j.data)) this.crmTimeline = j.data;
+      } catch (_) {}
+    },
+
+    async loadLeadPurchases(leadId) {
+      try {
+        const r = await this.authFetch(`/api/leads/${leadId}/purchases`);
+        const j = await r.json();
+        if (j.ok && Array.isArray(j.data)) this.crmPurchases = j.data;
+      } catch (_) {}
+    },
+
+    async addPurchase(leadId) {
+      const produto = prompt('Produto comprado:');
+      if (!produto?.trim()) return;
+      const valorStr = prompt('Valor da compra (R$):');
+      const valor = valorStr ? Number(valorStr.replace(',', '.')) : null;
+      try {
+        const r = await this.authFetch(`/api/leads/${leadId}/purchases`, {
+          method: 'POST',
+          body: JSON.stringify({ produto, valor }),
+        });
+        const j = await r.json();
+        if (j.ok) {
+          await this.loadLeadPurchases(leadId);
+          await this.loadLeadTimeline(leadId);
+          await this.selectCrmLead({ id: leadId, phone: this.crmLead.phone });
+          this.crmFeedback = 'ok';
+          this.crmFeedbackMsg = 'Compra registrada!';
+        }
+      } catch (_) {}
+      finally { setTimeout(() => { this.crmFeedback = null; }, 3000); }
+    },
+
+    scoreColor(score) {
+      if (score >= 75) return '#ef4444';
+      if (score >= 50) return '#f59e0b';
+      if (score >= 25) return '#38bdf8';
+      return '#6b7280';
+    },
+
+    scoreLabel(score) {
+      if (score >= 75) return 'Muito quente';
+      if (score >= 50) return 'Promissor';
+      if (score >= 25) return 'Em construção';
+      return 'Frio';
     },
 
     crmWhatsApp(phone) {
