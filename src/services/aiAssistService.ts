@@ -104,10 +104,18 @@ async function callGemini(
   systemPrompt: string,
   key: string,
   model: string,
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>,
 ): Promise<string | null> {
   const url  = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+  const contents = [
+    ...(history ?? []).map(turn => ({
+      role:  turn.role === 'user' ? 'user' : 'model',
+      parts: [{ text: turn.content }],
+    })),
+    { role: 'user', parts: [{ text: message }] },
+  ];
   const body = {
-    contents:          [{ role: 'user', parts: [{ text: message }] }],
+    contents,
     systemInstruction: { parts: [{ text: systemPrompt }] },
     generationConfig:  { maxOutputTokens: 300, temperature: 0.5 },
   };
@@ -177,7 +185,7 @@ export async function aiAssist(
 
   try {
     if (provider === 'gemini') {
-      return await callGemini(message, createSystemPrompt(ctx, intentHint), key, model);
+      return await callGemini(message, createSystemPrompt(ctx, intentHint), key, model, ctx.conversationHistory);
     }
     return null;
   } catch (err) {

@@ -1,7 +1,7 @@
 import { FLOW_MAP, NodeId } from './flowMap';
 import { BotSession, BotResponse } from '../types';
 import { updateSession } from '../services/sessionService';
-import { saveMensagem } from '../services/mensagemService';
+import { saveMensagem, fetchHistorico } from '../services/mensagemService';
 import { registerLead } from '../services/leadService';
 import { generateWhatsAppLink } from '../providers/messaging';
 import { isOptedOut, registerOptOut, removeOptOut } from '../services/optoutService';
@@ -169,6 +169,30 @@ export async function processMessage(
   // cai no brain fixo sem impacto de performance (só lê env vars).
   const AI_ASSIST_INTENTS = new Set(['conversa_geral', 'identidade_loja', 'store_site', 'duvida_operacional', 'unknown']);
   if (AI_ASSIST_INTENTS.has(intentResult.intent)) {
+    // Busca histórico da sessão para dar memória conversacional à IA
+    const rawHistory = await fetchHistorico(storeId, session.phone, 8);
+    const mappedHistory = rawHistory
+      .filter(m => m.node !== 'OPTOUT' && m.node !== 'FORA_HORARIO')
+      .map(m => ({
+        role: m.direcao === 'entrada' ? 'user' as const : 'assistant' as const,
+        content: m.conteudo,
+      }));
+
+    // Trunca mensagens individuais longas
+    const truncated = mappedHistory.map(turn => ({
+      ...turn,
+      content: turn.content.length > 300 ? turn.content.slice(0, 300) + '...' : turn.content,
+    }));
+
+    // Mantém apenas as mais recentes que cabem em 1500 chars no total
+    let totalChars = 0;
+    const conversationHistory = [...truncated].reverse().filter(turn => {
+      totalChars += turn.content.length;
+      return totalChars <= 1_500;
+    }).reverse();
+
+    console.log(`[aiAssist] history=${conversationHistory.length} turns loaded`);
+
     const site = runtimeKnowledge.websiteSensor;
     const aiCtx: AiAssistContext = {
       storeName:       ctx._storeName    || 'nossa loja',
@@ -187,6 +211,7 @@ export async function processMessage(
         ? site.rawSummary.split('\n').find(l => l.startsWith('Descrição:'))?.replace('Descrição: ', '')
         : undefined,
       siteSummary:     site?.rawSummary        || undefined,
+      conversationHistory: conversationHistory.length > 0 ? conversationHistory : undefined,
     };
     const aiReply = await aiAssist(messageText, aiCtx, intentResult.intent);
     if (aiReply) {
