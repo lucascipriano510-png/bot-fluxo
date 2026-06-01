@@ -289,14 +289,42 @@ router.post('/chat', async (req, res) => {
 // ── Sessions ──────────────────────────────────────────────────────────────────
 router.get('/sessions', async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { data: sessions, error } = await supabase
       .from('bot_sessions')
       .select('*')
       .eq('store_id', req.storeId!)
       .order('atualizado_em', { ascending: false })
       .limit(100);
     if (error) throw error;
-    res.json({ ok: true, data: data || [] });
+
+    if (!sessions || sessions.length === 0) {
+      return res.json({ ok: true, data: [] });
+    }
+
+    const phones = sessions.map(s => s.phone);
+    const { data: msgs } = await supabase
+      .from('bot_mensagens')
+      .select('phone, conteudo, direcao, criado_em')
+      .eq('store_id', req.storeId!)
+      .in('phone', phones)
+      .order('criado_em', { ascending: false });
+
+    const lastByPhone = new Map<string, { phone: string; conteudo: string; direcao: string; criado_em: string }>();
+    for (const m of (msgs || [])) {
+      if (!lastByPhone.has(m.phone)) lastByPhone.set(m.phone, m);
+    }
+
+    const mapped = sessions.map(s => {
+      const last = lastByPhone.get(s.phone);
+      return {
+        ...s,
+        last_msg: last
+          ? (last.direcao === 'saida' ? `Bot: ${last.conteudo}` : last.conteudo).slice(0, 60)
+          : null,
+      };
+    });
+
+    res.json({ ok: true, data: mapped });
   } catch (err: unknown) {
     res.json({ ok: false, data: [], error: errMsg(err) });
   }

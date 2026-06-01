@@ -509,7 +509,10 @@
               <div class="conv-info">
                 <div class="conv-name" x-text="c.name || c.phone"></div>
                 <div class="conv-msg" x-text="c.msg || c.node"></div>
-                <span class="badge" style="margin-top:4px;font-size:10px" :class="tagColor(c.tag || 'novo')" x-text="c.tag || 'novo'"></span>
+                <div style="display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap">
+                  <span class="badge" style="font-size:10px" :class="tagColor(c.tag || 'novo')" x-text="c.tag || 'novo'"></span>
+                  <span x-show="c.humano_ativo" style="background:var(--gold,#f59e0b);color:#000;border-radius:4px;font-size:9px;font-weight:700;padding:1px 5px;letter-spacing:0.3px">HUMANO</span>
+                </div>
               </div>
               <div class="conv-meta">
                 <div class="conv-time" x-text="c.time || fmtTime(c.atualizado_em)"></div>

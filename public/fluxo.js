@@ -149,6 +149,8 @@ function FluxoCommand() {
     atendSending: false,
     atendLead: null,
     atendHumano: false,
+    viewedConvs: new Set(),
+    _inboxPoller: null,
 
     /* settings */
     cfg: {
@@ -324,6 +326,7 @@ function FluxoCommand() {
     },
 
     async logout() {
+      if (this._inboxPoller) { clearInterval(this._inboxPoller); this._inboxPoller = null; }
       if (this._sb) await this._sb.auth.signOut();
       this.authUser   = null;
       this._authToken = null;
@@ -365,6 +368,28 @@ function FluxoCommand() {
       if (!this.authUser) return; // mostra tela de login
 
       await this._loadPanelData();
+      this._inboxPoller = setInterval(async () => {
+        if (this.page !== 'atendimentos') return;
+        await this.loadSessions();
+        await this.loadLeads();
+        if (this.atendPhone) {
+          try {
+            const r = await this.authFetch('/api/messages/' + this.atendPhone);
+            const j = await r.json();
+            if (j.ok && Array.isArray(j.data)) {
+              const newMsgs = j.data.map(m => ({
+                from: m.direcao === 'saida' ? 'bot' : 'user',
+                text: m.conteudo,
+                time: this.fmtTime(m.criado_em),
+              }));
+              if (newMsgs.length !== this.atendMessages.length) {
+                this.atendMessages = newMsgs;
+                this.$nextTick(() => this.scrollChat());
+              }
+            }
+          } catch (_) {}
+        }
+      }, 10000);
       if (this.page === 'relatorios') {
         await this.$nextTick();
         this.initCharts();
@@ -508,16 +533,19 @@ function FluxoCommand() {
         const j = await r.json();
         if (j.ok && Array.isArray(j.data)) {
           this.sessions = j.data;
-          this.conversations = j.data.slice(0, 10).map(s => ({
-            id: s.id,
-            name: s.nome || s.phone,
-            phone: s.phone,
-            msg: `Nó atual: ${s.current_node}`,
-            time: this.fmtTime(s.atualizado_em),
-            unread: 0,
-            tag: 'novo',
-            node: s.current_node,
-            avatar: (s.nome || s.phone).charAt(0).toUpperCase(),
+          const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+          this.conversations = j.data.slice(0, 100).map(s => ({
+            id:           s.id,
+            name:         s.nome || s.phone,
+            phone:        s.phone,
+            msg:          s.last_msg || `Nó: ${s.current_node}`,
+            time:         this.fmtTime(s.atualizado_em),
+            unread:       (!this.viewedConvs.has(s.id) && new Date(s.atualizado_em).getTime() > fiveMinAgo) ? 1 : 0,
+            tag:          'novo',
+            node:         s.current_node,
+            avatar:       (s.nome || s.phone).charAt(0).toUpperCase(),
+            humano_ativo: s.humano_ativo || false,
+            context:      s.context,
           }));
         }
       } catch (_) {}
@@ -966,11 +994,27 @@ function FluxoCommand() {
 
     /* ── Atendimentos ────────────────────────────────────────────────── */
     async selectConv(conv) {
+      this.viewedConvs.add(conv.id);
       this.selectedConv  = conv.id;
       this.atendPhone    = conv.phone;
       this.atendMessages = [];
       this.atendHumano   = conv.humano_ativo || false;
       this.atendLead     = this.leads.find(l => l.phone === conv.phone) || null;
+      if (!this.atendLead) {
+        const ctxRaw = conv.context;
+        const ctx = typeof ctxRaw === 'string' ? JSON.parse(ctxRaw || '{}') : (ctxRaw || {});
+        const sessionData = {
+          phone:            conv.phone,
+          nome:             ctx.nome || ctx._nome || null,
+          interesse:        ctx.interesse || ctx._interesse || null,
+          cidade:           ctx.cidade || ctx._cidade || null,
+          status_comercial: null,
+          valor_potencial:  ctx.ultimo_preco_visto ? Number(ctx.ultimo_preco_visto) : null,
+        };
+        if (sessionData.nome || sessionData.interesse) {
+          this.atendLead = sessionData;
+        }
+      }
       try {
         const r = await this.authFetch('/api/messages/' + conv.phone);
         const j = await r.json();
