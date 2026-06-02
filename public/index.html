@@ -1371,8 +1371,23 @@
 
     <!-- ── KANBAN ───────────────────────────── -->
     <div x-show="page === 'kanban'" class="page-section">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
-        <button class="btn" @click="loadKanban()" style="font-size:12px">↺ Atualizar</button>
+      <!-- Métricas do pipeline -->
+      <div style="display:flex;gap:16px;margin-bottom:18px;flex-wrap:wrap">
+        <div style="flex:1;min-width:140px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px">
+          <div style="font-size:22px;font-weight:800" x-text="pipelineCount"></div>
+          <div style="font-size:11px;color:var(--mu)">Leads no pipeline</div>
+        </div>
+        <div style="flex:1;min-width:140px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px">
+          <div style="font-size:22px;font-weight:800;color:var(--green)" x-text="fmtBRL(pipelineTotal)"></div>
+          <div style="font-size:11px;color:var(--mu)">Valor potencial total</div>
+        </div>
+        <div style="flex:1;min-width:140px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px">
+          <div style="font-size:22px;font-weight:800;color:var(--gold)" x-text="pipelineConversion + '%'"></div>
+          <div style="font-size:11px;color:var(--mu)">Taxa de conversão</div>
+        </div>
+        <div style="display:flex;align-items:center">
+          <button class="btn" @click="loadKanban()" style="font-size:12px">↺ Atualizar</button>
+        </div>
       </div>
       <div class="kanban-wrap">
         <template x-for="col in kanban" :key="col.id">
@@ -1388,6 +1403,7 @@
               </div>
               <span class="kanban-count" x-text="col.items.length"></span>
             </div>
+            <div style="font-size:10px;color:var(--mu);margin-bottom:8px" x-show="col.total > 0" x-text="fmtBRL(col.total)"></div>
             <template x-for="item in col.items" :key="item.id">
               <div class="kanban-card" draggable="true"
                 @dragstart="kanbanDragStart(item.id, col.id)"
@@ -1399,7 +1415,10 @@
                 </div>
                 <div class="kanban-card-info" x-text="item.phone"></div>
                 <div class="kanban-card-info" style="margin-top:4px" x-text="item.interesse"></div>
-                <div class="kanban-card-val" x-text="item.val"></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+                  <div class="kanban-card-val" x-text="item.val"></div>
+                  <span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;color:#000" :style="`background:${scoreColor(item.score||0)}`" x-text="item.score || 0"></span>
+                </div>
               </div>
             </template>
             <div x-show="col.items.length === 0" style="text-align:center;padding:20px 0;font-size:12px;color:var(--mu2);border:2px dashed var(--border);border-radius:8px;margin-top:4px">

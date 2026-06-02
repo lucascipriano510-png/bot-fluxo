@@ -759,15 +759,21 @@ router.patch('/leads/:id/stage', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'Stage inválido' });
   }
   try {
+    const patch: Record<string, unknown> = { kanban_stage: stage, atualizado_em: new Date().toISOString() };
+    if (stage === 'pagamento' || stage === 'carrinho') patch.status_comercial = 'QUENTE';
+    else if (stage === 'interessado' || stage === 'escolhendo') patch.status_comercial = 'MORNO';
+    else if (stage === 'finalizado') { patch.status = 'concluido'; patch.status_comercial = 'QUENTE'; }
+
     const { data, error } = await supabase
       .from('bot_leads')
-      .update({ kanban_stage: stage, atualizado_em: new Date().toISOString() })
+      .update(patch)
       .eq('id', req.params.id)
       .eq('store_id', req.storeId!)
       .select('id')
       .single();
     if (error) throw error;
     if (!data) return res.status(404).json({ ok: false, error: 'Lead não encontrado' });
+    updateLeadScore(req.storeId!, req.params.id).catch(() => {});
     res.json({ ok: true });
   } catch (err: unknown) {
     res.json({ ok: false, error: errMsg(err) });

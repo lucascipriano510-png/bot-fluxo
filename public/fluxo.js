@@ -102,6 +102,9 @@ function FluxoCommand() {
     kanbanDragId: null,
     kanbanDragStage: null,
     kanbanDragOver: null,
+    pipelineTotal: 0,
+    pipelineCount: 0,
+    pipelineConversion: 0,
 
     /* reports */
     reports: null,
@@ -284,6 +287,7 @@ function FluxoCommand() {
       window.location.hash = p;
       if (p === 'relatorios')  this.$nextTick(() => this.loadReports());
       if (p === 'kanban')      this.loadKanban();
+      if (p === 'leads')       this.loadLeads();
       if (p === 'respostas')   this.loadRespostas();
       if (p === 'integracoes') { this.loadIntegrations(); this.loadAiIntegration(); this.loadChannels(); this.loadKnowledge(); }
     },
@@ -405,22 +409,30 @@ function FluxoCommand() {
       if (this.page === 'integracoes') this.loadIntegrations();
       if (this._inboxPoller) clearInterval(this._inboxPoller);
       this._inboxPoller = setInterval(async () => {
-        if (this.page !== 'atendimentos') return;
-        await this.loadSessions();
-        await this.loadLeads();
-        if (this.atendPhone) {
-          try {
-            const r = await this.authFetch('/api/messages/' + this.atendPhone);
-            const j = await r.json();
-            if (j.ok && Array.isArray(j.data) && j.data.length !== this.atendMessages.length) {
-              this.atendMessages = j.data.map(m => ({
-                from: m.direcao === 'saida' ? 'bot' : 'user',
-                text: m.conteudo,
-                time: this.fmtTime(m.criado_em || m.created_at),
-              }));
-              this.scrollChat();
-            }
-          } catch (_) {}
+        if (this.page === 'atendimentos') {
+          await this.loadSessions();
+          await this.loadLeads();
+          if (this.atendPhone) {
+            try {
+              const r = await this.authFetch('/api/messages/' + this.atendPhone);
+              const j = await r.json();
+              if (j.ok && Array.isArray(j.data) && j.data.length !== this.atendMessages.length) {
+                this.atendMessages = j.data.map(m => ({
+                  from: m.direcao === 'saida' ? 'bot' : 'user',
+                  text: m.conteudo,
+                  time: this.fmtTime(m.criado_em || m.created_at),
+                }));
+                this.scrollChat();
+              }
+            } catch (_) {}
+          }
+        } else if (this.page === 'leads') {
+          await this.loadLeads();
+        } else if (this.page === 'kanban') {
+          await this.loadKanban();
+        } else if (this.page === 'dashboard') {
+          await this.loadLeads();
+          await this.loadFollowupToday();
         }
       }, 12000);
     },
@@ -1146,19 +1158,29 @@ function FluxoCommand() {
         const j = await r.json();
         if (!j.ok) return;
         const cols = [
-          { id: 'novo',        label: 'Novo Lead',        color: '#38BDF8', items: [] },
-          { id: 'interessado', label: 'Interessado',       color: '#A855F7', items: [] },
-          { id: 'escolhendo',  label: 'Escolhendo',        color: '#FACC15', items: [] },
-          { id: 'carrinho',    label: 'Carrinho Montado',  color: '#F97316', items: [] },
-          { id: 'pagamento',   label: 'Aguardando Pgto.',  color: '#22C55E', items: [] },
-          { id: 'finalizado',  label: 'Finalizado',        color: '#6B7280', items: [] },
+          { id: 'novo',        label: 'Novo Lead',       color: '#38BDF8', items: [], total: 0 },
+          { id: 'interessado', label: 'Interessado',      color: '#A855F7', items: [], total: 0 },
+          { id: 'escolhendo',  label: 'Escolhendo',       color: '#FACC15', items: [], total: 0 },
+          { id: 'carrinho',    label: 'Carrinho Montado', color: '#F97316', items: [], total: 0 },
+          { id: 'pagamento',   label: 'Aguardando Pgto.', color: '#22C55E', items: [], total: 0 },
+          { id: 'finalizado',  label: 'Finalizado',       color: '#6B7280', items: [], total: 0 },
         ];
         for (const lead of j.data) {
           const stage = lead.kanban_stage || 'novo';
           const col   = cols.find(c => c.id === stage) || cols[0];
-          col.items.push({ id: lead.id, name: lead.nome || lead.phone, phone: lead.phone, interesse: lead.interesse || '—', val: this.fmtBRL(lead.valor_potencial), status: lead.status_comercial });
+          const val   = Number(lead.valor_potencial) || 0;
+          col.items.push({
+            id: lead.id, name: lead.nome || lead.phone, phone: lead.phone,
+            interesse: lead.interesse || '—', val: this.fmtBRL(val), valNum: val,
+            status: lead.status_comercial, score: lead.conversion_score || 0,
+          });
+          col.total += val;
         }
         this.kanban = cols;
+        this.pipelineCount = cols.reduce((s, c) => s + c.items.length, 0);
+        this.pipelineTotal = cols.reduce((s, c) => s + c.total, 0);
+        const finalizados  = cols.find(c => c.id === 'finalizado')?.items.length || 0;
+        this.pipelineConversion = this.pipelineCount > 0 ? Math.round((finalizados / this.pipelineCount) * 100) : 0;
       } catch (_) {}
     },
 

@@ -881,8 +881,8 @@ body {
 }
 
 .kanban-col {
-  min-width: 230px;
-  max-width: 230px;
+  flex: 0 0 280px;
+  min-width: 280px;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);

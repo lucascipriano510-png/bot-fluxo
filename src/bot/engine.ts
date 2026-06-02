@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { BotSession, BotResponse } from '../types';
 import { updateSession } from '../services/sessionService';
 import { saveMensagem, fetchHistorico } from '../services/mensagemService';
-import { registerLead } from '../services/leadService';
+import { registerLead, upsertLeadLight } from '../services/leadService';
 import { generateWhatsAppLink } from '../providers/messaging';
 import { isOptedOut, registerOptOut, removeOptOut } from '../services/optoutService';
 import { isBusinessHours, openingTimeStr } from '../utils/businessHours';
@@ -52,6 +52,20 @@ function estimateValue(_ctx: Record<string, string>): number {
 
 const OPTOUT_TRIGGER = /\b(parar|stop|sair|cancelar|n[aã]o quero|remover|descadastrar|opt.?out)\b/i;
 const REOPT_TRIGGER  = /\b(quero receber|ativar|retomar|voltar|continuar|ol[aá]|oi\b)/i;
+
+function inferKanbanStage(
+  intent: string,
+  ctx: Record<string, string>,
+  catalogReturned: boolean,
+  messageText?: string,
+): string {
+  const msg = (messageText || '').toLowerCase();
+  if (/\b(vou querer|pode separar|fechado|quero comprar|vou levar|fechar pedido|finalizar)\b/.test(msg)) return 'pagamento';
+  if (intent === 'payment' || /\b(como (compro|pago|faço pra comprar)|forma de pagamento|parcela)\b/.test(msg)) return 'carrinho';
+  if (ctx.nome && ctx.interesse) return 'escolhendo';
+  if (catalogReturned || ['compra', 'orcamento', 'price', 'disponibilidade', 'busca_item', 'catalog'].includes(intent)) return 'interessado';
+  return 'novo';
+}
 
 export async function processMessage(
   session: BotSession,
@@ -176,6 +190,7 @@ export async function processMessage(
         logInventoryQuery(storeId, session.phone, messageText, compoundFilters, offers.length, reply);
         await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
         await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: reply,       node: 'CATALOG' });
+        upsertLeadLight({ store_id: storeId, phone: session.phone, nome: ctx.nome, interesse: compoundFilters.category || ctx.interesse, cidade: ctx.cidade, valor_potencial: Number(offers[0]?.price) || undefined, status_comercial: 'MORNO', stage_hint: 'interessado', context: ctx }).catch(() => {});
         return { text: reply, nextNode: currentNodeId, context: ctx };
       }
     }
@@ -199,6 +214,7 @@ export async function processMessage(
         logInventoryQuery(storeId, session.phone, messageText, priceProductFilters, offers.length, reply);
         await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
         await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: reply,       node: 'CATALOG' });
+        upsertLeadLight({ store_id: storeId, phone: session.phone, nome: ctx.nome, interesse: priceProductFilters!.category || ctx.interesse, cidade: ctx.cidade, valor_potencial: Number(offers[0]?.price) || undefined, status_comercial: 'MORNO', stage_hint: 'interessado', context: ctx }).catch(() => {});
         return { text: reply, nextNode: currentNodeId, context: ctx };
       }
       logInventoryQuery(storeId, session.phone, messageText, priceProductFilters, 0, '(price+product fallback to brain/ai)');
@@ -235,6 +251,7 @@ export async function processMessage(
         logInventoryQuery(storeId, session.phone, messageText, rawFilters, offers.length, reply);
         await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
         await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: reply,       node: 'CATALOG' });
+        upsertLeadLight({ store_id: storeId, phone: session.phone, nome: ctx.nome, interesse: rawFilters.category || ctx.interesse, cidade: ctx.cidade, valor_potencial: Number(offers[0]?.price) || undefined, status_comercial: 'MORNO', stage_hint: 'interessado', context: ctx }).catch(() => {});
         return { text: reply, nextNode: currentNodeId, context: ctx };
       }
       logInventoryQuery(storeId, session.phone, messageText, rawFilters, 0, '(ai/brain fallback)');
@@ -449,6 +466,21 @@ export async function processMessage(
 
   // ── 8. Salva mensagem de saída ────────────────────────────────────────────
   await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida', conteudo: text, node: nextNodeId });
+
+  // Captura automática para intents comerciais que não passaram pelo catálogo
+  const COMMERCIAL_INTENTS = ['busca_item', 'catalog', 'price', 'compra', 'orcamento', 'disponibilidade', 'price_sensitivity', 'gift', 'new_arrivals', 'wholesale'];
+  if (COMMERCIAL_INTENTS.includes(intentResult.intent)) {
+    upsertLeadLight({
+      store_id:         storeId,
+      phone:            session.phone,
+      nome:             ctx.nome,
+      interesse:        ctx.interesse || undefined,
+      cidade:           ctx.cidade,
+      status_comercial: 'FRIO',
+      stage_hint:       inferKanbanStage(intentResult.intent, ctx, false, messageText),
+      context:          ctx,
+    }).catch(() => {});
+  }
 
   return { text, nextNode: finalNode, context: ctx };
 }
