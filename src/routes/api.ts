@@ -17,6 +17,7 @@ import { requireAuth } from '../middleware/auth';
 import { sendMessage, invalidateCredCache } from '../providers/messaging';
 import { runStoreAnalysis } from '../services/analysisService';
 import { recordConversion } from '../services/storeBrainService';
+import { initBaileys, getWaState, sendWaMessage, disconnectBaileys } from '../whatsapp/baileys';
 import { updateLeadScore, calculateLeadScore } from '../services/leadScoreService';
 
 const router = Router();
@@ -1339,6 +1340,64 @@ router.post('/brain/conversion', async (req, res) => {
   } catch (err: unknown) {
     res.json({ ok: false, error: errMsg(err) });
   }
+});
+
+// ── WhatsApp (Baileys) ────────────────────────────────────────────────────────
+router.get('/wa/status', async (req, res) => {
+  await initBaileys(req.storeId!).catch(() => {});
+  const s = getWaState();
+  res.json({ ok: true, status: s.status, qr: s.qr });
+});
+
+router.get('/wa/conversations', async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('wa_conversations')
+      .select('*')
+      .eq('store_id', req.storeId!)
+      .order('last_time', { ascending: false });
+    res.json({ ok: true, data: data || [] });
+  } catch (err: unknown) {
+    res.json({ ok: false, data: [], error: errMsg(err) });
+  }
+});
+
+router.get('/wa/messages/:phone', async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('wa_messages')
+      .select('*')
+      .eq('store_id', req.storeId!)
+      .eq('phone', req.params.phone)
+      .order('timestamp', { ascending: true })
+      .limit(100);
+    // Mark as read
+    await supabase.from('wa_conversations')
+      .update({ unread_count: 0 })
+      .eq('store_id', req.storeId!)
+      .eq('phone', req.params.phone);
+    res.json({ ok: true, data: data || [] });
+  } catch (err: unknown) {
+    res.json({ ok: false, data: [], error: errMsg(err) });
+  }
+});
+
+router.post('/wa/send', async (req, res) => {
+  const { phone, text } = req.body as { phone?: string; text?: string };
+  if (!phone?.trim() || !text?.trim()) {
+    return res.status(400).json({ ok: false, error: 'phone e text obrigatórios' });
+  }
+  try {
+    await sendWaMessage(phone.trim(), text.trim(), req.storeId!);
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
+router.post('/wa/disconnect', async (_req, res) => {
+  await disconnectBaileys().catch(() => {});
+  res.json({ ok: true });
 });
 
 export default router;

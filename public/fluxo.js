@@ -148,6 +148,17 @@ function FluxoCommand() {
     respostaFeedback:  null,
     respostaFeedbackMsg: '',
 
+    /* whatsapp direto */
+    waStatus:          'disconnected',
+    waQr:              null,
+    waConversations:   [],
+    waSelectedPhone:   null,
+    waMessages:        [],
+    waInput:           '',
+    waSending:         false,
+    waPollingInterval: null,
+    waSearch:          '',
+
     /* atendimentos */
     atendMessages: [],
     atendPhone: null,
@@ -200,6 +211,18 @@ function FluxoCommand() {
 
     /* computed */
     get currentConvMessages() { return this.atendMessages; },
+
+    get waFilteredConversations() {
+      const q = this.waSearch.trim().toLowerCase();
+      if (!q) return this.waConversations;
+      return this.waConversations.filter(c =>
+        (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q)
+      );
+    },
+
+    get waCurrentConv() {
+      return this.waConversations.find(c => c.phone === this.waSelectedPhone) || null;
+    },
 
     get currentConv() {
       return this.conversations.find(c => c.id === this.selectedConv) || this.conversations[0];
@@ -282,6 +305,9 @@ function FluxoCommand() {
 
     /* navigation */
     navigate(p) {
+      if (this.page === 'whatsapp' && p !== 'whatsapp' && this.waPollingInterval) {
+        clearInterval(this.waPollingInterval); this.waPollingInterval = null;
+      }
       this.page = p;
       this.sidebarOpen = false;
       window.location.hash = p;
@@ -290,6 +316,7 @@ function FluxoCommand() {
       if (p === 'leads')       this.loadLeads();
       if (p === 'respostas')   this.loadRespostas();
       if (p === 'integracoes') { this.loadIntegrations(); this.loadAiIntegration(); this.loadChannels(); this.loadKnowledge(); }
+      if (p === 'whatsapp')    this.$nextTick(() => this.waInit());
     },
 
     /* ── Helpers ──────────────────────────────────────────────────────────── */
@@ -557,6 +584,103 @@ function FluxoCommand() {
         const j = await r.json();
         if (j.ok && j.data) this.brain = j.data;
       } catch (_) {}
+    },
+
+    /* ── WhatsApp direto (Baileys) ──────────────────────────────────────── */
+    async waInit() {
+      await this.waLoadStatus();
+      if (this.waPollingInterval) { clearInterval(this.waPollingInterval); this.waPollingInterval = null; }
+      if (this.waStatus === 'qr_pending') {
+        this.waPollingInterval = setInterval(async () => {
+          await this.waLoadStatus();
+          if (this.waStatus === 'connected') {
+            clearInterval(this.waPollingInterval); this.waPollingInterval = null;
+            await this.waLoadConversations();
+          }
+        }, 3000);
+      } else if (this.waStatus === 'connected') {
+        await this.waLoadConversations();
+        this.waPollingInterval = setInterval(async () => {
+          await this.waLoadConversations();
+          if (this.waSelectedPhone) await this.waLoadMessages(this.waSelectedPhone);
+        }, 5000);
+      }
+    },
+
+    async waLoadStatus() {
+      try {
+        const r = await this.authFetch('/api/wa/status');
+        const j = await r.json();
+        if (j.ok) { this.waStatus = j.status; this.waQr = j.qr || null; }
+      } catch (_) {}
+    },
+
+    async waLoadConversations() {
+      try {
+        const r = await this.authFetch('/api/wa/conversations');
+        const j = await r.json();
+        if (j.ok && Array.isArray(j.data)) this.waConversations = j.data;
+      } catch (_) {}
+    },
+
+    async waLoadMessages(phone) {
+      try {
+        const r = await this.authFetch('/api/wa/messages/' + phone);
+        const j = await r.json();
+        if (j.ok && Array.isArray(j.data)) {
+          this.waMessages = j.data;
+          this.$nextTick(() => {
+            const el = document.getElementById('wa-messages');
+            if (el) { el.scrollTop = el.scrollHeight; requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; }); }
+          });
+        }
+      } catch (_) {}
+    },
+
+    async waSelectConv(phone) {
+      this.waSelectedPhone = phone;
+      this.waMessages = [];
+      await this.waLoadMessages(phone);
+      // mark read locally
+      const conv = this.waConversations.find(c => c.phone === phone);
+      if (conv) conv.unread_count = 0;
+    },
+
+    async waSend() {
+      const text = this.waInput.trim();
+      if (!text || !this.waSelectedPhone || this.waSending) return;
+      this.waSending = true;
+      this.waInput   = '';
+      try {
+        const r = await this.authFetch('/api/wa/send', {
+          method: 'POST',
+          body: JSON.stringify({ phone: this.waSelectedPhone, text }),
+        });
+        const j = await r.json();
+        if (j.ok) {
+          this.waMessages.push({ direction: 'out', text, timestamp: new Date().toISOString() });
+          this.$nextTick(() => {
+            const el = document.getElementById('wa-messages');
+            if (el) el.scrollTop = el.scrollHeight;
+          });
+        } else {
+          this.waInput = text;
+          alert('Erro ao enviar: ' + (j.error || 'tente novamente'));
+        }
+      } catch (_) { this.waInput = text; }
+      finally { this.waSending = false; }
+    },
+
+    async waDisconnect() {
+      if (!confirm('Desconectar o WhatsApp e limpar a sessão?')) return;
+      await this.authFetch('/api/wa/disconnect', { method: 'POST' });
+      this.waStatus = 'disconnected'; this.waQr = null;
+      this.waConversations = []; this.waSelectedPhone = null; this.waMessages = [];
+      if (this.waPollingInterval) { clearInterval(this.waPollingInterval); this.waPollingInterval = null; }
+    },
+
+    waKeydown(e) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.waSend(); }
     },
 
     async runAnalysis() {
