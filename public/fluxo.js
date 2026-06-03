@@ -590,6 +590,7 @@ function FluxoCommand() {
     async waInit() {
       await this.waLoadStatus();
       if (this.waPollingInterval) { clearInterval(this.waPollingInterval); this.waPollingInterval = null; }
+      if (this.waStatus === 'unavailable') return; // Vercel stub — sem polling
       if (this.waStatus === 'qr_pending') {
         this.waPollingInterval = setInterval(async () => {
           await this.waLoadStatus();

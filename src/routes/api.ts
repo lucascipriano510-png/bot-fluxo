@@ -1343,9 +1343,14 @@ router.post('/brain/conversion', async (req, res) => {
 });
 
 // ── WhatsApp (Baileys) ────────────────────────────────────────────────────────
+// Baileys requer processo Node.js persistente — não funciona em Vercel serverless.
+// O stub retorna 'unavailable' para o painel mostrar mensagem clara ao invés de quebrar.
 router.get('/wa/status', async (req, res) => {
   await initBaileys(req.storeId!).catch(() => {});
   const s = getWaState();
+  if (s.status === 'unavailable') {
+    return res.json({ ok: true, status: 'unavailable', qr: null, message: 'WhatsApp requer servidor dedicado (Railway/Render/VPS). Não disponível na Vercel.' });
+  }
   res.json({ ok: true, status: s.status, qr: s.qr });
 });
 
@@ -1386,6 +1391,9 @@ router.post('/wa/send', async (req, res) => {
   const { phone, text } = req.body as { phone?: string; text?: string };
   if (!phone?.trim() || !text?.trim()) {
     return res.status(400).json({ ok: false, error: 'phone e text obrigatórios' });
+  }
+  if (getWaState().status === 'unavailable') {
+    return res.json({ ok: false, error: 'WhatsApp requer servidor dedicado.' });
   }
   try {
     await sendWaMessage(phone.trim(), text.trim(), req.storeId!);
