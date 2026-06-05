@@ -267,6 +267,12 @@ function FluxoCommand() {
         }
       }
       let result = [...merged.values()];
+      // Filtrar grupos: is_group, phone com @, JIDs de grupo (16+ dígitos)
+      result = result.filter(c =>
+        !c.is_group &&
+        !(c.phone || '').includes('@') &&
+        !/^\d{16,}$/.test(c.phone || '')
+      );
       const q = this.inboxSearch.trim().toLowerCase();
       if (q) result = result.filter(c =>
         (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q)

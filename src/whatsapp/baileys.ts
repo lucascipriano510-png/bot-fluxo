@@ -141,8 +141,10 @@ export async function initBaileys(storeId: string): Promise<void> {
         if (msg.key.fromMe) continue; // ignorar mensagens enviadas pelo próprio número
 
         const jid = msg.key.remoteJid || '';
-        const isGroup = jid.endsWith('@g.us');
-        const phone = jid.replace('@s.whatsapp.net', '').replace('@g.us', '').replace(/@.*/, '');
+        // Ignorar grupos completamente — só processar contatos privados
+        if (jid.endsWith('@g.us')) continue;
+
+        const phone = jid.replace('@s.whatsapp.net', '').replace(/@.*/, '');
 
         const text =
           msg.message?.conversation ||
@@ -154,11 +156,8 @@ export async function initBaileys(storeId: string): Promise<void> {
         const ts = new Date(Number(msg.messageTimestamp) * 1000).toISOString();
         const name = resolveName(msg, phone);
 
-        // CRM: cria ou atualiza lead apenas para conversas privadas
-        let leadId: string | null = null;
-        if (!isGroup) {
-          leadId = await upsertLeadFromInbox(storeId, phone, name, text);
-        }
+        // CRM: cria ou atualiza lead (só chegam contatos privados aqui)
+        const leadId = await upsertLeadFromInbox(storeId, phone, name, text);
 
         await supabase.from('wa_messages').insert({
           store_id: storeId, phone, direction: 'in', text, timestamp: ts, lead_id: leadId,
@@ -177,7 +176,7 @@ export async function initBaileys(storeId: string): Promise<void> {
           name,
           last_message: text,
           last_time:    ts,
-          is_group:     isGroup,
+          is_group:     false,
           lead_id:      leadId,
           unread_count: (existingConv?.unread_count || 0) + 1,
         }, { onConflict: 'store_id,phone' }).then(null, () => {});

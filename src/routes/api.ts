@@ -1360,10 +1360,24 @@ router.get('/wa/conversations', async (req, res) => {
       .from('wa_conversations')
       .select('*')
       .eq('store_id', req.storeId!)
+      .or('is_group.eq.false,is_group.is.null')
       .order('last_time', { ascending: false });
     res.json({ ok: true, data: data || [] });
   } catch (err: unknown) {
     res.json({ ok: false, data: [], error: errMsg(err) });
+  }
+});
+
+router.post('/wa/cleanup', async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('wa_conversations')
+      .delete()
+      .eq('store_id', req.storeId!)
+      .or('is_group.eq.true,phone.like.%@%');
+    res.json({ ok: !error, error: error?.message });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 
