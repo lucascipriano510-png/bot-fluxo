@@ -1484,6 +1484,19 @@ function FluxoCommand() {
       }
     },
 
+    async toggleBot() {
+      const newVal = !this.cfg.bot_ativo;
+      this.cfg.bot_ativo = newVal;
+      try {
+        await this.authFetch('/api/settings', {
+          method: 'POST',
+          body: JSON.stringify({ bot_ativo: newVal }),
+        });
+      } catch (_) {
+        this.cfg.bot_ativo = !newVal; // reverte se falhar
+      }
+    },
+
     async updateLeadStage(stage) {
       if (!this.atendLead?.id) return;
       try {
