@@ -370,6 +370,27 @@
         </div>
       </div>
 
+      <!-- Follow-ups programados -->
+      <div class="card" style="margin-bottom:20px" x-data="{ followups: [] }" x-init="authFetch('/api/leads/followup').then(r=>r.json()).then(j=>{ if(j.ok) followups=j.data; })">
+        <div class="card-header">
+          <div><div class="card-title">Ações programadas</div><div class="card-sub">Leads com próxima ação nas próximas 24h</div></div>
+          <button class="btn btn-ghost" @click="navigate('leads')" style="font-size:11px;padding:5px 10px">Ver todos no CRM</button>
+        </div>
+        <div x-show="followups.length === 0" style="padding:20px;text-align:center;color:var(--mu);font-size:12px">Nenhuma ação programada.</div>
+        <div style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:4px 0">
+          <template x-for="f in followups" :key="f.id">
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;background:var(--card2)"
+                 :style="new Date(f.proxima_acao_at) < new Date() ? 'border-left:3px solid #ef4444' : new Date(f.proxima_acao_at).toDateString() === new Date().toDateString() ? 'border-left:3px solid #f59e0b' : 'border-left:3px solid #38bdf8'">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:600" x-text="f.nome || f.phone"></div>
+                <div style="font-size:11px;color:var(--mu)" x-text="f.proxima_acao || 'Sem descrição'"></div>
+              </div>
+              <div style="font-size:11px;color:var(--mu2);flex-shrink:0" x-text="fmtDate(f.proxima_acao_at)"></div>
+            </div>
+          </template>
+        </div>
+      </div>
+
       <!-- Bottom row -->
       <div class="grid-2">
         <div class="card">
@@ -630,6 +651,37 @@
               <button @click="crmFilter='FRIO'" :class="crmFilter==='FRIO' ? 'btn' : 'btn btn-ghost'" style="font-size:10px;padding:3px 9px;color:var(--mu)">🧊 Frios</button>
             </div>
           </div>
+          <!-- Filtros avançados -->
+          <div style="padding:0 14px 10px;border-bottom:1px solid var(--border)">
+            <button @click="showAdvFilters=!showAdvFilters" style="font-size:11px;color:var(--mu);background:none;border:none;cursor:pointer;padding:6px 0">
+              Filtros avançados <span x-text="showAdvFilters ? '▲' : '▾'"></span>
+            </button>
+            <div x-show="showAdvFilters" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
+              <select x-model="crmFilterStage" style="font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--card2);color:var(--tx)">
+                <option value="">Todos estágios</option>
+                <option value="novo">Novo</option>
+                <option value="interessado">Interessado</option>
+                <option value="escolhendo">Escolhendo</option>
+                <option value="carrinho">Carrinho</option>
+                <option value="pagamento">Pagamento</option>
+                <option value="finalizado">Finalizado</option>
+              </select>
+              <select x-model="crmFilterSilence" style="font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--card2);color:var(--tx)">
+                <option value="any">Qualquer atividade</option>
+                <option value="today">Ativo hoje</option>
+                <option value="silent_2d">Silêncio 1–2 dias</option>
+                <option value="silent_7d">Silêncio +7 dias</option>
+              </select>
+              <input type="number" x-model.number="crmFilterMinScore" placeholder="Score mínimo" min="0" max="100"
+                     style="font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--card2);color:var(--tx)">
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+              <span style="font-size:11px;color:var(--mu2)">Mostrando <span x-text="crmFilteredLeads.length"></span> de <span x-text="leads.length"></span> leads</span>
+              <button @click="crmFilter='';crmFilterStage='';crmFilterSilence='any';crmFilterMinScore=0;crmSearch=''"
+                      style="font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer">Limpar filtros</button>
+            </div>
+          </div>
+
           <div style="overflow-y:auto;flex:1">
             <div x-show="crmFilteredLeads.length === 0" style="padding:32px 16px;text-align:center;color:var(--mu);font-size:12px">Nenhum lead encontrado.</div>
             <template x-for="l in crmFilteredLeads" :key="l.id">
@@ -637,10 +689,26 @@
                 <div class="conv-avatar" style="width:32px;height:32px;font-size:12px;flex-shrink:0" x-text="(l.nome||l.phone).charAt(0).toUpperCase()"></div>
                 <div style="flex:1;min-width:0">
                   <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="l.nome || l.phone"></div>
-                  <div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="l.interesse || l.phone"></div>
+                  <div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:4px">
+                    <span x-text="l.interesse || l.phone"></span>
+                    <span x-show="l.origem" style="background:#818cf8;color:#fff;padding:1px 5px;border-radius:8px;font-size:9px" x-text="l.origem"></span>
+                  </div>
+                  <div x-show="l.last_interaction_at" style="font-size:10px;color:var(--mu2)" x-text="'Última: ' + fmtDate(l.last_interaction_at)"></div>
+                  <template x-if="l.proxima_acao_at">
+                    <div style="font-size:10px;margin-top:2px"
+                         :style="new Date(l.proxima_acao_at) < new Date() ? 'color:#ef4444' : new Date(l.proxima_acao_at).toDateString() === new Date().toDateString() ? 'color:#f59e0b' : 'color:var(--mu2)'"
+                         x-text="'📅 ' + new Date(l.proxima_acao_at).toLocaleDateString('pt-BR')"></div>
+                  </template>
                 </div>
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
-                  <span class="badge" :class="statusColor(l.status_comercial)" style="font-size:9px" x-text="l.status_comercial"></span>
+                  <div style="display:flex;align-items:center;gap:3px">
+                    <template x-if="silenceLabel(leadSilentHours(l))">
+                      <span x-data="{ sl: silenceLabel(leadSilentHours(l)) }"
+                            :style="`background:${sl.color};color:#fff;padding:1px 6px;border-radius:10px;font-size:9px;font-weight:600`"
+                            x-text="sl.badge"></span>
+                    </template>
+                    <span class="badge" :class="statusColor(l.status_comercial)" style="font-size:9px" x-text="l.status_comercial"></span>
+                  </div>
                   <span style="font-size:10px;color:var(--mu2)" x-text="fmtTime(l.atualizado_em)"></span>
                 </div>
               </div>
@@ -693,9 +761,27 @@
                 <div class="crm-row3">
                   <div class="field"><label>Variação</label><input type="text" x-model="crmLead.tamanho" placeholder="Tamanho, plano, nível..."></div>
                   <div class="field"><label>Tipo/estilo</label><input type="text" x-model="crmLead.estilo" placeholder="Ex: básico, premium, urgente..."></div>
-                  <div class="field"><label>Origem</label><input type="text" x-model="crmLead.origem" placeholder="Instagram, WhatsApp..."></div>
+                  <div class="field">
+                    <label>Origem</label>
+                    <select x-model="crmLead.origem">
+                      <option value="">Selecionar origem...</option>
+                      <option value="instagram">Instagram</option>
+                      <option value="whatsapp">WhatsApp</option>
+                      <option value="facebook">Facebook</option>
+                      <option value="indicacao">Indicação</option>
+                      <option value="trafego_pago">Tráfego Pago</option>
+                      <option value="site">Site</option>
+                      <option value="outro">Outro</option>
+                    </select>
+                  </div>
                 </div>
-                <div class="field"><label>Próxima ação</label><input type="text" x-model="crmLead.proxima_acao" placeholder="O que fazer com esse lead?"></div>
+                <div class="field">
+                  <label>Próxima ação</label>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                    <input type="text" x-model="crmLead.proxima_acao" placeholder="O que fazer com esse lead?">
+                    <input type="date" x-model="crmLead.proxima_acao_at">
+                  </div>
+                </div>
                 <div class="field"><label>Notas internas</label><textarea x-model="crmLead.notes" rows="4" placeholder="Observações, histórico de contato, preferências..."></textarea></div>
               </div>
 
@@ -1285,11 +1371,23 @@
                 style="cursor:grab">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
                   <div class="kanban-card-name" x-text="item.name"></div>
-                  <span class="badge" :class="statusColor(item.status)" style="font-size:9px" x-text="item.status"></span>
+                  <div style="display:flex;align-items:center;gap:3px">
+                    <template x-if="silenceLabel(leadSilentHours(item))">
+                      <span x-data="{ sl: silenceLabel(leadSilentHours(item)) }"
+                            :style="`background:${sl.color};color:#fff;padding:1px 5px;border-radius:8px;font-size:9px;font-weight:600`"
+                            x-text="sl.badge"></span>
+                    </template>
+                    <span class="badge" :class="statusColor(item.status)" style="font-size:9px" x-text="item.status"></span>
+                  </div>
                 </div>
                 <div class="kanban-card-info" x-text="item.phone"></div>
                 <div class="kanban-card-info" style="margin-top:4px" x-text="item.interesse"></div>
+                <div x-show="item.proxima_acao" style="font-size:10px;color:var(--mu);margin-top:4px" x-text="item.proxima_acao"></div>
                 <div class="kanban-card-val" x-text="item.val"></div>
+                <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px">
+                  <button @click="navigate('leads'); $nextTick(() => selectCrmLead(item))"
+                          style="font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;padding:0">Abrir CRM</button>
+                </div>
               </div>
             </template>
             <div x-show="col.items.length === 0" style="text-align:center;padding:20px 0;font-size:12px;color:var(--mu2);border:2px dashed var(--border);border-radius:8px;margin-top:4px">
@@ -1925,5 +2023,27 @@
 </div><!-- /painel autenticado -->
 
 <script src="/fluxo.js"></script>
+
+<!-- ── Modal de Compra ────────────────────────────────── -->
+<div x-show="purchaseModal" style="position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5)" @click.self="purchaseModal=false">
+  <div style="background:var(--surface,var(--card));border-radius:12px;padding:24px;width:100%;max-width:400px;display:flex;flex-direction:column;gap:12px;border:1px solid var(--border)">
+    <div style="font-weight:600;font-size:15px">Registrar Compra</div>
+    <input x-model="purchaseForm.produto" placeholder="Produto ou serviço..."
+           style="padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--tx);font-size:13px">
+    <input x-model="purchaseForm.valor" type="number" step="0.01" placeholder="Valor R$"
+           style="padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--tx);font-size:13px">
+    <textarea x-model="purchaseForm.notes" placeholder="Observação (opcional)" rows="2"
+              style="padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--tx);font-size:13px;resize:none;font-family:inherit"></textarea>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button @click="purchaseModal=false" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--tx);cursor:pointer;font-size:13px">Cancelar</button>
+      <button @click="submitPurchase()" :disabled="purchaseSaving || !purchaseForm.produto || !purchaseForm.valor"
+              style="padding:8px 16px;border-radius:8px;background:var(--green,#22c55e);color:#fff;border:none;cursor:pointer;font-size:13px">
+        <span x-show="!purchaseSaving">Registrar compra</span>
+        <span x-show="purchaseSaving">Salvando...</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

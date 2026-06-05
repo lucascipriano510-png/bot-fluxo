@@ -2,6 +2,21 @@
    FLUXO COMMAND — App Logic + Mock Data
    ═══════════════════════════════════════════════════ */
 
+/* ─── Helpers globais de silêncio de lead ─────────── */
+function leadSilentHours(lead) {
+  const ref = lead.last_interaction_at || lead.atualizado_em;
+  if (!ref) return 0;
+  return (Date.now() - new Date(ref).getTime()) / 3600000;
+}
+
+function silenceLabel(hours) {
+  if (hours < 24) return null;
+  const days = Math.floor(hours / 24);
+  if (hours < 48) return { badge: '1d', color: '#38bdf8' };
+  if (hours < 168) return { badge: `${days}d`, color: '#f59e0b' };
+  return { badge: `${days}d`, color: '#ef4444' };
+}
+
 const MOCK = {
   kanban: [
     { id: 'novo',        label: 'Novo Lead',        color: '#38BDF8', items: [] },
@@ -899,10 +914,12 @@ function FluxoCommand() {
             interesse:        this.crmLead.interesse,
             status_comercial: this.crmLead.status_comercial,
             proxima_acao:     this.crmLead.proxima_acao,
+            proxima_acao_at:  this.crmLead.proxima_acao_at || null,
             valor_potencial:  Number(this.crmLead.valor_potencial) || 0,
             cidade:           this.crmLead.cidade,
             tamanho:          this.crmLead.tamanho,
             estilo:           this.crmLead.estilo,
+            origem:           this.crmLead.origem,
             notes:            this.crmLead.notes,
           }),
         });
@@ -930,6 +947,39 @@ function FluxoCommand() {
       return `https://wa.me/${n}`;
     },
 
+    addPurchase(leadId) {
+      this.purchaseLeadId = leadId;
+      this.purchaseForm = { produto: '', valor: '', notes: '' };
+      this.purchaseModal = true;
+    },
+
+    async submitPurchase() {
+      if (!this.purchaseForm.produto || !this.purchaseForm.valor) return;
+      this.purchaseSaving = true;
+      try {
+        await this.authFetch(`/api/leads/${this.purchaseLeadId}/purchases`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            produto: this.purchaseForm.produto,
+            valor: parseFloat(this.purchaseForm.valor),
+            notes: this.purchaseForm.notes,
+          }),
+        });
+        this.purchaseModal = false;
+      } finally {
+        this.purchaseSaving = false;
+      }
+    },
+
+    async loadLeadPurchases(_leadId) {
+      // placeholder — endpoint a implementar futuramente
+    },
+
+    async loadLeadTimeline(_leadId) {
+      // placeholder — endpoint a implementar futuramente
+    },
+
     /* ── Kanban ──────────────────────────────────────────────────────── */
     async loadKanban() {
       try {
@@ -947,7 +997,7 @@ function FluxoCommand() {
         for (const lead of j.data) {
           const stage = lead.kanban_stage || 'novo';
           const col   = cols.find(c => c.id === stage) || cols[0];
-          col.items.push({ id: lead.id, name: lead.nome || lead.phone, phone: lead.phone, interesse: lead.interesse || '—', val: this.fmtBRL(lead.valor_potencial), status: lead.status_comercial });
+          col.items.push({ id: lead.id, name: lead.nome || lead.phone, phone: lead.phone, interesse: lead.interesse || '—', val: this.fmtBRL(lead.valor_potencial), status: lead.status_comercial, proxima_acao: lead.proxima_acao, proxima_acao_at: lead.proxima_acao_at, last_interaction_at: lead.last_interaction_at, conversion_score: lead.conversion_score, origem: lead.origem });
         }
         this.kanban = cols;
       } catch (_) {}
@@ -1125,6 +1175,11 @@ function FluxoCommand() {
 
     fmtBRL(v) {
       return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(v) || 0);
+    },
+
+    fmtDate(iso) {
+      if (!iso) return '';
+      return new Date(iso).toLocaleDateString('pt-BR');
     },
 
     tagColor(tag) {
