@@ -33,6 +33,7 @@ export interface BotLead {
   intencao_compra?: string;
   status_comercial?: 'QUENTE' | 'MORNO' | 'FRIO';
   proxima_acao?: string;
+  proxima_acao_at?: string;
   valor_potencial?: number;
   status: 'novo' | 'qualificado' | 'encaminhado' | 'concluido';
   context?: Record<string, string>;

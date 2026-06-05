@@ -566,6 +566,25 @@ router.delete('/products/:id', async (req, res) => {
 });
 
 // ── Leads CRM ─────────────────────────────────────────────────────────────────
+// ── Leads com ação agendada para as próximas 24h ──────────────────────────────
+router.get('/leads/followup', async (req, res) => {
+  try {
+    const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from('bot_leads')
+      .select('*')
+      .eq('store_id', req.storeId!)
+      .neq('status', 'concluido')
+      .not('proxima_acao_at', 'is', null)
+      .lte('proxima_acao_at', deadline)
+      .order('proxima_acao_at', { ascending: true });
+    if (error) throw error;
+    res.json({ ok: true, data: data || [] });
+  } catch (err: unknown) {
+    res.json({ ok: false, data: [], error: errMsg(err) });
+  }
+});
+
 router.get('/leads/:id', async (req, res) => {
   try {
     const { data: lead, error } = await supabase
@@ -590,7 +609,7 @@ router.get('/leads/:id', async (req, res) => {
 
 router.put('/leads/:id', async (req, res) => {
   try {
-    const allowed = ['nome','interesse','status_comercial','proxima_acao','valor_potencial','cidade','tamanho','estilo','origem','status','notes','kanban_stage'] as const;
+    const allowed = ['nome','interesse','status_comercial','proxima_acao','proxima_acao_at','valor_potencial','cidade','tamanho','estilo','origem','status','notes','kanban_stage'] as const;
     const patch: Record<string, unknown> = {};
     for (const key of allowed) {
       if (key in req.body) patch[key] = req.body[key];

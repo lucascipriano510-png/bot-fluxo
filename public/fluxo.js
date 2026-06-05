@@ -180,6 +180,18 @@ function FluxoCommand() {
     cfgFeedbackMsg: '',
     cfgSetupNeeded: false,
 
+    /* purchase modal */
+    purchaseModal: false,
+    purchaseForm: { produto: '', valor: '', notes: '' },
+    purchaseSaving: false,
+    purchaseLeadId: null,
+
+    /* crm advanced filters */
+    crmFilterStage: '',
+    crmFilterSilence: 'any',
+    crmFilterMinScore: 0,
+    showAdvFilters: false,
+
     /* computed */
     get currentConvMessages() { return this.atendMessages; },
 
@@ -190,8 +202,24 @@ function FluxoCommand() {
     get crmFilteredLeads() {
       let list = this.leads;
       const q = this.crmSearch.trim().toLowerCase();
-      if (q) list = list.filter(l => (l.nome||'').toLowerCase().includes(q) || (l.phone||'').includes(q) || (l.interesse||'').toLowerCase().includes(q));
+      if (q) list = list.filter(l =>
+        (l.nome||'').toLowerCase().includes(q) ||
+        (l.phone||'').includes(q) ||
+        (l.interesse||'').toLowerCase().includes(q) ||
+        (l.origem||'').toLowerCase().includes(q)
+      );
       if (this.crmFilter) list = list.filter(l => l.status_comercial === this.crmFilter);
+      if (this.crmFilterStage) list = list.filter(l => (l.kanban_stage || 'novo') === this.crmFilterStage);
+      if (this.crmFilterSilence && this.crmFilterSilence !== 'any') {
+        list = list.filter(l => {
+          const h = leadSilentHours(l);
+          if (this.crmFilterSilence === 'today')     return h < 24;
+          if (this.crmFilterSilence === 'silent_2d') return h >= 24 && h < 48;
+          if (this.crmFilterSilence === 'silent_7d') return h >= 168;
+          return true;
+        });
+      }
+      if (this.crmFilterMinScore > 0) list = list.filter(l => (l.conversion_score || 0) >= this.crmFilterMinScore);
       return list;
     },
 
