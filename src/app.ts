@@ -14,6 +14,21 @@ const TYPING_DELAY_MS = Number(process.env.TYPING_DELAY_MS ?? 800);
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 const app = express();
+
+// CORS — painel Vercel precisa bater no servidor Render
+app.use((req, res, next) => {
+  const allowed = ['https://bot.fluxooutlet.com.br', 'http://localhost:3000'];
+  const origin = req.headers.origin || '';
+  if (allowed.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 app.use(express.json());
 
 // ── Painel visual ─────────────────────────────────────────────────────────────

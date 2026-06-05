@@ -149,6 +149,7 @@ function FluxoCommand() {
     respostaFeedbackMsg: '',
 
     /* whatsapp direto */
+    waBaseUrl:         'https://bot-fluxo.onrender.com',
     waStatus:          'disconnected',
     waQr:              null,
     waConversations:   [],
@@ -610,7 +611,7 @@ function FluxoCommand() {
 
     async waLoadStatus() {
       try {
-        const r = await this.authFetch('/api/wa/status');
+        const r = await this.authFetch(this.waBaseUrl + '/api/wa/status');
         const j = await r.json();
         if (j.ok) { this.waStatus = j.status; this.waQr = j.qr || null; }
       } catch (_) {}
@@ -618,7 +619,7 @@ function FluxoCommand() {
 
     async waLoadConversations() {
       try {
-        const r = await this.authFetch('/api/wa/conversations');
+        const r = await this.authFetch(this.waBaseUrl + '/api/wa/conversations');
         const j = await r.json();
         if (j.ok && Array.isArray(j.data)) this.waConversations = j.data;
       } catch (_) {}
@@ -626,7 +627,7 @@ function FluxoCommand() {
 
     async waLoadMessages(phone) {
       try {
-        const r = await this.authFetch('/api/wa/messages/' + phone);
+        const r = await this.authFetch(this.waBaseUrl + '/api/wa/messages/' + phone);
         const j = await r.json();
         if (j.ok && Array.isArray(j.data)) {
           this.waMessages = j.data;
@@ -653,7 +654,7 @@ function FluxoCommand() {
       this.waSending = true;
       this.waInput   = '';
       try {
-        const r = await this.authFetch('/api/wa/send', {
+        const r = await this.authFetch(this.waBaseUrl + '/api/wa/send', {
           method: 'POST',
           body: JSON.stringify({ phone: this.waSelectedPhone, text }),
         });
@@ -674,7 +675,7 @@ function FluxoCommand() {
 
     async waDisconnect() {
       if (!confirm('Desconectar o WhatsApp e limpar a sessão?')) return;
-      await this.authFetch('/api/wa/disconnect', { method: 'POST' });
+      await this.authFetch(this.waBaseUrl + '/api/wa/disconnect', { method: 'POST' });
       this.waStatus = 'disconnected'; this.waQr = null;
       this.waConversations = []; this.waSelectedPhone = null; this.waMessages = [];
       if (this.waPollingInterval) { clearInterval(this.waPollingInterval); this.waPollingInterval = null; }
