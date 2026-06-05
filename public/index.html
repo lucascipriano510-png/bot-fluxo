@@ -128,12 +128,7 @@
 
     <div class="sb-item" :class="{ active: page==='atendimentos' }" @click="navigate('atendimentos')">
       <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      Atendimentos
-    </div>
-
-    <div class="sb-item" :class="{ active: page==='whatsapp' }" @click="navigate('whatsapp')">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.106.549 4.085 1.513 5.8L0 24l6.37-1.49A11.96 11.96 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.854 0-3.6-.502-5.1-1.378l-.364-.217-3.78.885.914-3.686-.236-.374A9.94 9.94 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-      WhatsApp
+      Inbox
     </div>
 
     <div class="sb-item" :class="{ active: page==='leads' }" @click="navigate('leads')">
@@ -220,10 +215,10 @@
 
     <div class="hdr-title">
       <h1 x-text="{
-        dashboard:'Dashboard', atendimentos:'Atendimentos', leads:'CRM',
+        dashboard:'Dashboard', atendimentos:'Inbox', leads:'CRM',
         produtos:'Produtos', respostas:'Respostas Rápidas', kanban:'Kanban Comercial',
         relatorios:'Relatórios', simulador:'Testar Bot', integracoes:'Integrações',
-        configuracoes:'Configurações', whatsapp:'WhatsApp'
+        configuracoes:'Configurações'
       }[page] || 'Dashboard'"></h1>
       <span x-text="{
         dashboard:'Visão geral da operação, atendimentos e performance.',
@@ -232,11 +227,11 @@
         produtos:'Catálogo de produtos, estoque e gerenciamento.',
         respostas:'Respostas automáticas do bot.',
         kanban:'Pipeline comercial por estágio.',
+        atendimentos:'Conversas do WhatsApp e atendimentos em tempo real.',
         relatorios:'Métricas e performance real.',
         simulador:'Teste o bot em tempo real.',
         integracoes:'Conexões externas e APIs.',
         configuracoes:'Configurações da loja e do bot.',
-        whatsapp:'Inbox de mensagens diretas do seu número.',
       }[page] || ''"></span>
     </div>
 
@@ -522,132 +517,238 @@
       </div>
     </div>
 
-    <!-- ── ATENDIMENTOS ─────────────────────── -->
-    <div x-show="page === 'atendimentos'" class="page-section">
-      <div class="atend-shell">
-        <div class="atend-list">
-          <div class="atend-list-header">Conversas — <span x-text="conversations.length"></span></div>
-          <div x-show="conversations.length === 0" style="padding:32px 16px;text-align:center;color:var(--mu);font-size:12px;line-height:1.6">
-            Nenhuma conversa ainda.<br>Aguardando a primeira mensagem do WhatsApp.
+    <!-- ── INBOX (Atendimentos unificado) ────────────────────────────────── -->
+    <div x-show="page === 'atendimentos'" class="page-section" style="padding:0;overflow:hidden;height:calc(100vh - 56px)">
+      <div style="display:flex;height:100%;font-family:'Segoe UI',sans-serif">
+
+        <!-- Coluna 1: Lista (320px) -->
+        <div style="width:320px;flex-shrink:0;background:#111b21;border-right:1px solid #2a2d3e;display:flex;flex-direction:column">
+
+          <!-- Header -->
+          <div style="height:56px;background:#202c33;display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0;border-bottom:1px solid #2a2d3e">
+            <span style="font-size:16px;font-weight:700;color:#e9edef;flex:1">Conversas</span>
+            <span style="background:#00a884;color:#fff;border-radius:12px;font-size:11px;font-weight:700;padding:2px 8px" x-text="inboxConversations.length"></span>
           </div>
-          <template x-for="c in conversations" :key="c.id">
-            <div class="conv-item" :class="{ selected: String(selectedConv) === String(c.id) }" style="margin:4px 6px;border-radius:8px" @click="selectConv(c)">
-              <div class="conv-avatar" x-text="c.avatar || c.name?.charAt(0)"></div>
-              <div class="conv-info">
-                <div class="conv-name" x-text="c.name || c.phone"></div>
-                <div class="conv-msg" x-text="c.msg || c.node"></div>
-                <div style="display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap">
-                  <span class="badge" style="font-size:10px" :class="tagColor(c.tag || 'novo')" x-text="c.tag || 'novo'"></span>
-                  <span x-show="c.humano_ativo" style="background:#f59e0b;color:#000;border-radius:4px;font-size:9px;font-weight:700;padding:1px 5px;letter-spacing:.3px;flex-shrink:0">HUMANO</span>
-                  <span x-show="c.unread > 0 && !c.humano_ativo" style="background:#22c55e;color:#000;border-radius:10px;font-size:9px;font-weight:700;padding:2px 6px;flex-shrink:0">NOVO</span>
+
+          <!-- Busca -->
+          <div style="padding:8px 12px;background:#111b21;flex-shrink:0">
+            <div style="background:#2a3942;border-radius:20px;display:flex;align-items:center;gap:8px;padding:7px 14px">
+              <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:#8696a0;stroke-width:2;flex-shrink:0"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input type="text" x-model="inboxSearch" placeholder="Pesquisar ou iniciar conversa"
+                style="background:transparent;border:none;outline:none;color:#d1d7db;font-size:13px;width:100%;font-family:inherit" placeholder="Pesquisar ou iniciar conversa">
+            </div>
+          </div>
+
+          <!-- Filtros -->
+          <div style="padding:4px 12px 8px;display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap">
+            <template x-for="f in [{v:'todos',l:'Todos'},{v:'nao_lidos',l:'Não lidos'},{v:'bot',l:'Bot ativo'},{v:'humano',l:'Humano'}]" :key="f.v">
+              <button @click="inboxFilter=f.v"
+                :style="inboxFilter===f.v ? 'background:#00a884;color:#fff;border-color:#00a884' : 'background:transparent;color:#8696a0;border-color:#2a3942'"
+                style="font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid;cursor:pointer;font-family:inherit"
+                x-text="f.l"></button>
+            </template>
+          </div>
+
+          <!-- Lista -->
+          <div style="flex:1;overflow-y:auto">
+            <div x-show="inboxConversations.length === 0"
+              style="padding:32px 16px;text-align:center;color:#8696a0;font-size:13px;line-height:1.6">
+              Nenhuma conversa ainda.<br>Aguardando mensagens do WhatsApp.
+            </div>
+            <template x-for="c in inboxConversations" :key="c.phone">
+              <div @click="selectConv(c)"
+                style="display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;border-bottom:1px solid #2a2d3e;transition:background .15s"
+                :style="atendPhone===c.phone ? 'background:#2a3942' : ''"
+                @mouseenter="$el.style.background='#2a3942'"
+                @mouseleave="$el.style.background=atendPhone===c.phone?'#2a3942':''">
+                <!-- Avatar -->
+                <div style="width:49px;height:49px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff"
+                  :style="c.is_group ? 'background:#6b7280' : c.humano_ativo ? 'background:#f59e0b' : 'background:#25d366'">
+                  <span x-show="!c.is_group" x-text="(c.name||c.phone).charAt(0).toUpperCase()"></span>
+                  <svg x-show="c.is_group" viewBox="0 0 24 24" style="width:26px;height:26px;fill:#fff"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                </div>
+                <!-- Info -->
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">
+                    <div style="font-size:15px;font-weight:500;color:#e9edef;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" x-text="c.name||c.phone"></div>
+                    <div style="font-size:12px;flex-shrink:0;margin-left:8px" :style="(c.unread||0)>0?'color:#00a884':'color:#8696a0'" x-text="fmtTime(c.last_time||c.atualizado_em)"></div>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+                    <div style="font-size:13px;color:#8696a0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1" x-text="c.msg||c.last_message||'—'"></div>
+                    <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+                      <span x-show="c.humano_ativo" style="background:#f59e0b;color:#000;border-radius:4px;font-size:9px;font-weight:700;padding:1px 5px">HUMANO</span>
+                      <span x-show="!c.humano_ativo && !c.is_group" style="background:#2a3942;color:#8696a0;border-radius:4px;font-size:9px;font-weight:700;padding:1px 5px">BOT</span>
+                      <div x-show="(c.unread||0)>0" style="background:#00a884;color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700" x-text="c.unread"></div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div class="conv-meta">
-                <div class="conv-time" x-text="c.time || fmtTime(c.atualizado_em)"></div>
-                <div class="conv-unread" x-show="c.unread > 0" x-text="c.unread"></div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Coluna 2: Chat -->
+        <div style="flex:1;background:#0b141a;display:flex;flex-direction:column;position:relative;overflow:hidden">
+
+          <!-- Vazio -->
+          <div x-show="!atendPhone" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#8696a0">
+            <svg viewBox="0 0 24 24" style="width:60px;height:60px;fill:#00a884;opacity:.4"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.106.549 4.085 1.513 5.8L0 24l6.37-1.49A11.96 11.96 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.854 0-3.6-.502-5.1-1.378l-.364-.217-3.78.885.914-3.686-.236-.374A9.94 9.94 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+            <div style="font-size:14px">Selecione uma conversa</div>
+          </div>
+
+          <!-- Chat ativo -->
+          <template x-if="atendPhone">
+            <div style="display:flex;flex-direction:column;height:100%">
+
+              <!-- Header do chat -->
+              <div style="height:60px;background:#202c33;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid #2a2d3e;flex-shrink:0">
+                <div style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;flex-shrink:0"
+                  :style="atendHumano ? 'background:#f59e0b' : 'background:#25d366'"
+                  x-text="(currentConv?.name||currentConv?.phone||'?').charAt(0).toUpperCase()"></div>
+                <div style="flex:1">
+                  <div style="font-size:15px;font-weight:500;color:#e9edef" x-text="currentConv?.name||currentConv?.phone||atendPhone"></div>
+                  <div style="font-size:13px;color:#8696a0" x-text="atendHumano ? 'Humano ativo' : 'Bot respondendo'"></div>
+                </div>
+                <button class="btn" style="font-size:11px;padding:5px 10px;gap:5px" @click="assumeConv()" :disabled="!atendPhone||atendHumano" :style="atendHumano?'opacity:.4':''">
+                  <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  Assumir
+                </button>
+                <button class="btn btn-green" style="font-size:11px;padding:5px 10px;gap:5px" @click="releaseConv()" :disabled="!atendPhone||!atendHumano" :style="!atendHumano?'opacity:.4':''">
+                  <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  Devolver ao bot
+                </button>
+              </div>
+
+              <!-- Mensagens -->
+              <div id="atend-messages" style="flex:1;overflow-y:auto;padding:12px 5%;display:flex;flex-direction:column;gap:2px">
+                <div x-show="atendLoading" style="display:flex;align-items:center;justify-content:center;padding:40px;color:#8696a0;gap:8px;font-size:13px">
+                  <svg style="width:16px;height:16px;animation:spin 1s linear infinite" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                  Carregando mensagens...
+                </div>
+                <div x-show="!atendLoading && atendMessages.length===0" style="text-align:center;padding:40px;color:#8696a0;font-size:13px">Sem mensagens registradas.</div>
+                <template x-for="(m, i) in atendMessagesWithDates" :key="i">
+                  <div>
+                    <!-- Separador de data -->
+                    <div x-show="m._sep" style="display:flex;justify-content:center;margin:8px 0">
+                      <span style="background:#182229;color:#8696a0;font-size:11px;padding:3px 12px;border-radius:8px" x-text="m.label"></span>
+                    </div>
+                    <!-- Bolha -->
+                    <div x-show="!m._sep" :style="m.direction==='out'||m.from==='bot' ? 'display:flex;justify-content:flex-end;margin:2px 0' : 'display:flex;justify-content:flex-start;margin:2px 0'">
+                      <div :style="m.direction==='out'||m.from==='bot'
+                        ? 'background:#005c4b;border-radius:8px 0 8px 8px;max-width:65%;padding:6px 10px 8px'
+                        : 'background:#202c33;border-radius:0 8px 8px 8px;max-width:65%;padding:6px 10px 8px'">
+                        <div style="font-size:14px;color:#e9edef;white-space:pre-wrap;word-break:break-word" x-text="m.text"></div>
+                        <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;margin-top:2px">
+                          <span style="font-size:11px;color:#8696a0" x-text="m.time"></span>
+                          <span x-show="m.direction==='out'||m.from==='bot'" style="font-size:11px;color:#53bdeb">✓✓</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <!-- Input -->
+              <div style="background:#202c33;min-height:62px;display:flex;align-items:center;gap:10px;padding:10px 16px;flex-shrink:0;border-top:1px solid #2a2d3e">
+                <svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:#aebac1;stroke-width:2;flex-shrink:0;cursor:pointer"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                <input type="text" x-model="atendReply" @keydown="atendKeydown($event)" :disabled="!atendPhone||atendSending"
+                  placeholder="Mensagem"
+                  style="flex:1;background:#2a3942;border:none;outline:none;border-radius:8px;padding:9px 14px;color:#d1d7db;font-size:14px;font-family:inherit">
+                <button @click="sendAtendReply()" :disabled="atendSending||!atendReply.trim()"
+                  style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;flex-shrink:0"
+                  :style="atendReply.trim() ? 'background:#00a884' : 'background:#2a3942'">
+                  <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" :style="atendReply.trim()?'stroke:#fff':'stroke:#8696a0'"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
               </div>
             </div>
           </template>
         </div>
 
-        <div class="atend-chat">
-          <div class="atend-chat-header">
-            <div class="conv-avatar" x-text="currentConv?.avatar || '?'"></div>
-            <div>
-              <div style="font-size:13px;font-weight:700" x-text="currentConv?.name || currentConv?.phone || 'Selecione uma conversa'"></div>
-              <div style="font-size:11px;color:var(--mu)" x-text="atendHumano ? '🟡 Humano ativo' : ('Nó: ' + (currentConv?.node || 'INICIO'))"></div>
-            </div>
-            <div style="margin-left:auto;display:flex;gap:8px">
-              <button class="btn" style="font-size:11px;padding:5px 10px;gap:5px"
-                @click="assumeConv()" :disabled="!atendPhone || atendHumano"
-                :style="atendHumano ? 'opacity:.4' : ''">
-                <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                Assumir
-              </button>
-              <button class="btn btn-green" style="font-size:11px;padding:5px 10px;gap:5px"
-                @click="releaseConv()" :disabled="!atendPhone || !atendHumano"
-                :style="!atendHumano ? 'opacity:.4' : ''">
-                <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                Devolver ao bot
-              </button>
-            </div>
+        <!-- Coluna 3: Ficha (280px) -->
+        <div x-show="atendPhone" style="width:280px;flex-shrink:0;background:#111b21;border-left:1px solid #2a2d3e;overflow-y:auto;display:flex;flex-direction:column">
+
+          <!-- Header ficha -->
+          <div style="padding:20px 16px;border-bottom:1px solid #2a2d3e;text-align:center">
+            <div style="width:56px;height:56px;border-radius:50%;background:#25d366;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff;margin:0 auto 10px"
+              x-text="(currentConv?.name||currentConv?.phone||'?').charAt(0).toUpperCase()"></div>
+            <div style="font-size:15px;font-weight:700;color:#e9edef;margin-bottom:2px" x-text="currentConv?.name||currentConv?.phone||atendPhone"></div>
+            <div style="font-size:12px;color:#8696a0;margin-bottom:8px" x-text="currentConv?.phone||atendPhone||'—'"></div>
+            <span class="badge" :class="statusColor(atendLead?.status_comercial)" x-text="atendLead?.status_comercial||'FRIO'"></span>
           </div>
 
-          <div class="atend-messages" id="atend-messages">
-            <template x-for="(m, i) in currentConvMessages" :key="i">
-              <div :class="m.from === 'bot' ? 'bubble bubble-bot' : 'bubble bubble-user'">
-                <span style="white-space:pre-wrap" x-text="m.text"></span>
-                <div class="bubble-time" x-text="m.time"></div>
-              </div>
-            </template>
-            <!-- Carregando -->
-            <div x-show="atendLoading" style="display:flex;align-items:center;justify-content:center;flex:1;color:var(--mu);font-size:13px;gap:8px;padding:40px 20px">
-              <svg style="width:16px;height:16px;animation:spin 1s linear infinite" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-              Carregando mensagens...
-            </div>
-            <!-- Sem conversa selecionada -->
-            <div x-show="!atendLoading && !atendPhone" class="empty" style="padding:40px 20px">
-              <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              <p>Selecione uma conversa.</p>
-            </div>
-            <!-- Conversa selecionada mas sem mensagens -->
-            <div x-show="!atendLoading && atendPhone && currentConvMessages.length === 0" class="empty" style="padding:40px 20px">
-              <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              <p>Sem mensagens registradas.</p>
-            </div>
-          </div>
-
-          <div class="atend-input-row">
-            <input class="atend-input" x-model="atendReply" placeholder="Responder manualmente..."
-              type="text" @keydown="atendKeydown($event)" :disabled="!atendPhone || atendSending">
-            <button class="btn btn-green" style="padding:8px 14px"
-              @click="sendAtendReply()" :disabled="!atendPhone || atendSending || !atendReply.trim()">
-              <span x-text="atendSending ? '...' : 'Enviar'"></span>
+          <!-- Seção Atendimento -->
+          <div style="padding:16px;border-bottom:1px solid #2a2d3e">
+            <div style="font-size:10px;font-weight:700;color:#8696a0;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">Atendimento</div>
+            <div style="font-size:13px;font-weight:500;margin-bottom:12px" :style="atendHumano?'color:#f59e0b':'color:#25d366'" x-text="atendHumano?'Humano ativo':'Bot respondendo'"></div>
+            <button class="btn" style="width:100%;justify-content:center;font-size:12px;margin-bottom:6px;gap:5px" @click="assumeConv()" :disabled="!atendPhone||atendHumano" :style="atendHumano?'opacity:.4':''">
+              <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              Assumir conversa
+            </button>
+            <button class="btn btn-green" style="width:100%;justify-content:center;font-size:12px;gap:5px" @click="releaseConv()" :disabled="!atendPhone||!atendHumano" :style="!atendHumano?'opacity:.4':''">
+              <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Devolver ao bot
             </button>
           </div>
-        </div>
 
-        <div class="atend-ficha">
-          <div class="ficha-header">
-            <div class="ficha-avatar" x-text="currentConv?.avatar || '?'"></div>
-            <div class="ficha-name" x-text="currentConv?.name || currentConv?.phone || 'Cliente'"></div>
-            <div class="ficha-phone" x-text="currentConv?.phone || '—'"></div>
-            <div style="margin-top:10px">
-              <span class="badge" :class="statusColor(atendLead?.status_comercial)" x-text="atendLead?.status_comercial || 'novo'"></span>
+          <!-- Seção CRM -->
+          <div style="padding:16px;border-bottom:1px solid #2a2d3e">
+            <div style="font-size:10px;font-weight:700;color:#8696a0;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">CRM</div>
+            <div x-show="atendLead" style="display:flex;flex-direction:column;gap:8px">
+              <div>
+                <div style="font-size:10px;color:#8696a0;margin-bottom:3px">Interesse</div>
+                <input type="text" :value="atendLead?.interesse||''" @change="atendLead && (atendLead.interesse=$event.target.value)"
+                  placeholder="—" style="width:100%;background:#2a3942;border:none;border-radius:6px;padding:5px 8px;color:#d1d7db;font-size:12px;font-family:inherit;outline:none;box-sizing:border-box">
+              </div>
+              <div>
+                <div style="font-size:10px;color:#8696a0;margin-bottom:3px">Valor potencial</div>
+                <input type="number" :value="atendLead?.valor_potencial||''" @change="atendLead && (atendLead.valor_potencial=Number($event.target.value))"
+                  placeholder="—" style="width:100%;background:#2a3942;border:none;border-radius:6px;padding:5px 8px;color:#d1d7db;font-size:12px;font-family:inherit;outline:none;box-sizing:border-box">
+              </div>
+              <div>
+                <div style="font-size:10px;color:#8696a0;margin-bottom:3px">Próxima ação</div>
+                <input type="text" :value="atendLead?.proxima_acao||''" @change="atendLead && (atendLead.proxima_acao=$event.target.value)"
+                  placeholder="—" style="width:100%;background:#2a3942;border:none;border-radius:6px;padding:5px 8px;color:#d1d7db;font-size:12px;font-family:inherit;outline:none;box-sizing:border-box">
+              </div>
+              <div x-show="atendLead?.conversion_score != null" style="font-size:12px;color:#8696a0">Score: <span style="color:#e9edef;font-weight:600" x-text="atendLead?.conversion_score"></span></div>
+              <button class="btn btn-green" style="width:100%;justify-content:center;font-size:12px;gap:5px;margin-top:4px"
+                @click="navigate('leads'); $nextTick(() => { const l=leads.find(x=>x.phone===atendPhone); if(l) selectCrmLead(l); })">
+                Ver no CRM
+              </button>
             </div>
+            <div x-show="!atendLead" style="font-size:12px;color:#8696a0;font-style:italic">Lead será criado ao receber mensagem.</div>
           </div>
-          <div class="ficha-field"><div class="ficha-field-label">Nó atual</div><div class="ficha-field-val" x-text="currentConv?.node || 'INICIO'"></div></div>
-          <div class="ficha-field"><div class="ficha-field-label">Telefone</div><div class="ficha-field-val" x-text="currentConv?.phone || '—'"></div></div>
-          <div class="ficha-field"><div class="ficha-field-label">Interesse</div><div class="ficha-field-val" x-text="atendLead?.interesse || '—'"></div></div>
-          <div class="ficha-field"><div class="ficha-field-label">Cidade</div><div class="ficha-field-val" x-text="atendLead?.cidade || '—'"></div></div>
-          <div class="ficha-field"><div class="ficha-field-label">Valor estimado</div><div class="ficha-field-val" style="color:var(--gold)" x-text="atendLead ? fmtBRL(atendLead.valor_potencial) : '—'"></div></div>
-          <div class="ficha-field"><div class="ficha-field-label">Atendimento</div>
-            <div class="ficha-field-val">
-              <span :class="atendHumano ? 'badge badge-gold' : 'badge badge-green'" x-text="atendHumano ? 'Humano' : 'Bot'"></span>
-            </div>
+
+          <!-- Seção Kanban -->
+          <div style="padding:16px;border-bottom:1px solid #2a2d3e">
+            <div style="font-size:10px;font-weight:700;color:#8696a0;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">Kanban</div>
+            <select x-show="atendLead" :value="atendLead?.kanban_stage||'novo'" @change="updateLeadStage($event.target.value)"
+              style="width:100%;background:#2a3942;border:1px solid #3d5065;border-radius:6px;padding:7px 8px;color:#d1d7db;font-size:12px;font-family:inherit;outline:none;cursor:pointer">
+              <option value="novo">Novo Lead</option>
+              <option value="interessado">Interessado</option>
+              <option value="escolhendo">Escolhendo</option>
+              <option value="carrinho">Carrinho</option>
+              <option value="pagamento">Pagamento</option>
+              <option value="finalizado">Finalizado</option>
+            </select>
+            <div x-show="!atendLead" style="font-size:12px;color:#8696a0;font-style:italic">—</div>
           </div>
-          <div style="margin-top:18px;display:flex;flex-direction:column;gap:8px">
-            <a x-show="currentConv?.phone" :href="(() => { let n = (currentConv?.phone||'').replace(/\D/g,''); if(n && !n.startsWith('55')) n='55'+n; return n ? 'https://wa.me/'+n : '#'; })()" target="_blank"
-              class="btn btn-green" style="justify-content:center;text-decoration:none;gap:6px">
-              <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.06 6.06l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+
+          <!-- Seção Ações -->
+          <div style="padding:16px;display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:10px;font-weight:700;color:#8696a0;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Ações</div>
+            <a x-show="atendPhone" :href="(() => { let n=(atendPhone||'').replace(/\D/g,''); if(n&&!n.startsWith('55'))n='55'+n; return n?'https://wa.me/'+n:'#'; })()"
+              target="_blank" class="btn btn-green" style="justify-content:center;font-size:12px;gap:5px;text-decoration:none">
+              <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.06 6.06l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
               Abrir no WhatsApp
             </a>
-            <button class="btn" style="justify-content:center;gap:6px" @click="navigate('leads'); $nextTick(() => { const l = leads.find(x=>x.phone===atendPhone); if(l) selectCrmLead(l); })">
-              <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              Ver no CRM
-            </button>
-            <button class="btn" x-show="atendPhone||currentConv?.phone" style="justify-content:center;gap:6px"
-              @click="navigate('whatsapp'); $nextTick(() => { const ph = atendPhone||currentConv?.phone; if(ph) waSelectConv(ph); })">
-              <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:#e9edef"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.106.549 4.085 1.513 5.8L0 24l6.37-1.49A11.96 11.96 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.854 0-3.6-.502-5.1-1.378l-.364-.217-3.78.885.914-3.686-.236-.374A9.94 9.94 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-              Abrir no Inbox WA
-            </button>
-            <div style="display:flex;gap:6px;margin-top:2px" x-show="atendLead && !atendLead._fromSession">
+            <div x-show="atendLead && !atendLead._fromSession" style="display:flex;gap:6px">
               <button class="btn btn-green" style="flex:1;justify-content:center;font-size:11px" @click="convertLead(atendLead.id)">✅ Convertido</button>
               <button class="btn" style="flex:1;justify-content:center;font-size:11px;background:rgba(239,68,68,.15);color:#ef4444;border-color:#ef4444" @click="loseLead(atendLead.id)">❌ Perdido</button>
             </div>
-            <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:11px;margin-top:4px" x-show="atendLead && !atendLead._fromSession" @click="addNoteLead(atendLead.id)">📝 Adicionar nota</button>
+            <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:11px" x-show="atendLead && !atendLead._fromSession" @click="addNoteLead(atendLead.id)">📝 Adicionar nota</button>
           </div>
         </div>
+
       </div>
     </div>
 
@@ -2059,8 +2160,8 @@
 
     </div>
 
-    <!-- ── WHATSAPP ───────────────────────────────────── -->
-    <div x-show="page === 'whatsapp'" class="page-section" style="padding:0;overflow:hidden;height:calc(100vh - 56px)">
+    <!-- WhatsApp standalone removido — inbox unificado em Atendimentos -->
+    <div x-show="false" style="display:none">
       <div style="display:flex;height:100%;font-family:'Segoe UI',sans-serif">
 
         <!-- Coluna esquerda: lista de conversas -->

@@ -160,6 +160,8 @@ function FluxoCommand() {
     waSending:         false,
     waPollingInterval: null,
     waSearch:          '',
+    inboxSearch:       '',
+    inboxFilter:       'todos',
 
     /* atendimentos */
     atendMessages: [],
@@ -233,6 +235,69 @@ function FluxoCommand() {
       return this.leads.find(l => l.phone === this.waSelectedPhone) || null;
     },
 
+    get inboxConversations() {
+      const merged = new Map();
+      for (const c of this.conversations) {
+        merged.set(c.phone, { ...c, last_time: c.atualizado_em });
+      }
+      for (const w of this.waConversations) {
+        const ex = merged.get(w.phone);
+        if (ex) {
+          merged.set(w.phone, {
+            ...ex,
+            name: w.name || ex.name,
+            msg: w.last_message || ex.msg,
+            last_time: w.last_time || ex.atualizado_em,
+            unread: Math.max(w.unread_count || 0, ex.unread || 0),
+            is_group: w.is_group || false,
+          });
+        } else {
+          const n = w.name || w.phone;
+          merged.set(w.phone, {
+            id: w.id, phone: w.phone, name: n,
+            avatar: n.charAt(0).toUpperCase(),
+            msg: w.last_message || '—',
+            last_time: w.last_time,
+            unread: w.unread_count || 0,
+            is_group: w.is_group || false,
+            humano_ativo: false, tag: 'novo', node: 'INICIO', context: {},
+          });
+        }
+      }
+      let result = [...merged.values()];
+      const q = this.inboxSearch.trim().toLowerCase();
+      if (q) result = result.filter(c =>
+        (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q)
+      );
+      if (this.inboxFilter === 'nao_lidos') result = result.filter(c => (c.unread || 0) > 0);
+      if (this.inboxFilter === 'bot')       result = result.filter(c => !c.humano_ativo);
+      if (this.inboxFilter === 'humano')    result = result.filter(c => c.humano_ativo);
+      return result.sort((a, b) => {
+        const ta = a.last_time ? new Date(a.last_time).getTime() : 0;
+        const tb = b.last_time ? new Date(b.last_time).getTime() : 0;
+        return tb - ta;
+      });
+    },
+
+    get atendMessagesWithDates() {
+      const msgs = this.atendMessages;
+      if (!msgs.length) return msgs;
+      const result = [];
+      let lastDate = null;
+      for (const m of msgs) {
+        const d = m.ts ? new Date(m.ts) : null;
+        if (d) {
+          const dk = d.toDateString();
+          if (dk !== lastDate) {
+            lastDate = dk;
+            result.push({ _sep: true, label: this.fmtDateSep(d) });
+          }
+        }
+        result.push(m);
+      }
+      return result;
+    },
+
     get waCurrentConv() {
       return this.waConversations.find(c => c.phone === this.waSelectedPhone) || null;
     },
@@ -255,7 +320,7 @@ function FluxoCommand() {
     get ignorarHorario()  { return this.cfg.ignorar_horario; },
     set ignorarHorario(v) { this.cfg.ignorar_horario = v; },
 
-    get waConfigured() { return this.evoConfigured; },
+    get waConfigured() { return this.waStatus === 'connected'; },
 
     get leadsQuentes() { return this.leads.filter(l => l.status_comercial === 'QUENTE').length; },
     get leadsMornos()  { return this.leads.filter(l => l.status_comercial === 'MORNO').length; },
@@ -329,6 +394,7 @@ function FluxoCommand() {
       if (p === 'leads')       this.loadLeads();
       if (p === 'respostas')   this.loadRespostas();
       if (p === 'integracoes') { this.loadIntegrations(); this.loadAiIntegration(); this.loadChannels(); this.loadKnowledge(); }
+      if (p === 'atendimentos') { this.loadSessions(); this.waLoadConversations(); this.loadLeads(); }
       if (p === 'whatsapp')    { this.loadLeads(); this.$nextTick(() => this.waInit()); }
     },
 
@@ -451,6 +517,7 @@ function FluxoCommand() {
       this._inboxPoller = setInterval(async () => {
         if (this.page === 'atendimentos') {
           await this.loadSessions();
+          await this.waLoadConversations();
           await this.loadLeads();
           if (this.atendPhone) {
             try {
@@ -1384,22 +1451,49 @@ function FluxoCommand() {
         }
       }
       try {
-        const r = await this.authFetch('/api/messages/' + conv.phone);
-        const j = await r.json();
-        if (j.ok && Array.isArray(j.data)) {
-          this.atendMessages = j.data.map(m => ({
-            from: m.direcao === 'saida' ? 'bot' : 'user',
-            text: m.conteudo,
-            time: this.fmtTime(m.criado_em || m.created_at),
-          }));
-          this.atendLoading = false;
-          this.scrollChat();
-        } else {
-          this.atendLoading = false;
-        }
+        const [botRes, waRes] = await Promise.allSettled([
+          this.authFetch('/api/messages/' + conv.phone).then(r => r.json()),
+          fetch(this.waBaseUrl + '/api/wa/messages/' + conv.phone, {
+            headers: this._authToken ? { 'Authorization': 'Bearer ' + this._authToken } : {},
+          }).then(r => r.json()).catch(() => ({ ok: false })),
+        ]);
+        const toTs = s => { try { return new Date(s).getTime(); } catch { return 0; } };
+        const botMsgs = (botRes.status === 'fulfilled' && botRes.value?.ok && Array.isArray(botRes.value.data))
+          ? botRes.value.data.map(m => ({
+              from: m.direcao === 'saida' ? 'bot' : 'user',
+              text: m.conteudo,
+              time: this.fmtTime(m.criado_em || m.created_at),
+              ts: toTs(m.criado_em || m.created_at),
+              direction: m.direcao === 'saida' ? 'out' : 'in',
+            }))
+          : [];
+        const waMsgs = (waRes.status === 'fulfilled' && waRes.value?.ok && Array.isArray(waRes.value.data))
+          ? waRes.value.data.map(m => ({
+              from: m.direction === 'out' ? 'bot' : 'user',
+              text: m.text,
+              time: this.fmtTime(m.timestamp),
+              ts: toTs(m.timestamp),
+              direction: m.direction,
+            }))
+          : [];
+        this.atendMessages = [...botMsgs, ...waMsgs].sort((a, b) => a.ts - b.ts);
+        this.atendLoading = false;
+        this.scrollChat();
       } catch (_) {
         this.atendLoading = false;
       }
+    },
+
+    async updateLeadStage(stage) {
+      if (!this.atendLead?.id) return;
+      try {
+        await this.authFetch(`/api/leads/${this.atendLead.id}/stage`, {
+          method: 'PATCH',
+          body: JSON.stringify({ stage }),
+        });
+        this.atendLead = { ...this.atendLead, kanban_stage: stage };
+        this.loadKanban();
+      } catch (_) {}
     },
 
     async assumeConv() {
@@ -1519,6 +1613,13 @@ function FluxoCommand() {
         return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       }
       return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    },
+
+    fmtDateSep(d) {
+      const today = new Date(); const yest = new Date(+today - 864e5);
+      if (d.toDateString() === today.toDateString()) return 'HOJE';
+      if (d.toDateString() === yest.toDateString()) return 'ONTEM';
+      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' });
     },
 
     fmtBRL(v) {
