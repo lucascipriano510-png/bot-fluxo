@@ -162,6 +162,8 @@ function FluxoCommand() {
     waSearch:          '',
     inboxSearch:       '',
     inboxFilter:       'todos',
+    fichaOpen:         true,
+    _crmSaveTimers:    {},
 
     /* atendimentos */
     atendMessages: [],
@@ -277,6 +279,12 @@ function FluxoCommand() {
         const tb = b.last_time ? new Date(b.last_time).getTime() : 0;
         return tb - ta;
       });
+    },
+
+    get leadByPhone() {
+      const m = {};
+      for (const l of this.leads) if (l.phone) m[l.phone] = l;
+      return m;
     },
 
     get atendMessagesWithDates() {
@@ -1484,6 +1492,20 @@ function FluxoCommand() {
       }
     },
 
+    saveCrmField(field, value) {
+      if (!this.atendLead?.id) return;
+      clearTimeout((this._crmSaveTimers || {})[field]);
+      if (!this._crmSaveTimers) this._crmSaveTimers = {};
+      this._crmSaveTimers[field] = setTimeout(async () => {
+        try {
+          await this.authFetch(`/api/leads/${this.atendLead.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ [field]: value }),
+          });
+        } catch (_) {}
+      }, 800);
+    },
+
     async toggleBot() {
       const newVal = !this.cfg.bot_ativo;
       this.cfg.bot_ativo = newVal;
@@ -1527,24 +1549,36 @@ function FluxoCommand() {
       this.atendSending = true;
       const sent = text;
       this.atendReply = '';
+      this.$nextTick(() => {
+        const ta = document.getElementById('inbox-textarea');
+        if (ta) { ta.style.height = 'auto'; }
+      });
       try {
-        const r = await this.authFetch(`/api/sessions/${this.atendPhone}/message`, {
-          method: 'POST',
-          body: JSON.stringify({ text: sent }),
-        });
-        const j = await r.json();
-        if (j.ok) {
-          this.atendMessages.push({ from: 'bot', text: sent, time: this.timeNow() });
-          this.scrollChat();
-          if (!j.whatsappSent && j.whatsappError) {
-            console.warn('[Inbox] Mensagem salva mas WhatsApp não enviou:', j.whatsappError);
-          }
-        } else {
-          alert('Erro ao enviar: ' + (j.error || 'Tente novamente.'));
-          this.atendReply = sent;
+        // Tenta enviar pelo Baileys (Render) se a conversa existe lá
+        const isWaConv = this.waConversations.some(w => w.phone === this.atendPhone);
+        let ok = false;
+        if (isWaConv) {
+          try {
+            const headers = { 'Content-Type': 'application/json' };
+            if (this._authToken) headers['Authorization'] = 'Bearer ' + this._authToken;
+            const r = await fetch(this.waBaseUrl + '/api/wa/send', {
+              method: 'POST', headers, body: JSON.stringify({ phone: this.atendPhone, text: sent }),
+            });
+            const j = await r.json();
+            if (j.ok) ok = true;
+          } catch (_) {}
         }
+        if (!ok) {
+          const r = await this.authFetch(`/api/sessions/${this.atendPhone}/message`, {
+            method: 'POST', body: JSON.stringify({ text: sent }),
+          });
+          const j = await r.json();
+          if (!j.ok) throw new Error(j.error || 'Erro ao enviar');
+        }
+        this.atendMessages.push({ from: 'bot', text: sent, time: this.timeNow(), ts: Date.now(), direction: 'out' });
+        this.scrollChat();
       } catch (_) {
-        alert('Erro de conexão ao enviar mensagem.');
+        alert('Erro ao enviar mensagem. Tente novamente.');
         this.atendReply = sent;
       }
       finally { this.atendSending = false; }
