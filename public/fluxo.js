@@ -156,6 +156,7 @@ function FluxoCommand() {
     waSelectedPhone:   null,
     waMessages:        [],
     waInput:           '',
+    waGroupsOpen:      false,
     waSending:         false,
     waPollingInterval: null,
     waSearch:          '',
@@ -213,12 +214,23 @@ function FluxoCommand() {
     /* computed */
     get currentConvMessages() { return this.atendMessages; },
 
-    get waFilteredConversations() {
+    get waPrivateConvs() {
       const q = this.waSearch.trim().toLowerCase();
-      if (!q) return this.waConversations;
       return this.waConversations.filter(c =>
-        (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q)
+        !c.is_group && (!q || (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q))
       );
+    },
+
+    get waGroupConvs() {
+      const q = this.waSearch.trim().toLowerCase();
+      return this.waConversations.filter(c =>
+        c.is_group && (!q || (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q))
+      );
+    },
+
+    get waCrmInfo() {
+      if (!this.waSelectedPhone) return null;
+      return this.leads.find(l => l.phone === this.waSelectedPhone) || null;
     },
 
     get waCurrentConv() {
@@ -317,7 +329,7 @@ function FluxoCommand() {
       if (p === 'leads')       this.loadLeads();
       if (p === 'respostas')   this.loadRespostas();
       if (p === 'integracoes') { this.loadIntegrations(); this.loadAiIntegration(); this.loadChannels(); this.loadKnowledge(); }
-      if (p === 'whatsapp')    this.$nextTick(() => this.waInit());
+      if (p === 'whatsapp')    { this.loadLeads(); this.$nextTick(() => this.waInit()); }
     },
 
     /* ── Helpers ──────────────────────────────────────────────────────────── */

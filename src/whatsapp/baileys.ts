@@ -1,5 +1,6 @@
 // baileys.ts — Real quando ENABLE_BAILEYS=true (Render/Railway/VPS).
 // Sem a variável, retorna stub 'unavailable' (compatível com Vercel serverless).
+// MODO OBSERVADOR — nunca responder automaticamente
 
 import { supabase } from '../lib/supabase';
 import qrcode from 'qrcode';
@@ -19,6 +20,70 @@ const silentLogger = {
   error: console.error, fatal: console.error,
   child() { return this; },
 };
+
+function formatPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.startsWith('55') && digits.length >= 12) {
+    const ddd = digits.slice(2, 4);
+    const num = digits.slice(4);
+    const f = num.length === 9
+      ? `${num.slice(0, 5)}-${num.slice(5)}`
+      : `${num.slice(0, 4)}-${num.slice(4)}`;
+    return `+55 (${ddd}) ${f}`;
+  }
+  return digits ? `+${digits}` : raw;
+}
+
+function resolveName(msg: any, phone: string): string {
+  if (msg.pushName) return msg.pushName;
+  const jid = msg.key.remoteJid || '';
+  if (_socket?.contacts) {
+    const c = _socket.contacts[jid];
+    if (c?.name) return c.name;
+    if (c?.notify) return c.notify;
+  }
+  return formatPhone(phone);
+}
+
+async function upsertLeadFromInbox(
+  storeId: string,
+  phone: string,
+  name: string,
+  firstMessage: string,
+): Promise<string | null> {
+  try {
+    const { data: existing } = await supabase
+      .from('bot_leads')
+      .select('id')
+      .eq('store_id', storeId)
+      .eq('phone', phone)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase.from('bot_leads')
+        .update({ atualizado_em: new Date().toISOString() })
+        .eq('id', existing.id);
+      return existing.id as string;
+    }
+
+    const { data: created } = await supabase.from('bot_leads').insert({
+      store_id:         storeId,
+      phone,
+      nome:             name,
+      origem:           'whatsapp_inbox',
+      status_comercial: 'FRIO',
+      interesse:        firstMessage.slice(0, 100),
+      kanban_stage:     'novo',
+      status:           'novo',
+      qualificado_em:   new Date().toISOString(),
+      atualizado_em:    new Date().toISOString(),
+    }).select('id').single();
+
+    return (created?.id as string) || null;
+  } catch {
+    return null;
+  }
+}
 
 export function getWaState() {
   return { status: _status, qr: _qr, storeId: null };
@@ -69,26 +134,37 @@ export async function initBaileys(storeId: string): Promise<void> {
 
     _socket.ev.on('creds.update', saveCreds);
 
+    // MODO OBSERVADOR — nunca responder automaticamente
     _socket.ev.on('messages.upsert', async ({ messages, type }: any) => {
       if (type !== 'notify') return;
       for (const msg of messages) {
-        if (msg.key.fromMe) continue;
+        if (msg.key.fromMe) continue; // ignorar mensagens enviadas pelo próprio número
+
+        const jid = msg.key.remoteJid || '';
+        const isGroup = jid.endsWith('@g.us');
+        const phone = jid.replace('@s.whatsapp.net', '').replace('@g.us', '').replace(/@.*/, '');
+
         const text =
           msg.message?.conversation ||
           msg.message?.extendedTextMessage?.text ||
           msg.message?.imageMessage?.caption || '';
-        const phone = (msg.key.remoteJid || '')
-          .replace('@s.whatsapp.net', '')
-          .replace(/@.*/, '');
+
         if (!text || !phone) continue;
 
         const ts = new Date(Number(msg.messageTimestamp) * 1000).toISOString();
+        const name = resolveName(msg, phone);
+
+        // CRM: cria ou atualiza lead apenas para conversas privadas
+        let leadId: string | null = null;
+        if (!isGroup) {
+          leadId = await upsertLeadFromInbox(storeId, phone, name, text);
+        }
 
         await supabase.from('wa_messages').insert({
-          store_id: storeId, phone, direction: 'in', text, timestamp: ts,
+          store_id: storeId, phone, direction: 'in', text, timestamp: ts, lead_id: leadId,
         }).then(null, () => {});
 
-        const { data: existing } = await supabase
+        const { data: existingConv } = await supabase
           .from('wa_conversations')
           .select('unread_count')
           .eq('store_id', storeId)
@@ -96,11 +172,14 @@ export async function initBaileys(storeId: string): Promise<void> {
           .single();
 
         await supabase.from('wa_conversations').upsert({
-          store_id: storeId,
+          store_id:     storeId,
           phone,
+          name,
           last_message: text,
-          last_time: ts,
-          unread_count: (existing?.unread_count || 0) + 1,
+          last_time:    ts,
+          is_group:     isGroup,
+          lead_id:      leadId,
+          unread_count: (existingConv?.unread_count || 0) + 1,
         }, { onConflict: 'store_id,phone' }).then(null, () => {});
       }
     });
@@ -125,10 +204,10 @@ export async function sendWaMessage(phone: string, text: string, storeId: string
   }).then(null, () => {});
 
   await supabase.from('wa_conversations').upsert({
-    store_id: storeId,
+    store_id:     storeId,
     phone,
     last_message: text,
-    last_time: ts,
+    last_time:    ts,
     unread_count: 0,
   }, { onConflict: 'store_id,phone' }).then(null, () => {});
 }
