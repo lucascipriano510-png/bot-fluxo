@@ -156,9 +156,12 @@ function FluxoCommand() {
     waSelectedPhone:   null,
     waMessages:        [],
     waInput:           '',
-    waGroupsOpen:      false,
-    waSending:         false,
-    waPollingInterval: null,
+    waGroupsOpen:        false,
+    waSending:           false,
+    waPollingInterval:   null,
+    waReconnectModal:    false,
+    waReconnectPoller:   null,
+    waStatusPoller:      null,
     waSearch:          '',
     inboxSearch:       '',
     inboxFilter:       'todos',
@@ -556,6 +559,10 @@ function FluxoCommand() {
           await this.loadFollowupToday();
         }
       }, 12000);
+      // Polling global do status WA — independente da página
+      if (this.waStatusPoller) clearInterval(this.waStatusPoller);
+      this.waStatusPoller = setInterval(() => this.waLoadStatus(), 30000);
+      this.waLoadStatus(); // checar imediatamente ao carregar
     },
 
     async _checkStoreStatus() {
@@ -708,6 +715,24 @@ function FluxoCommand() {
         const j = await r.json();
         if (j.ok) { this.waStatus = j.status; this.waQr = j.qr || null; }
       } catch (_) {}
+    },
+
+    waOpenReconnect() {
+      this.waReconnectModal = true;
+      this.waLoadStatus();
+      if (this.waReconnectPoller) clearInterval(this.waReconnectPoller);
+      this.waReconnectPoller = setInterval(async () => {
+        await this.waLoadStatus();
+        if (this.waStatus === 'connected') {
+          this.waCloseReconnect();
+          await this.waLoadConversations();
+        }
+      }, 3000);
+    },
+
+    waCloseReconnect() {
+      this.waReconnectModal = false;
+      if (this.waReconnectPoller) { clearInterval(this.waReconnectPoller); this.waReconnectPoller = null; }
     },
 
     async waLoadConversations() {

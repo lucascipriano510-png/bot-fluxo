@@ -1354,6 +1354,12 @@ router.get('/wa/status', async (req, res) => {
   res.json({ ok: true, status: s.status, qr: s.qr });
 });
 
+router.get('/wa/qr', async (req, res) => {
+  await initBaileys(req.storeId!).catch(() => {});
+  const s = getWaState();
+  res.json({ ok: true, status: s.status, qr: s.qr });
+});
+
 router.get('/wa/conversations', async (req, res) => {
   try {
     const { data } = await supabase

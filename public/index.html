@@ -208,6 +208,12 @@
       <div class="dot-sm" :class="waConfigured ? '' : 'yellow'"></div>
       <span x-text="waConfigured ? 'WhatsApp ativo' : 'WhatsApp pendente'"></span>
     </div>
+    <div x-show="!waConfigured" style="margin-top:6px">
+      <button @click="waOpenReconnect()"
+        style="width:100%;font-size:11px;font-weight:600;padding:5px 0;border-radius:6px;background:rgba(0,168,132,.15);color:#00a884;border:1px solid rgba(0,168,132,.3);cursor:pointer;font-family:inherit">
+        Reconectar WhatsApp
+      </button>
+    </div>
     <div class="sb-status-row"><div class="dot-sm"></div> Dados sincronizados</div>
   </div>
 </aside>
@@ -2438,6 +2444,33 @@
 
   </div><!-- /cmd-content -->
 </div><!-- /cmd-main -->
+
+<!-- Modal QR — Reconectar WhatsApp -->
+<div x-show="waReconnectModal" x-transition
+  style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;display:flex;align-items:center;justify-content:center"
+  @click.self="waCloseReconnect()">
+  <div style="background:#fff;border-radius:16px;padding:32px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="font-size:18px;font-weight:700;color:#111b21;margin-bottom:6px">Reconectar WhatsApp</div>
+    <div style="font-size:13px;color:#667781;margin-bottom:24px;line-height:1.5">
+      Abra o WhatsApp no celular<br>
+      → <strong>Dispositivos conectados</strong><br>
+      → <strong>Conectar dispositivo</strong><br>
+      → Escaneie o QR code abaixo
+    </div>
+    <!-- QR ou loading -->
+    <div style="display:flex;align-items:center;justify-content:center;min-height:200px">
+      <img x-show="waQr" :src="waQr" style="width:200px;height:200px;border-radius:8px">
+      <div x-show="!waQr && waStatus==='qr_pending'" style="color:#667781;font-size:13px">Gerando QR code...</div>
+      <div x-show="waStatus==='connected'" style="color:#00a884;font-size:15px;font-weight:600">✓ Conectado!</div>
+      <div x-show="waStatus==='disconnected'" style="color:#667781;font-size:13px">Iniciando conexão...</div>
+    </div>
+    <div style="font-size:11px;color:#8696a0;margin-top:12px">Atualiza automaticamente a cada 3s</div>
+    <button @click="waCloseReconnect()"
+      style="margin-top:20px;width:100%;padding:10px;border-radius:8px;background:#f0f2f5;border:none;color:#54656f;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+      Fechar
+    </button>
+  </div>
+</div>
 
 </div><!-- /painel autenticado -->
 
