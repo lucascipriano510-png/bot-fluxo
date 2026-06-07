@@ -89,6 +89,71 @@ export function getWaState() {
   return { status: _status, qr: _qr, storeId: null };
 }
 
+async function useSupabaseAuthState(storeId: string) {
+  const B = await import('@whiskeysockets/baileys') as any;
+  const { initAuthCreds, BufferJSON, proto } = B;
+
+  async function readData(key: string) {
+    const { data } = await supabase
+      .from('baileys_auth')
+      .select('value')
+      .eq('store_id', storeId)
+      .eq('key', key)
+      .maybeSingle();
+    if (!data) return null;
+    return JSON.parse(JSON.stringify(data.value), BufferJSON.reviver);
+  }
+
+  async function writeData(key: string, value: any) {
+    await supabase.from('baileys_auth').upsert({
+      store_id: storeId,
+      key,
+      value: JSON.parse(JSON.stringify(value, BufferJSON.replacer)),
+    }, { onConflict: 'store_id,key' });
+  }
+
+  async function removeData(key: string) {
+    await supabase.from('baileys_auth')
+      .delete()
+      .eq('store_id', storeId)
+      .eq('key', key);
+  }
+
+  const creds = (await readData('creds')) || initAuthCreds();
+
+  const state = {
+    creds,
+    keys: {
+      get: async (type: string, ids: string[]) => {
+        const result: Record<string, any> = {};
+        await Promise.all(ids.map(async (id) => {
+          let value = await readData(`${type}-${id}`);
+          if (type === 'app-state-sync-key' && value) {
+            value = proto.Message.AppStateSyncKeyData.fromObject(value);
+          }
+          result[id] = value;
+        }));
+        return result;
+      },
+      set: async (data: Record<string, Record<string, any>>) => {
+        await Promise.all(
+          Object.entries(data).flatMap(([category, entries]) =>
+            Object.entries(entries).map(([id, value]) => {
+              const key = `${category}-${id}`;
+              return value ? writeData(key, value) : removeData(key);
+            })
+          )
+        );
+      },
+    },
+  };
+
+  return {
+    state,
+    saveCreds: () => writeData('creds', state.creds),
+  };
+}
+
 export async function initBaileys(storeId: string): Promise<void> {
   if (!ENABLED) return;
   if (_initializing) return;
@@ -98,9 +163,9 @@ export async function initBaileys(storeId: string): Promise<void> {
   try {
     const B = await import('@whiskeysockets/baileys') as any;
     const makeWASocket = B.default ?? B.makeWASocket ?? B;
-    const { useMultiFileAuthState, DisconnectReason } = B;
+    const { DisconnectReason } = B;
 
-    const { state, saveCreds } = await useMultiFileAuthState('./baileys-auth');
+    const { state, saveCreds } = await useSupabaseAuthState(storeId);
 
     _socket = makeWASocket({
       auth: state,
