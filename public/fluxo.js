@@ -1158,6 +1158,31 @@ function FluxoCommand() {
       return digits;
     },
 
+    async addConvToCrm() {
+      if (!this.atendPhone) return;
+      const conv = this.waConversations.find(c => c.phone === this.atendPhone)
+                || this.conversations.find(c => c.phone === this.atendPhone);
+      const nome = conv?.name || this.atendPhone;
+      try {
+        const r = await this.authFetch('/api/leads', {
+          method: 'POST',
+          body: JSON.stringify({
+            phone:            this.atendPhone,
+            nome,
+            origem:           'whatsapp_inbox',
+            status_comercial: 'FRIO',
+            kanban_stage:     'novo',
+          }),
+        });
+        const j = await r.json();
+        if (j.ok) {
+          await this.loadLeads();
+          const normAtend = this.normalizePhone(this.atendPhone);
+          this.atendLead = this.leads.find(l => this.normalizePhone(l.phone) === normAtend) || j.data;
+        }
+      } catch (_) {}
+    },
+
     openNewLeadModal() {
       this.newLead = { phone: '', nome: '', interesse: '', status_comercial: 'FRIO', kanban_stage: 'novo', valor_potencial: '', cidade: '' };
       this.newLeadError = null;

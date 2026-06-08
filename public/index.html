@@ -764,7 +764,10 @@
               <button class="inbox-btn-full" style="margin-top:4px"
                 @click="navigate('leads');$nextTick(()=>{const l=leads.find(x=>x.phone===atendPhone);if(l)selectCrmLead(l);})">Ver no CRM</button>
             </div>
-            <div x-show="!atendLead" style="font-size:13px;color:#8696a0;font-style:italic">Lead criado automaticamente ao receber mensagem.</div>
+            <div x-show="!atendLead" style="display:flex;flex-direction:column;gap:10px">
+              <div style="font-size:12px;color:#8696a0;font-style:italic">Lead não vinculado a esta conversa.</div>
+              <button class="inbox-btn-full green" @click="addConvToCrm()">+ Adicionar ao CRM</button>
+            </div>
           </div>
 
           <!-- Kanban -->
@@ -779,7 +782,7 @@
               <option value="pagamento">Aguardando Pgto</option>
               <option value="finalizado">Finalizado</option>
             </select>
-            <div x-show="!atendLead" style="font-size:13px;color:#8696a0">—</div>
+            <div x-show="!atendLead" style="font-size:12px;color:#8696a0;font-style:italic">Adicione ao CRM primeiro.</div>
           </div>
 
           <!-- Acoes -->
