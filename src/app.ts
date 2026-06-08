@@ -17,11 +17,16 @@ const app = express();
 
 // CORS — painel Vercel precisa bater no servidor Render
 app.use((req, res, next) => {
-  const allowed = ['https://bot.fluxooutlet.com.br', 'http://localhost:3000'];
   const origin = req.headers.origin || '';
-  if (allowed.includes(origin)) {
+  const isAllowed =
+    origin === 'https://bot.fluxooutlet.com.br' ||
+    origin === 'http://localhost:3000' ||
+    origin === 'http://localhost:5173' ||
+    /^https:\/\/bot-fluxo.*\.vercel\.app$/.test(origin) ||
+    /^https:\/\/.*\.fluxooutlet\.com\.br$/.test(origin);
+  if (isAllowed) {
     res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
   }

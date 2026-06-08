@@ -47,6 +47,7 @@ router.get('/config', (_req, res) => {
   res.json({
     supabaseUrl:      process.env.SUPABASE_URL,
     supabaseAnonKey:  process.env.SUPABASE_ANON_KEY || '',
+    renderUrl:        (process.env.RENDER_EXTERNAL_URL || '').replace(/\/$/, '') || null,
   });
 });
 

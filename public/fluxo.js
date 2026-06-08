@@ -149,7 +149,7 @@ function FluxoCommand() {
     respostaFeedbackMsg: '',
 
     /* whatsapp direto */
-    waBaseUrl:         'https://bot-fluxo.onrender.com',
+    waBaseUrl:         '',
     waStatus:          'disconnected',
     waQr:              null,
     waConversations:   [],
@@ -438,7 +438,7 @@ function FluxoCommand() {
     async authFetch(url, opts = {}) {
       const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
       if (this._authToken) headers['Authorization'] = `Bearer ${this._authToken}`;
-      return fetch(url, { ...opts, headers });
+      return fetch(url, { credentials: 'include', ...opts, headers });
     },
 
     async login() {
@@ -495,6 +495,8 @@ function FluxoCommand() {
       try {
         const cfgRes = await fetch('/api/config');
         const cfg    = await cfgRes.json();
+        // Define waBaseUrl antes de qualquer chamada ao backend
+        this.waBaseUrl = cfg.renderUrl || window.location.origin;
         if (cfg.supabaseUrl && cfg.supabaseAnonKey && window.supabase) {
           this._sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
 
@@ -534,8 +536,8 @@ function FluxoCommand() {
         this.loadReports(),
         this.loadFollowupToday(),
         this.loadBrain(),
+        this.loadKanban(),
       ]);
-      if (this.page === 'kanban')      this.loadKanban();
       if (this.page === 'relatorios')  this.loadReports();
       if (this.page === 'respostas')   this.loadRespostas();
       if (this.page === 'integracoes') this.loadIntegrations();
@@ -570,8 +572,10 @@ function FluxoCommand() {
       }, 12000);
       // Polling global do status WA — independente da página
       if (this.waStatusPoller) clearInterval(this.waStatusPoller);
-      this.waStatusPoller = setInterval(() => this.waLoadStatus(), 30000);
+      this.waStatusPoller = setInterval(() => this.waLoadStatus(), 10000);
       this.waLoadStatus(); // checar imediatamente ao carregar
+      // Inicializa conexão WA no boot sem precisar navegar para a página
+      this.$nextTick(() => this.waInit());
     },
 
     async _checkStoreStatus() {
@@ -719,11 +723,19 @@ function FluxoCommand() {
     },
 
     async waLoadStatus() {
+      if (!this.waBaseUrl) return;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
       try {
-        const r = await this.authFetch(this.waBaseUrl + '/api/wa/status');
+        const r = await this.authFetch(this.waBaseUrl + '/api/wa/status', { signal: controller.signal });
         const j = await r.json();
         if (j.ok) { this.waStatus = j.status; this.waQr = j.qr || null; }
-      } catch (_) {}
+      } catch (err) {
+        if (err.name === 'AbortError') this.waStatus = 'disconnected';
+        // outros erros de rede mantêm estado atual
+      } finally {
+        clearTimeout(timer);
+      }
     },
 
     waOpenReconnect() {

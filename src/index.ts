@@ -23,13 +23,15 @@ app.listen(PORT, () => {
     }
   }
 
-  // Self-ping a cada 10 min para evitar sleep do Render free tier
+  // Self-ping a cada 4 min para evitar sleep do Render free tier
   const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
   if (RENDER_URL) {
-    setInterval(() => {
-      fetch(`${RENDER_URL}/api/health`)
-        .then(() => console.log('[keep-alive] ping ok'))
+    const doPing = () => {
+      fetch(`${RENDER_URL}/status`)
+        .then(r => console.log('[keep-alive] ping ok', r.status))
         .catch(() => {});
-    }, 10 * 60 * 1000);
+    };
+    doPing(); // ping imediato no boot
+    setInterval(doPing, 4 * 60 * 1000);
   }
 });
