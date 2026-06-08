@@ -4,6 +4,7 @@
 
 import { supabase } from '../lib/supabase';
 import qrcode from 'qrcode';
+import { normalizePhone } from '../utils/phone';
 
 export type WaStatus = 'connected' | 'qr_pending' | 'disconnected' | 'unavailable';
 
@@ -215,7 +216,7 @@ export async function initBaileys(storeId: string): Promise<void> {
         // Ignorar grupos completamente — só processar contatos privados
         if (jid.endsWith('@g.us')) continue;
 
-        const phone = jid.replace('@s.whatsapp.net', '').replace(/@.*/, '');
+        const phone = normalizePhone(jid);
 
         const text =
           msg.message?.conversation ||
@@ -265,17 +266,18 @@ export async function sendWaMessage(phone: string, text: string, storeId: string
   if (!ENABLED || !_socket || _status !== 'connected') {
     throw new Error('WhatsApp não conectado.');
   }
-  const jid = phone.includes('@') ? phone : `${phone}@s.whatsapp.net`;
+  const normalizedPhone = normalizePhone(phone);
+  const jid = normalizedPhone.includes('@') ? normalizedPhone : `${normalizedPhone}@s.whatsapp.net`;
   await _socket.sendMessage(jid, { text });
 
   const ts = new Date().toISOString();
   await supabase.from('wa_messages').insert({
-    store_id: storeId, phone, direction: 'out', text, timestamp: ts,
+    store_id: storeId, phone: normalizedPhone, direction: 'out', text, timestamp: ts,
   }).then(null, () => {});
 
   await supabase.from('wa_conversations').upsert({
     store_id:     storeId,
-    phone,
+    phone:        normalizedPhone,
     last_message: text,
     last_time:    ts,
     unread_count: 0,

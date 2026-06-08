@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import { supabase } from '../lib/supabase';
+import { normalizePhone } from '../utils/phone';
 import { fetchLeads } from '../services/leadService';
 import { fetchHistorico } from '../services/mensagemService';
 import { FLOW_MAP } from '../bot/flowMap';
@@ -1428,18 +1429,19 @@ router.post('/wa/cleanup', async (req, res) => {
 
 router.get('/wa/messages/:phone', async (req, res) => {
   try {
+    const phone = normalizePhone(req.params.phone);
     const { data } = await supabase
       .from('wa_messages')
       .select('*')
       .eq('store_id', req.storeId!)
-      .eq('phone', req.params.phone)
+      .eq('phone', phone)
       .order('timestamp', { ascending: true })
       .limit(100);
     // Mark as read
     await supabase.from('wa_conversations')
       .update({ unread_count: 0 })
       .eq('store_id', req.storeId!)
-      .eq('phone', req.params.phone);
+      .eq('phone', phone);
     res.json({ ok: true, data: data || [] });
   } catch (err: unknown) {
     res.json({ ok: false, data: [], error: errMsg(err) });

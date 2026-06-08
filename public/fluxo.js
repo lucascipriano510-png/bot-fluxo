@@ -243,7 +243,8 @@ function FluxoCommand() {
 
     get waCrmInfo() {
       if (!this.waSelectedPhone) return null;
-      return this.leads.find(l => l.phone === this.waSelectedPhone) || null;
+      const norm = this.normalizePhone(this.waSelectedPhone);
+      return this.leads.find(l => this.normalizePhone(l.phone) === norm) || null;
     },
 
     get inboxConversations() {
@@ -751,7 +752,8 @@ function FluxoCommand() {
 
     async waLoadMessages(phone) {
       try {
-        const r = await this.authFetch(this.waBaseUrl + '/api/wa/messages/' + phone);
+        const normPhone = this.normalizePhone(phone);
+        const r = await this.authFetch(this.waBaseUrl + '/api/wa/messages/' + normPhone);
         const j = await r.json();
         if (j.ok && Array.isArray(j.data)) {
           this.waMessages = j.data;
@@ -1146,6 +1148,16 @@ function FluxoCommand() {
       this.productModal = true;
     },
 
+    normalizePhone(raw) {
+      if (!raw) return '';
+      const digits = String(raw).replace(/\D/g, '');
+      if (!digits) return raw;
+      if ((digits.length === 10 || digits.length === 11) && !digits.startsWith('55')) {
+        return '55' + digits;
+      }
+      return digits;
+    },
+
     openNewLeadModal() {
       this.newLead = { phone: '', nome: '', interesse: '', status_comercial: 'FRIO', kanban_stage: 'novo', valor_potencial: '', cidade: '' };
       this.newLeadError = null;
@@ -1512,7 +1524,8 @@ function FluxoCommand() {
       this.atendMessages = [];
       this.atendLoading  = true;
       this.atendHumano   = conv.humano_ativo || false;
-      this.atendLead     = this.leads.find(l => l.phone === conv.phone) || null;
+      const normConvPhone = this.normalizePhone(conv.phone);
+      this.atendLead     = this.leads.find(l => this.normalizePhone(l.phone) === normConvPhone) || null;
       if (!this.atendLead) {
         const ctx = (typeof conv.context === 'string')
           ? (() => { try { return JSON.parse(conv.context); } catch { return {}; } })()
