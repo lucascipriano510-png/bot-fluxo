@@ -365,7 +365,7 @@ router.post('/leads', async (req, res) => {
     valor_potencial:  valor_potencial ? Number(valor_potencial) : null,
     cidade:           cidade?.trim() || null,
     origem:           origem?.trim() || 'manual',
-    status:           'novo',
+    status:           'qualificado',
     qualificado_em:   new Date().toISOString(),
     atualizado_em:    new Date().toISOString(),
   };
@@ -1494,7 +1494,7 @@ router.post('/wa/backfill-leads', async (req, res) => {
         status_comercial: 'FRIO',
         interesse:        (conv.last_message || '').slice(0, 100),
         kanban_stage:     'novo',
-        status:           'novo',
+        status:           'qualificado',
         qualificado_em:   new Date().toISOString(),
         atualizado_em:    new Date().toISOString(),
       }, { onConflict: 'store_id,phone' }).select('id').single();

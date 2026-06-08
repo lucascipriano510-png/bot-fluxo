@@ -75,7 +75,7 @@ async function upsertLeadFromInbox(
       status_comercial: 'FRIO',
       interesse:        firstMessage.slice(0, 100),
       kanban_stage:     'novo',
-      status:           'novo',
+      status:           'qualificado',
       qualificado_em:   new Date().toISOString(),
       atualizado_em:    new Date().toISOString(),
     }).select('id').single();
