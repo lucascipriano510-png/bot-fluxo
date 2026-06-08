@@ -22,4 +22,14 @@ app.listen(PORT, () => {
       console.warn('[boot] STORE_ID não definido — Baileys não inicializado no boot.');
     }
   }
+
+  // Self-ping a cada 10 min para evitar sleep do Render free tier
+  const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
+  if (RENDER_URL) {
+    setInterval(() => {
+      fetch(`${RENDER_URL}/api/health`)
+        .then(() => console.log('[keep-alive] ping ok'))
+        .catch(() => {});
+    }, 10 * 60 * 1000);
+  }
 });

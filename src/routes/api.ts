@@ -36,6 +36,12 @@ function errMsg(err: unknown): string {
   return String(err);
 }
 
+// ── Health check público ───────────────────────────────────────────────────────
+router.get('/health', (_req, res) => {
+  const s = getWaState();
+  res.json({ status: 'ok', whatsapp: s.status, timestamp: new Date().toISOString() });
+});
+
 // ── Config pública (sem auth) — bootstrapa o cliente Supabase no frontend ────
 router.get('/config', (_req, res) => {
   res.json({

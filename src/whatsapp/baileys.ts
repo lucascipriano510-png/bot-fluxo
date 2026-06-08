@@ -14,6 +14,7 @@ let _status: WaStatus = ENABLED ? 'disconnected' : 'unavailable';
 let _qr: string | null = null;
 let _socket: any = null;
 let _initializing = false;
+let _disconnectedAt: Date | null = null;
 
 const silentLogger = {
   level: 'silent' as const,
@@ -196,11 +197,35 @@ export async function initBaileys(storeId: string): Promise<void> {
         _qr = null;
         _socket = null;
         _initializing = false;
-        if (!loggedOut) setTimeout(() => initBaileys(storeId), 5000);
+        if (!loggedOut) {
+          _disconnectedAt = new Date();
+          setTimeout(() => initBaileys(storeId), 5000);
+        } else {
+          _disconnectedAt = null;
+        }
       } else if (connection === 'open') {
         _status = 'connected';
         _qr = null;
         _initializing = false;
+
+        const operatorPhone = process.env.OPERATOR_PHONE;
+        if (operatorPhone && _disconnectedAt) {
+          const fell = _disconnectedAt;
+          _disconnectedAt = null;
+          const sock = _socket;
+          setTimeout(async () => {
+            try {
+              const opJid = normalizePhone(operatorPhone) + '@s.whatsapp.net';
+              const ts = fell.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+              await sock.sendMessage(opJid, { text: `⚠️ Fluxo Command: WhatsApp ficou offline em ${ts}.` });
+              await sock.sendMessage(opJid, { text: `✅ Fluxo Command: WhatsApp reconectado com sucesso.` });
+            } catch (e) {
+              console.error('[alert] Erro ao enviar alerta ao operador:', e);
+            }
+          }, 3000);
+        } else {
+          _disconnectedAt = null;
+        }
       }
     });
 
