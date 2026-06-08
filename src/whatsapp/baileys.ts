@@ -80,7 +80,11 @@ async function upsertLeadFromInbox(
     }).select('id').single();
 
     return (created?.id as string) || null;
-  } catch {
+  } catch (err: unknown) {
+    console.error('[upsertLeadFromInbox] ERRO ao criar lead:', {
+      storeId, phone, name,
+      error: err instanceof Error ? err.message : JSON.stringify(err),
+    });
     return null;
   }
 }

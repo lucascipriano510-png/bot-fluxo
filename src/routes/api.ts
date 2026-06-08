@@ -1428,4 +1428,54 @@ router.post('/wa/disconnect', async (_req, res) => {
   res.json({ ok: true });
 });
 
+// ── Backfill: cria leads para conversas existentes sem lead no CRM ─────────
+router.post('/wa/backfill-leads', async (req, res) => {
+  try {
+    const storeId = req.storeId!;
+    const { data: convs, error } = await supabase
+      .from('wa_conversations')
+      .select('phone, name, last_message')
+      .eq('store_id', storeId)
+      .eq('is_group', false);
+
+    if (error) throw error;
+    if (!convs || convs.length === 0) return res.json({ ok: true, created: 0 });
+
+    let created = 0;
+    for (const conv of convs) {
+      const { data: existing } = await supabase
+        .from('bot_leads')
+        .select('id')
+        .eq('store_id', storeId)
+        .eq('phone', conv.phone)
+        .maybeSingle();
+
+      if (existing) continue;
+
+      const { error: insertErr } = await supabase.from('bot_leads').insert({
+        store_id:         storeId,
+        phone:            conv.phone,
+        nome:             conv.name || conv.phone,
+        origem:           'whatsapp_inbox',
+        status_comercial: 'FRIO',
+        interesse:        (conv.last_message || '').slice(0, 100),
+        kanban_stage:     'novo',
+        status:           'novo',
+        qualificado_em:   new Date().toISOString(),
+        atualizado_em:    new Date().toISOString(),
+      });
+
+      if (insertErr) {
+        console.error('[backfill-leads] erro ao inserir lead:', { phone: conv.phone, error: insertErr.message });
+      } else {
+        created++;
+      }
+    }
+
+    res.json({ ok: true, created, total: convs.length });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
 export default router;
