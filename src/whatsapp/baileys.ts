@@ -54,17 +54,27 @@ async function upsertLeadFromInbox(
   firstMessage: string,
 ): Promise<string | null> {
   try {
+    const now = new Date().toISOString();
+
     const { data: existing } = await supabase
       .from('bot_leads')
-      .select('id')
+      .select('id, nome, message_count')
       .eq('store_id', storeId)
       .eq('phone', phone)
       .maybeSingle();
 
     if (existing) {
-      await supabase.from('bot_leads')
-        .update({ atualizado_em: new Date().toISOString() })
-        .eq('id', existing.id);
+      const updates: Record<string, unknown> = {
+        atualizado_em:   now,
+        last_message_at: now,
+        message_count:   (existing.message_count || 0) + 1,
+      };
+      // Atualiza nome se antes era só o número e agora temos pushName
+      if (name && name !== phone && (!existing.nome || existing.nome === phone)) {
+        updates.nome = name;
+      }
+      await supabase.from('bot_leads').update(updates).eq('id', existing.id);
+      console.log('[CRM] Lead atualizado:', phone, '| msgs:', updates.message_count);
       return existing.id as string;
     }
 
@@ -74,19 +84,21 @@ async function upsertLeadFromInbox(
       nome:             name,
       origem:           'whatsapp_inbox',
       status_comercial: 'FRIO',
-      interesse:        firstMessage.slice(0, 100),
+      interesse:        firstMessage.slice(0, 200),
       kanban_stage:     'novo',
       status:           'qualificado',
-      qualificado_em:   new Date().toISOString(),
-      atualizado_em:    new Date().toISOString(),
+      message_count:    1,
+      last_message_at:  now,
+      qualificado_em:   now,
+      atualizado_em:    now,
     }).select('id').single();
 
     if (insertErr) throw insertErr;
-    console.log('[upsertLeadFromInbox] Lead criado:', created?.id, 'phone:', phone);
+    console.log('[CRM] Lead criado:', phone, '| nome:', name);
     return (created?.id as string) || null;
   } catch (err: unknown) {
-    console.error('[upsertLeadFromInbox] ERRO ao criar lead:', {
-      storeId, phone, name,
+    console.error('[CRM] ERRO ao criar/atualizar lead:', {
+      storeId, phone,
       error: err instanceof Error ? err.message : JSON.stringify(err),
     });
     return null;
@@ -238,8 +250,9 @@ export async function initBaileys(storeId: string): Promise<void> {
         if (msg.key.fromMe) continue; // ignorar mensagens enviadas pelo próprio número
 
         const jid = msg.key.remoteJid || '';
-        // Ignorar grupos completamente — só processar contatos privados
+        // Ignorar grupos e broadcasts — só processar contatos privados
         if (jid.endsWith('@g.us')) continue;
+        if (jid === 'status@broadcast') continue;
 
         const phone = normalizePhone(jid);
 
