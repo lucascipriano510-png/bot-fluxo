@@ -343,6 +343,45 @@ router.get('/leads', async (req, res) => {
   }
 });
 
+router.post('/leads', async (req, res) => {
+  const { phone, nome, interesse, status_comercial, kanban_stage, valor_potencial, cidade, origem } =
+    req.body as Record<string, string>;
+
+  const digits = (phone || '').replace(/\D/g, '');
+  if (digits.length < 10) return res.status(400).json({ ok: false, error: 'Telefone inválido (mínimo 10 dígitos).' });
+  if (!nome?.trim()) return res.status(400).json({ ok: false, error: 'Nome obrigatório.' });
+
+  const VALID_TEMP = ['QUENTE', 'MORNO', 'FRIO'];
+  const VALID_STAGE = ['novo', 'interessado', 'escolhendo', 'carrinho', 'pagamento', 'finalizado'];
+
+  const payload = {
+    store_id:         req.storeId!,
+    phone:            digits,
+    nome:             nome.trim(),
+    interesse:        interesse?.trim() || null,
+    status_comercial: VALID_TEMP.includes(status_comercial) ? status_comercial : 'FRIO',
+    kanban_stage:     VALID_STAGE.includes(kanban_stage) ? kanban_stage : 'novo',
+    valor_potencial:  valor_potencial ? Number(valor_potencial) : null,
+    cidade:           cidade?.trim() || null,
+    origem:           origem?.trim() || 'manual',
+    status:           'novo',
+    qualificado_em:   new Date().toISOString(),
+    atualizado_em:    new Date().toISOString(),
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from('bot_leads')
+      .upsert(payload, { onConflict: 'store_id,phone' })
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ ok: true, data });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
 // ── Messages ──────────────────────────────────────────────────────────────────
 router.get('/messages/:phone', async (req, res) => {
   try {
@@ -1436,23 +1475,16 @@ router.post('/wa/backfill-leads', async (req, res) => {
       .from('wa_conversations')
       .select('phone, name, last_message')
       .eq('store_id', storeId)
-      .eq('is_group', false);
+      .eq('is_group', false)
+      .is('lead_id', null);
 
     if (error) throw error;
-    if (!convs || convs.length === 0) return res.json({ ok: true, created: 0 });
+    if (!convs || convs.length === 0) return res.json({ ok: true, created: 0, skipped: 0 });
 
     let created = 0;
+    let skipped = 0;
     for (const conv of convs) {
-      const { data: existing } = await supabase
-        .from('bot_leads')
-        .select('id')
-        .eq('store_id', storeId)
-        .eq('phone', conv.phone)
-        .maybeSingle();
-
-      if (existing) continue;
-
-      const { error: insertErr } = await supabase.from('bot_leads').insert({
+      const { data: inserted, error: insertErr } = await supabase.from('bot_leads').upsert({
         store_id:         storeId,
         phone:            conv.phone,
         nome:             conv.name || conv.phone,
@@ -1463,16 +1495,23 @@ router.post('/wa/backfill-leads', async (req, res) => {
         status:           'novo',
         qualificado_em:   new Date().toISOString(),
         atualizado_em:    new Date().toISOString(),
-      });
+      }, { onConflict: 'store_id,phone' }).select('id').single();
 
-      if (insertErr) {
-        console.error('[backfill-leads] erro ao inserir lead:', { phone: conv.phone, error: insertErr.message });
-      } else {
-        created++;
+      if (insertErr || !inserted) {
+        console.error('[backfill-leads] erro:', { phone: conv.phone, error: insertErr?.message });
+        skipped++;
+        continue;
       }
+
+      await supabase.from('wa_conversations')
+        .update({ lead_id: inserted.id })
+        .eq('store_id', storeId)
+        .eq('phone', conv.phone);
+
+      created++;
     }
 
-    res.json({ ok: true, created, total: convs.length });
+    res.json({ ok: true, created, skipped, total: convs.length });
   } catch (err: unknown) {
     res.json({ ok: false, error: errMsg(err) });
   }

@@ -66,7 +66,7 @@ async function upsertLeadFromInbox(
       return existing.id as string;
     }
 
-    const { data: created } = await supabase.from('bot_leads').insert({
+    const { data: created, error: insertErr } = await supabase.from('bot_leads').insert({
       store_id:         storeId,
       phone,
       nome:             name,
@@ -79,6 +79,8 @@ async function upsertLeadFromInbox(
       atualizado_em:    new Date().toISOString(),
     }).select('id').single();
 
+    if (insertErr) throw insertErr;
+    console.log('[upsertLeadFromInbox] Lead criado:', created?.id, 'phone:', phone);
     return (created?.id as string) || null;
   } catch (err: unknown) {
     console.error('[upsertLeadFromInbox] ERRO ao criar lead:', {

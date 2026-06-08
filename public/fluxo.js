@@ -168,6 +168,12 @@ function FluxoCommand() {
     fichaOpen:         true,
     _crmSaveTimers:    {},
 
+    /* novo lead manual */
+    newLeadModal:  false,
+    newLead:       { phone: '', nome: '', interesse: '', status_comercial: 'FRIO', kanban_stage: 'novo', valor_potencial: '', cidade: '' },
+    newLeadSaving: false,
+    newLeadError:  null,
+
     /* atendimentos */
     atendMessages: [],
     atendPhone: null,
@@ -1138,6 +1144,36 @@ function FluxoCommand() {
         qualification_questions: '',
       };
       this.productModal = true;
+    },
+
+    openNewLeadModal() {
+      this.newLead = { phone: '', nome: '', interesse: '', status_comercial: 'FRIO', kanban_stage: 'novo', valor_potencial: '', cidade: '' };
+      this.newLeadError = null;
+      this.newLeadModal = true;
+    },
+
+    async saveNewLead() {
+      if (this.newLeadSaving) return;
+      const digits = this.newLead.phone.replace(/\D/g, '');
+      if (digits.length < 10) { this.newLeadError = 'Telefone inválido (mínimo 10 dígitos).'; return; }
+      if (!this.newLead.nome.trim()) { this.newLeadError = 'Nome obrigatório.'; return; }
+      this.newLeadSaving = true;
+      this.newLeadError = null;
+      try {
+        const r = await this.authFetch('/api/leads', {
+          method: 'POST',
+          body: JSON.stringify(this.newLead),
+        });
+        const j = await r.json();
+        if (!j.ok) throw new Error(j.error || 'Erro ao criar lead.');
+        this.newLeadModal = false;
+        await this.loadLeads();
+        if (this.page === 'kanban') await this.loadKanban();
+      } catch (err) {
+        this.newLeadError = err.message || 'Erro ao criar lead.';
+      } finally {
+        this.newLeadSaving = false;
+      }
     },
 
     async saveIngestSelected() {
