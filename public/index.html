@@ -586,7 +586,7 @@
               Nenhuma conversa ainda.<br>Aguardando mensagens do WhatsApp.
             </div>
             <template x-for="c in inboxConversations" :key="c.phone">
-              <div @click="selectConv(c)"
+              <div @click="selectConv(c);$el.closest('.inbox-list')?.classList.add('conv-open');$el.closest('.inbox-shell')?.querySelector('.inbox-chat')?.classList.add('conv-open')"
                 style="height:72px;padding:0 16px;display:flex;align-items:center;gap:13px;cursor:pointer;transition:background .15s"
                 :style="atendPhone===c.phone ? 'background:#2a3942;border-bottom:none' : 'border-bottom:1px solid #2a2d3e'"
                 @mouseenter="if(atendPhone!==c.phone) $el.style.background='#2a3942'"
@@ -642,27 +642,34 @@
             <div style="display:flex;flex-direction:column;height:100%">
 
               <!-- Header do chat -->
-              <div style="height:60px;background:#f0f2f5;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid #d1d7db;flex-shrink:0">
-                <div style="width:40px;height:40px;border-radius:50%;background:#6b7280;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;flex-shrink:0"
+              <div style="height:60px;background:#202c33;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid #2a3942;flex-shrink:0">
+                <!-- Botão voltar mobile -->
+                <button @click="atendPhone=null;$el.closest('.inbox-chat').classList.remove('conv-open');document.querySelector('.inbox-list')?.classList.remove('conv-open')"
+                  style="display:none;background:none;border:none;cursor:pointer;padding:4px;color:#aebac1;flex-shrink:0" class="inbox-back-btn">
+                  <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <div style="width:40px;height:40px;border-radius:50%;background:#2a3942;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#e9edef;flex-shrink:0"
                   x-text="(currentConv?.name||currentConv?.phone||'?').charAt(0).toUpperCase()"></div>
-                <div style="flex:1">
-                  <div style="font-size:15px;font-weight:600;color:#111b21" x-text="currentConv?.name||currentConv?.phone||atendPhone"></div>
-                  <div style="font-size:13px;color:#667781" x-text="atendHumano?'Humano ativo':'Bot respondendo'"></div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:15px;font-weight:600;color:#e9edef;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" x-text="currentConv?.name||currentConv?.phone||atendPhone"></div>
+                  <div style="font-size:13px;color:#8696a0" x-text="atendHumano?'Humano ativo':'Bot respondendo'"></div>
                 </div>
                 <div style="display:flex;gap:10px;align-items:center">
-                  <svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:#54656f;stroke-width:2;cursor:pointer"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                  <svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:#54656f;stroke-width:2;cursor:pointer"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-                  <svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:#54656f;stroke-width:2;cursor:pointer"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+                  <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:#aebac1;stroke-width:2;cursor:pointer"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                  <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:#aebac1;stroke-width:2;cursor:pointer"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
                 </div>
               </div>
 
               <!-- Mensagens -->
               <div id="atend-messages" class="inbox-messages">
-                <div x-show="atendLoading" style="display:flex;align-items:center;justify-content:center;padding:40px;color:#54656f;gap:8px;font-size:13px">
-                  <svg style="width:16px;height:16px;animation:spin 1s linear infinite" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                <div x-show="atendLoading" style="display:flex;align-items:center;justify-content:center;padding:40px;color:#8696a0;gap:8px;font-size:13px">
+                  <svg style="width:16px;height:16px;animation:spin 1s linear infinite" viewBox="0 0 24 24" fill="none" stroke="#8696a0" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
                   Carregando mensagens...
                 </div>
-                <div x-show="!atendLoading && atendMessages.length===0" style="text-align:center;padding:40px;color:#54656f;font-size:13px">Sem mensagens registradas.</div>
+                <div x-show="!atendLoading && atendMessages.length===0" style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:12px;padding:40px;text-align:center">
+                  <svg viewBox="0 0 24 24" style="width:48px;height:48px;fill:#2a3942"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.106.549 4.085 1.513 5.8L0 24l6.37-1.49A11.96 11.96 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.854 0-3.6-.502-5.1-1.378l-.364-.217-3.78.885.914-3.686-.236-.374A9.94 9.94 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+                  <span style="font-size:14px;color:#8696a0">Nenhuma mensagem ainda nesta conversa.</span>
+                </div>
                 <template x-for="(m, i) in atendMessagesWithDates" :key="i">
                   <div>
                     <div x-show="m._sep" class="date-separator">
@@ -682,16 +689,16 @@
               </div>
 
               <!-- Barra de input -->
-              <div style="background:#f0f2f5;padding:10px 16px;display:flex;align-items:flex-end;gap:8px;flex-shrink:0">
-                <svg viewBox="0 0 24 24" style="width:28px;height:28px;fill:none;stroke:#54656f;stroke-width:2;flex-shrink:0;cursor:pointer;margin-bottom:7px"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-                <svg viewBox="0 0 24 24" style="width:28px;height:28px;fill:none;stroke:#54656f;stroke-width:2;flex-shrink:0;cursor:pointer;margin-bottom:7px"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                <div style="flex:1;background:#fff;border-radius:8px;padding:9px 12px;min-height:42px;display:flex;align-items:flex-end">
+              <div style="background:#202c33;padding:10px 16px;display:flex;align-items:flex-end;gap:8px;flex-shrink:0;border-top:1px solid #2a3942">
+                <svg viewBox="0 0 24 24" style="width:28px;height:28px;fill:none;stroke:#aebac1;stroke-width:2;flex-shrink:0;cursor:pointer;margin-bottom:7px"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                <svg viewBox="0 0 24 24" style="width:28px;height:28px;fill:none;stroke:#aebac1;stroke-width:2;flex-shrink:0;cursor:pointer;margin-bottom:7px"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                <div style="flex:1;background:#2a3942;border-radius:8px;padding:9px 12px;min-height:42px;display:flex;align-items:flex-end">
                   <textarea id="inbox-textarea" x-model="atendReply" @keydown="atendKeydown($event)"
                     @input="$el.style.height='auto';$el.style.height=Math.min($el.scrollHeight,120)+'px'"
                     :disabled="!atendPhone||atendSending"
                     placeholder="Digite uma mensagem"
                     rows="1"
-                    style="flex:1;background:transparent;border:none;outline:none;font-size:15px;color:#111b21;font-family:inherit;resize:none;max-height:120px;width:100%;line-height:1.5;padding:0"></textarea>
+                    style="flex:1;background:transparent;border:none;outline:none;font-size:15px;color:#e9edef;font-family:inherit;resize:none;max-height:120px;width:100%;line-height:1.5;padding:0"></textarea>
                 </div>
                 <button @click="sendAtendReply()" :disabled="atendSending"
                   style="width:52px;height:52px;border-radius:50%;background:#00a884;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">

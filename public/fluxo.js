@@ -556,9 +556,11 @@ function FluxoCommand() {
           await this.waLoadConversations();
           await this.loadLeads();
           if (this.atendPhone) {
+            const snapPhone = this.atendPhone;
             try {
-              const msgs = await this._loadAtendMessages(this.atendPhone);
-              if (msgs.length > this.atendMessages.length) {
+              const msgs = await this._loadAtendMessages(snapPhone);
+              if (this.atendPhone !== snapPhone) return; // usuário trocou de conversa durante o fetch
+              if (msgs.length >= this.atendMessages.length && msgs.length > 0) {
                 this.atendMessages = msgs;
                 this.scrollChat();
               }
@@ -720,9 +722,6 @@ function FluxoCommand() {
         await this.waLoadConversations();
         this.waPollingInterval = setInterval(async () => {
           await this.waLoadConversations();
-          if (this.waSelectedPhone && (this.page === 'whatsapp' || this.page === 'atendimentos')) {
-            await this.waLoadMessages(this.waSelectedPhone);
-          }
         }, 5000);
       }
     },
@@ -1583,7 +1582,7 @@ function FluxoCommand() {
       const toTs = s => { try { return new Date(s).getTime(); } catch { return 0; } };
       const normPhone = this.normalizePhone(phone);
       const [botRes, waRes] = await Promise.allSettled([
-        this.authFetch('/api/messages/' + phone).then(r => r.json()),
+        this.authFetch('/api/messages/' + normPhone).then(r => r.json()),
         this.authFetch(this.waBaseUrl + '/api/wa/messages/' + normPhone).then(r => r.json()).catch(() => ({ ok: false })),
       ]);
       const botMsgs = (botRes.status === 'fulfilled' && botRes.value?.ok && Array.isArray(botRes.value.data))
@@ -1621,11 +1620,12 @@ function FluxoCommand() {
       if (!this.viewedConvs) this.viewedConvs = new Set();
       this.viewedConvs.add(conv.id);
       this.selectedConv  = String(conv.id);
-      this.atendPhone    = conv.phone;
+      const targetPhone  = conv.phone;
+      this.atendPhone    = targetPhone;
       this.atendMessages = [];
       this.atendLoading  = true;
       this.atendHumano   = conv.humano_ativo || false;
-      const normConvPhone = this.normalizePhone(conv.phone);
+      const normConvPhone = this.normalizePhone(targetPhone);
       this.atendLead     = this.leads.find(l => this.normalizePhone(l.phone) === normConvPhone) || null;
       if (!this.atendLead) {
         const ctx = (typeof conv.context === 'string')
@@ -1636,14 +1636,18 @@ function FluxoCommand() {
         const cidade    = ctx.cidade    || ctx._cidade    || null;
         const preco     = ctx.ultimo_preco_visto ? Number(ctx.ultimo_preco_visto) : null;
         if (nome || interesse || cidade) {
-          this.atendLead = { phone: conv.phone, nome, interesse, cidade, status_comercial: null, valor_potencial: preco, _fromSession: true };
+          this.atendLead = { phone: targetPhone, nome, interesse, cidade, status_comercial: null, valor_potencial: preco, _fromSession: true };
         }
       }
       try {
-        this.atendMessages = await this._loadAtendMessages(conv.phone);
+        const msgs = await this._loadAtendMessages(targetPhone);
+        if (this.atendPhone !== targetPhone) return; // usuário trocou durante o fetch
+        this.atendMessages = msgs;
         this.scrollChat();
       } catch (_) {}
-      finally { this.atendLoading = false; }
+      finally {
+        if (this.atendPhone === targetPhone) this.atendLoading = false;
+      }
     },
 
     saveCrmField(field, value) {
