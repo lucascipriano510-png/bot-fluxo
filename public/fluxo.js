@@ -332,7 +332,12 @@ function FluxoCommand() {
     },
 
     get currentConv() {
-      return this.conversations.find(c => c.id === this.selectedConv) || this.conversations[0];
+      if (!this.atendPhone) return this.conversations[0] || null;
+      const norm = this.normalizePhone(this.atendPhone);
+      return this.waConversations.find(c => this.normalizePhone(c.phone) === norm)
+        || this.conversations.find(c => this.normalizePhone(c.phone) === norm)
+        || this.conversations.find(c => String(c.id) === this.selectedConv)
+        || null;
     },
 
     get crmFilteredLeads() {
@@ -552,14 +557,9 @@ function FluxoCommand() {
           await this.loadLeads();
           if (this.atendPhone) {
             try {
-              const r = await this.authFetch('/api/messages/' + this.atendPhone);
-              const j = await r.json();
-              if (j.ok && Array.isArray(j.data) && j.data.length !== this.atendMessages.length) {
-                this.atendMessages = j.data.map(m => ({
-                  from: m.direcao === 'saida' ? 'bot' : 'user',
-                  text: m.conteudo,
-                  time: this.fmtTime(m.criado_em || m.created_at),
-                }));
+              const msgs = await this._loadAtendMessages(this.atendPhone);
+              if (msgs.length > this.atendMessages.length) {
+                this.atendMessages = msgs;
                 this.scrollChat();
               }
             } catch (_) {}
@@ -1579,6 +1579,44 @@ function FluxoCommand() {
     },
 
     /* ── Atendimentos ────────────────────────────────────────────────── */
+    async _loadAtendMessages(phone) {
+      const toTs = s => { try { return new Date(s).getTime(); } catch { return 0; } };
+      const normPhone = this.normalizePhone(phone);
+      const [botRes, waRes] = await Promise.allSettled([
+        this.authFetch('/api/messages/' + phone).then(r => r.json()),
+        this.authFetch(this.waBaseUrl + '/api/wa/messages/' + normPhone).then(r => r.json()).catch(() => ({ ok: false })),
+      ]);
+      const botMsgs = (botRes.status === 'fulfilled' && botRes.value?.ok && Array.isArray(botRes.value.data))
+        ? botRes.value.data.map(m => ({
+            from:      m.direcao === 'saida' ? 'bot' : 'user',
+            text:      m.conteudo,
+            time:      this.fmtTime(m.criado_em || m.created_at),
+            ts:        toTs(m.criado_em || m.created_at),
+            direction: m.direcao === 'saida' ? 'out' : 'in',
+            _src:      'bot',
+          }))
+        : [];
+      const waMsgs = (waRes.status === 'fulfilled' && waRes.value?.ok && Array.isArray(waRes.value.data))
+        ? waRes.value.data.map(m => ({
+            from:      m.direction === 'out' ? 'bot' : 'user',
+            text:      m.text,
+            time:      this.fmtTime(m.timestamp),
+            ts:        toTs(m.timestamp),
+            direction: m.direction,
+            _src:      'wa',
+          }))
+        : [];
+      // Merge, ordena e deduplica por texto+ts próximos (janela 3s)
+      const all = [...botMsgs, ...waMsgs].sort((a, b) => a.ts - b.ts);
+      const deduped = [];
+      for (const m of all) {
+        const last = deduped[deduped.length - 1];
+        if (last && last.text === m.text && Math.abs(last.ts - m.ts) < 3000) continue;
+        deduped.push(m);
+      }
+      return deduped;
+    },
+
     async selectConv(conv) {
       if (!this.viewedConvs) this.viewedConvs = new Set();
       this.viewedConvs.add(conv.id);
@@ -1602,37 +1640,10 @@ function FluxoCommand() {
         }
       }
       try {
-        const [botRes, waRes] = await Promise.allSettled([
-          this.authFetch('/api/messages/' + conv.phone).then(r => r.json()),
-          fetch(this.waBaseUrl + '/api/wa/messages/' + conv.phone, {
-            headers: this._authToken ? { 'Authorization': 'Bearer ' + this._authToken } : {},
-          }).then(r => r.json()).catch(() => ({ ok: false })),
-        ]);
-        const toTs = s => { try { return new Date(s).getTime(); } catch { return 0; } };
-        const botMsgs = (botRes.status === 'fulfilled' && botRes.value?.ok && Array.isArray(botRes.value.data))
-          ? botRes.value.data.map(m => ({
-              from: m.direcao === 'saida' ? 'bot' : 'user',
-              text: m.conteudo,
-              time: this.fmtTime(m.criado_em || m.created_at),
-              ts: toTs(m.criado_em || m.created_at),
-              direction: m.direcao === 'saida' ? 'out' : 'in',
-            }))
-          : [];
-        const waMsgs = (waRes.status === 'fulfilled' && waRes.value?.ok && Array.isArray(waRes.value.data))
-          ? waRes.value.data.map(m => ({
-              from: m.direction === 'out' ? 'bot' : 'user',
-              text: m.text,
-              time: this.fmtTime(m.timestamp),
-              ts: toTs(m.timestamp),
-              direction: m.direction,
-            }))
-          : [];
-        this.atendMessages = [...botMsgs, ...waMsgs].sort((a, b) => a.ts - b.ts);
-        this.atendLoading = false;
+        this.atendMessages = await this._loadAtendMessages(conv.phone);
         this.scrollChat();
-      } catch (_) {
-        this.atendLoading = false;
-      }
+      } catch (_) {}
+      finally { this.atendLoading = false; }
     },
 
     saveCrmField(field, value) {
