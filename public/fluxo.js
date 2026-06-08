@@ -169,10 +169,12 @@ function FluxoCommand() {
     _crmSaveTimers:    {},
 
     /* novo lead manual */
-    newLeadModal:  false,
-    newLead:       { phone: '', nome: '', interesse: '', status_comercial: 'FRIO', kanban_stage: 'novo', valor_potencial: '', cidade: '' },
-    newLeadSaving: false,
-    newLeadError:  null,
+    newLeadModal:   false,
+    newLead:        { phone: '', nome: '', interesse: '', status_comercial: 'FRIO', kanban_stage: 'novo', valor_potencial: '', cidade: '' },
+    newLeadSaving:  false,
+    newLeadError:   null,
+    addingToCrm:    false,
+    addToCrmError:  null,
 
     /* atendimentos */
     atendMessages: [],
@@ -1159,7 +1161,9 @@ function FluxoCommand() {
     },
 
     async addConvToCrm() {
-      if (!this.atendPhone) return;
+      if (!this.atendPhone || this.addingToCrm) return;
+      this.addingToCrm   = true;
+      this.addToCrmError = null;
       const conv = this.waConversations.find(c => c.phone === this.atendPhone)
                 || this.conversations.find(c => c.phone === this.atendPhone);
       const nome = conv?.name || this.atendPhone;
@@ -1179,8 +1183,14 @@ function FluxoCommand() {
           await this.loadLeads();
           const normAtend = this.normalizePhone(this.atendPhone);
           this.atendLead = this.leads.find(l => this.normalizePhone(l.phone) === normAtend) || j.data;
+        } else {
+          this.addToCrmError = j.error || 'Erro ao criar lead.';
         }
-      } catch (_) {}
+      } catch (err) {
+        this.addToCrmError = err.message || 'Erro de conexão.';
+      } finally {
+        this.addingToCrm = false;
+      }
     },
 
     openNewLeadModal() {

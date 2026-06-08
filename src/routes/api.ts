@@ -357,7 +357,7 @@ router.post('/leads', async (req, res) => {
 
   const payload = {
     store_id:         req.storeId!,
-    phone:            digits,
+    phone:            normalizePhone(digits),
     nome:             nome.trim(),
     interesse:        interesse?.trim() || null,
     status_comercial: VALID_TEMP.includes(status_comercial) ? status_comercial : 'FRIO',
