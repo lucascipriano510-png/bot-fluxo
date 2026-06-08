@@ -173,8 +173,9 @@ function FluxoCommand() {
     newLead:        { phone: '', nome: '', interesse: '', status_comercial: 'FRIO', kanban_stage: 'novo', valor_potencial: '', cidade: '' },
     newLeadSaving:  false,
     newLeadError:   null,
-    addingToCrm:    false,
-    addToCrmError:  null,
+    addingToCrm:     false,
+    addToCrmError:   null,
+    waCurrentLoading: false,
 
     /* atendimentos */
     atendMessages: [],
@@ -761,6 +762,7 @@ function FluxoCommand() {
     },
 
     async waLoadConversations() {
+      if (!this.waBaseUrl) return;
       try {
         const r = await this.authFetch(this.waBaseUrl + '/api/wa/conversations');
         const j = await r.json();
@@ -791,7 +793,12 @@ function FluxoCommand() {
     async waSelectConv(phone) {
       this.waSelectedPhone = phone;
       this.waMessages = [];
-      await this.waLoadMessages(phone);
+      this.waCurrentLoading = true;
+      try {
+        await this.waLoadMessages(phone);
+      } finally {
+        this.waCurrentLoading = false;
+      }
       // mark read locally
       const conv = this.waConversations.find(c => c.phone === phone);
       if (conv) conv.unread_count = 0;

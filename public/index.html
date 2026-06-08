@@ -2363,8 +2363,7 @@
           </div>
 
           <!-- Chat -->
-          <template x-if="waSelectedPhone && waStatus!=='qr_pending'">
-            <div style="display:flex;flex-direction:column;height:100%">
+          <div x-show="waSelectedPhone && waStatus!=='qr_pending'" :key="waSelectedPhone" style="display:flex;flex-direction:column;height:100%">
 
               <!-- Header do chat -->
               <div style="height:60px;background:#202c33;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid #2a2d3e;flex-shrink:0">
@@ -2379,16 +2378,17 @@
 
               <!-- Mensagens -->
               <div id="wa-messages" style="flex:1;overflow-y:auto;padding:20px 5%;display:flex;flex-direction:column;gap:4px">
-                <div x-show="waMessages.length===0" style="text-align:center;padding:40px 0;color:#8696a0;font-size:13px">Sem mensagens.</div>
+                <div x-show="waCurrentLoading" style="text-align:center;padding:40px 0;color:#8696a0;font-size:13px">Carregando...</div>
+                <div x-show="waMessages.length===0 && !waCurrentLoading" style="text-align:center;padding:40px 0;color:#8696a0;font-size:13px">Sem mensagens.</div>
                 <template x-for="(m, i) in waMessages" :key="i">
-                  <div :style="m.direction==='out' ? 'display:flex;justify-content:flex-end' : 'display:flex;justify-content:flex-start'">
-                    <div :style="m.direction==='out'
+                  <div :style="(m.direction==='out'||m.from_me===true) ? 'display:flex;justify-content:flex-end' : 'display:flex;justify-content:flex-start'">
+                    <div :style="(m.direction==='out'||m.from_me===true)
                       ? 'background:#005c4b;border-radius:8px 0 8px 8px;max-width:65%;padding:6px 10px'
                       : 'background:#202c33;border-radius:0 8px 8px 8px;max-width:65%;padding:6px 10px'">
                       <div style="font-size:14px;color:#e9edef;white-space:pre-wrap;word-break:break-word" x-text="m.text"></div>
                       <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;margin-top:2px">
                         <div style="font-size:11px;color:#8696a0" x-text="fmtTime(m.timestamp)"></div>
-                        <span x-show="m.direction==='out'" style="font-size:11px;color:#53bdeb">✓✓</span>
+                        <span x-show="m.direction==='out'||m.from_me===true" style="font-size:11px;color:#53bdeb">✓✓</span>
                       </div>
                     </div>
                   </div>
@@ -2409,7 +2409,7 @@
                 </button>
               </div>
             </div>
-          </template>
+          </div>
         </div>
 
         <!-- Painel lateral CRM (280px) -->
