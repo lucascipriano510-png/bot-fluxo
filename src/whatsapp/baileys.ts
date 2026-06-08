@@ -247,8 +247,6 @@ export async function initBaileys(storeId: string): Promise<void> {
     _socket.ev.on('messages.upsert', async ({ messages, type }: any) => {
       if (type !== 'notify') return;
       for (const msg of messages) {
-        if (msg.key.fromMe) continue; // ignorar mensagens enviadas pelo próprio número
-
         const jid = msg.key.remoteJid || '';
         // Ignorar grupos e broadcasts — só processar contatos privados
         if (jid.endsWith('@g.us')) continue;
@@ -264,9 +262,25 @@ export async function initBaileys(storeId: string): Promise<void> {
         if (!text || !phone) continue;
 
         const ts = new Date(Number(msg.messageTimestamp) * 1000).toISOString();
-        const name = resolveName(msg, phone);
 
-        // CRM: cria ou atualiza lead (só chegam contatos privados aqui)
+        if (msg.key.fromMe) {
+          // Mensagem enviada pelo celular — salva como saída, sem criar lead, sem unread
+          await supabase.from('wa_messages').insert({
+            store_id: storeId, phone, direction: 'out', text, timestamp: ts,
+          }).then(null, () => {});
+
+          await supabase.from('wa_conversations').upsert({
+            store_id:     storeId,
+            phone,
+            last_message: text,
+            last_time:    ts,
+            is_group:     false,
+          }, { onConflict: 'store_id,phone' }).then(null, () => {});
+          continue;
+        }
+
+        // Mensagem recebida — comportamento completo
+        const name = resolveName(msg, phone);
         const leadId = await upsertLeadFromInbox(storeId, phone, name, text);
 
         await supabase.from('wa_messages').insert({

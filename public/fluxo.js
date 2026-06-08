@@ -325,7 +325,9 @@ function FluxoCommand() {
     },
 
     get waCurrentConv() {
-      return this.waConversations.find(c => c.phone === this.waSelectedPhone) || null;
+      if (!this.waSelectedPhone) return null;
+      const norm = this.normalizePhone(this.waSelectedPhone);
+      return this.waConversations.find(c => this.normalizePhone(c.phone) === norm) || null;
     },
 
     get currentConv() {
@@ -717,7 +719,9 @@ function FluxoCommand() {
         await this.waLoadConversations();
         this.waPollingInterval = setInterval(async () => {
           await this.waLoadConversations();
-          if (this.waSelectedPhone) await this.waLoadMessages(this.waSelectedPhone);
+          if (this.waSelectedPhone && (this.page === 'whatsapp' || this.page === 'atendimentos')) {
+            await this.waLoadMessages(this.waSelectedPhone);
+          }
         }, 5000);
       }
     },
@@ -770,11 +774,16 @@ function FluxoCommand() {
         const r = await this.authFetch(this.waBaseUrl + '/api/wa/messages/' + normPhone);
         const j = await r.json();
         if (j.ok && Array.isArray(j.data)) {
-          this.waMessages = j.data;
-          this.$nextTick(() => {
-            const el = document.getElementById('wa-messages');
-            if (el) { el.scrollTop = el.scrollHeight; requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; }); }
-          });
+          // Guard de race condition: usuário pode ter trocado de conversa durante o fetch
+          if (normPhone !== this.normalizePhone(this.waSelectedPhone)) return;
+          // Só sobrescreve se houver dados reais ou for a primeira carga
+          if (j.data.length > 0 || this.waMessages.length === 0) {
+            this.waMessages = j.data;
+            this.$nextTick(() => {
+              const el = document.getElementById('wa-messages');
+              if (el) { el.scrollTop = el.scrollHeight; requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; }); }
+            });
+          }
         }
       } catch (_) {}
     },
