@@ -277,15 +277,27 @@ export async function analyzeSingleLead(leadId: string): Promise<LeadIntelligenc
 }
 
 export async function processAllLeads(storeId: string): Promise<{ processed: number; errors: number; total: number }> {
-  console.log(`[Intelligence] processAllLeads iniciado para store: ${storeId}`);
+  console.log('[AI] ====== INICIANDO ANÁLISE EM LOTE ======');
+  console.log(`[AI] storeId: ${storeId}`);
 
+  // Sem filtro restritivo — busca TODOS os leads da loja
   const { data: leads, error } = await supabase
     .from('bot_leads')
     .select('id, nome, phone')
-    .eq('store_id', storeId);
+    .eq('store_id', storeId)
+    .order('atualizado_em', { ascending: false });
 
-  if (error) { console.error('[Intelligence] Erro ao buscar leads:', error); return { processed: 0, errors: 0, total: 0 }; }
-  if (!leads || leads.length === 0) { console.log('[Intelligence] Nenhum lead encontrado.'); return { processed: 0, errors: 0, total: 0 }; }
+  if (error) {
+    console.error('[AI] Erro ao buscar leads:', JSON.stringify(error));
+    return { processed: 0, errors: 1, total: 0 };
+  }
+
+  console.log(`[AI] Total de leads encontrados: ${leads?.length ?? 0}`);
+
+  if (!leads || leads.length === 0) {
+    console.error('[AI] ZERO leads retornados — storeId correto? Tabela bot_leads tem dados?');
+    return { processed: 0, errors: 0, total: 0 };
+  }
 
   let processed = 0;
   let errors    = 0;
@@ -311,7 +323,7 @@ export async function processAllLeads(storeId: string): Promise<{ processed: num
     if (i < leads.length - 1) await new Promise(r => setTimeout(r, 500));
   }
 
-  console.log(`[Intelligence] CONCLUÍDO: ${processed} sucesso, ${errors} erro`);
+  console.log(`[AI] ====== CONCLUÍDO: ${processed} sucesso | ${errors} erro ======`);
   if (erros.length > 0) console.error('[Intelligence] Erros:', erros);
   return { processed, errors, total };
 }

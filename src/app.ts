@@ -13,6 +13,13 @@ const WEBHOOK_SECRET  = process.env.WEBHOOK_SECRET || '';
 const TYPING_DELAY_MS = Number(process.env.TYPING_DELAY_MS ?? 800);
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+// Logs de startup — confirma variáveis de ambiente críticas
+console.log('[STARTUP] GEMINI_API_KEY presente:  ', !!(process.env.GEMINI_API_KEY || process.env.AI_ASSIST_KEY));
+console.log('[STARTUP] SUPABASE_URL presente:    ', !!process.env.SUPABASE_URL);
+console.log('[STARTUP] SUPABASE_SERVICE_KEY:     ', !!process.env.SUPABASE_SERVICE_KEY);
+console.log('[STARTUP] STORE_ID:                 ', !!process.env.STORE_ID);
+console.log('[STARTUP] ENABLE_BAILEYS:           ', process.env.ENABLE_BAILEYS);
+
 const app = express();
 
 // CORS — painel Vercel precisa bater no servidor Render

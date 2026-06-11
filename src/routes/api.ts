@@ -1486,15 +1486,20 @@ router.post('/wa/disconnect', async (_req, res) => {
 
 router.post('/intelligence/analyze-all', requireAuth, async (req, res) => {
   const storeId = req.storeId!;
-  const { data: leads } = await supabase
+  console.log(`[AI] Endpoint analyze-all chamado. storeId: ${storeId}`);
+
+  // Conta todos os leads da loja (sem filtro restritivo)
+  const { data: allLeads } = await supabase
     .from('bot_leads')
-    .select('id', { count: 'exact', head: true })
-    .eq('store_id', storeId)
-    .not('last_message_at', 'is', null);
-  const total = (leads as any)?.length ?? 0;
+    .select('id')
+    .eq('store_id', storeId);
+
+  const total = allLeads?.length ?? 0;
+  console.log(`[AI] Leads no banco para store ${storeId}: ${total}`);
+
   // Roda em background sem bloquear a response
-  processAllLeads(storeId).catch(err => console.error('[Intelligence] processAllLeads error:', err));
-  res.json({ ok: true, status: 'processing', total_leads: total });
+  processAllLeads(storeId).catch(err => console.error('[AI] Erro fatal em processAllLeads:', err));
+  res.json({ ok: true, status: 'processing', total_leads: total, mensagem: `Analisando ${total} leads em background` });
 });
 
 router.post('/intelligence/analyze/:leadId', requireAuth, async (req, res) => {
