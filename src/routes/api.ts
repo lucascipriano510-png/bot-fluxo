@@ -1482,33 +1482,44 @@ router.post('/wa/disconnect', async (_req, res) => {
   res.json({ ok: true });
 });
 
-// ── Intelligence (Gemini AI) ──────────────────────────────────────────────────
+// ── Intelligence (Gemini AI) — delega para Supabase Edge Functions ────────────
+// As Edge Functions rodam na infraestrutura Supabase e não dependem do Render.
+
+const EDGE_BASE = () => `${process.env.SUPABASE_URL}/functions/v1`;
+const EDGE_AUTH = () => `Bearer ${process.env.SUPABASE_ANON_KEY}`;
 
 router.post('/intelligence/analyze-all', requireAuth, async (req, res) => {
   const storeId = req.storeId!;
-  console.log(`[AI] Endpoint analyze-all chamado. storeId: ${storeId}`);
 
-  // Conta todos os leads da loja (sem filtro restritivo)
+  // Conta leads para feedback imediato ao frontend
   const { data: allLeads } = await supabase
-    .from('bot_leads')
-    .select('id')
-    .eq('store_id', storeId);
-
+    .from('bot_leads').select('id').eq('store_id', storeId);
   const total = allLeads?.length ?? 0;
-  console.log(`[AI] Leads no banco para store ${storeId}: ${total}`);
 
-  // Roda em background sem bloquear a response
-  processAllLeads(storeId).catch(err => console.error('[AI] Erro fatal em processAllLeads:', err));
-  res.json({ ok: true, status: 'processing', total_leads: total, mensagem: `Analisando ${total} leads em background` });
+  // Dispara Edge Function sem await — roda independente do Render
+  fetch(`${EDGE_BASE()}/analyze-all-leads`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': EDGE_AUTH() },
+    body: JSON.stringify({ storeId }),
+  }).catch(e => console.error('[AI] Erro ao disparar analyze-all-leads:', e));
+
+  console.log(`[AI] Edge Function analyze-all-leads disparada. Store: ${storeId}, leads: ${total}`);
+  res.json({ ok: true, status: 'processing', total_leads: total, mensagem: `Analisando ${total} leads via Edge Function` });
 });
 
 router.post('/intelligence/analyze/:leadId', requireAuth, async (req, res) => {
   try {
-    const result = await analyzeSingleLead(req.params.leadId);
-    res.json({ ok: true, data: result });
+    const r = await fetch(`${EDGE_BASE()}/analyze-lead`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': EDGE_AUTH() },
+      body: JSON.stringify({ leadId: req.params.leadId }),
+    });
+    const data = await r.json();
+    if (!r.ok) return res.status(r.status).json({ ok: false, ...data });
+    res.json({ ok: true, data });
   } catch (err: unknown) {
     console.error('[Intelligence] /analyze/:leadId error:', err);
-    res.status(500).json({ ok: false, error: errMsg(err), stack: err instanceof Error ? err.stack : undefined });
+    res.status(500).json({ ok: false, error: errMsg(err) });
   }
 });
 
