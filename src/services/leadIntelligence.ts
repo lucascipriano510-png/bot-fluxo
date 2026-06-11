@@ -54,7 +54,7 @@ async function callGemini(prompt: string): Promise<string | null> {
   const url  = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
   const body = {
     contents:         [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 600, temperature: 0 },
+    generationConfig: { maxOutputTokens: 1024, temperature: 0 },
   };
 
   try {
@@ -183,8 +183,9 @@ ${conversa}
 
 TEMPO DESDE ÚLTIMA MENSAGEM DO CLIENTE: ${horasDesdeUltimaMensagem}h
 
-Retorne este JSON exato (sem markdown, sem blocos de código):
-{"temperatura":"frio","score":0,"resumo":"","proxima_acao":"","intencao_principal":"sem_intencao_clara","kanban_coluna_sugerida":"novo","urgencia":"baixa","confianca":0.5}
+Retorne este JSON exato (sem markdown, sem blocos de código).
+"resumo" máximo 80 caracteres. "proxima_acao" máximo 60 caracteres.
+{"temperatura":"frio","score":0,"resumo":"máximo 80 chars","proxima_acao":"máximo 60 chars","intencao_principal":"sem_intencao_clara","kanban_coluna_sugerida":"novo","urgencia":"baixa","confianca":0.5}
 
 Valores válidos para kanban_coluna_sugerida: novo, interessado, escolhendo, carrinho, pagamento, finalizado
 Valores válidos para intencao_principal: primeiro_contato, reconhecimento_anuncio, pesquisa_produto, avaliacao_preco, intencao_compra, fechamento, abandono, reclamacao, retorno
@@ -199,23 +200,37 @@ Valores válidos para urgencia: alta, media, baixa`;
 
   console.log(`[Intelligence] Resposta bruta do Gemini: ${raw.slice(0, 200)}`);
 
-  // 8. Parse do JSON
+  // 8. Parse do JSON com fallback para truncamento
   try {
-    const cleaned = raw
+    let jsonStr = raw
       .replace(/```json\n?/g, '')
       .replace(/```\n?/g, '')
       .trim();
 
-    const result = JSON.parse(cleaned) as LeadIntelligenceResult;
+    // Fallback: JSON truncado — tenta fechar o objeto
+    if (!jsonStr.endsWith('}')) {
+      const lastComplete = jsonStr.lastIndexOf('",');
+      if (lastComplete > 0) {
+        jsonStr = jsonStr.substring(0, lastComplete + 1) + '}';
+      } else {
+        jsonStr = jsonStr + '"}';
+      }
+      console.warn(`[Intelligence] JSON truncado — fallback de fechamento aplicado`);
+    }
 
-    // Normalizar e validar
-    if (!['quente', 'morno', 'frio'].includes(result.temperatura))   result.temperatura = 'frio';
-    if (!['alta', 'media', 'baixa'].includes(result.urgencia))       result.urgencia    = 'baixa';
-    result.kanban_coluna_sugerida = normalizeKanbanStage(result.kanban_coluna_sugerida || '');
-    result.score     = Math.max(0, Math.min(100, Number(result.score) || 0));
-    result.confianca = Math.max(0, Math.min(1,   Number(result.confianca) || 0.5));
-    if (!result.resumo)       result.resumo       = 'Análise concluída.';
-    if (!result.proxima_acao) result.proxima_acao = 'Manter contato e acompanhar interesse.';
+    const parsed = JSON.parse(jsonStr);
+
+    // Defaults para campos faltantes + normalização
+    const result: LeadIntelligenceResult = {
+      temperatura:            (['quente','morno','frio'].includes(parsed.temperatura) ? parsed.temperatura : 'frio'),
+      score:                  Math.max(0, Math.min(100, Number(parsed.score) || 10)),
+      resumo:                 parsed.resumo            || 'Análise incompleta.',
+      proxima_acao:           parsed.proxima_acao      || 'Verificar lead manualmente.',
+      intencao_principal:     parsed.intencao_principal || 'primeiro_contato',
+      kanban_coluna_sugerida: normalizeKanbanStage(parsed.kanban_coluna_sugerida || ''),
+      urgencia:               (['alta','media','baixa'].includes(parsed.urgencia) ? parsed.urgencia : 'baixa'),
+      confianca:              Math.max(0, Math.min(1, Number(parsed.confianca) || 0.3)),
+    };
 
     console.log(`[Intelligence] Parse OK — score: ${result.score}, temp: ${result.temperatura}`);
     return result;
