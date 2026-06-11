@@ -258,6 +258,9 @@ export async function analyzeSingleLead(leadId: string): Promise<LeadIntelligenc
     !lead?.kanban_movido_manualmente_em ||
     lead.kanban_movido_manualmente_em < twoHoursAgo;
 
+  // Mapeia temperatura IA para status_comercial (QUENTE/MORNO/FRIO)
+  const statusMap: Record<string, string> = { quente: 'QUENTE', morno: 'MORNO', frio: 'FRIO' };
+
   const updates: Record<string, unknown> = {
     ai_score:           result.score,
     ai_resumo:          result.resumo,
@@ -268,6 +271,8 @@ export async function analyzeSingleLead(leadId: string): Promise<LeadIntelligenc
     ai_urgencia:        result.urgencia,
     ai_confianca:       result.confianca,
     ai_analisado_em:    now,
+    // Sincroniza temperatura principal com análise IA
+    status_comercial:   statusMap[result.temperatura] || 'FRIO',
   };
 
   if (canAutoMove && result.kanban_coluna_sugerida !== lead?.kanban_stage) {

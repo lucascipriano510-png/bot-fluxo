@@ -349,7 +349,7 @@ function FluxoCommand() {
       let list = this.leads;
       const q = this.crmSearch.trim().toLowerCase();
       if (q) list = list.filter(l => (l.nome||'').toLowerCase().includes(q) || (l.phone||'').includes(q) || (l.interesse||'').toLowerCase().includes(q));
-      if (this.crmFilter) list = list.filter(l => l.status_comercial === this.crmFilter);
+      if (this.crmFilter) list = list.filter(l => (l.ai_temperatura?.toUpperCase() ?? l.status_comercial) === this.crmFilter);
       return list;
     },
 
@@ -361,9 +361,9 @@ function FluxoCommand() {
 
     get waConfigured() { return this.waStatus === 'connected'; },
 
-    get leadsQuentes() { return this.leads.filter(l => l.status_comercial === 'QUENTE').length; },
-    get leadsMornos()  { return this.leads.filter(l => l.status_comercial === 'MORNO').length; },
-    get leadsFrios()   { return this.leads.filter(l => l.status_comercial === 'FRIO').length; },
+    get leadsQuentes() { return this.leads.filter(l => (l.ai_temperatura?.toUpperCase() ?? l.status_comercial) === 'QUENTE').length; },
+    get leadsMornos()  { return this.leads.filter(l => (l.ai_temperatura?.toUpperCase() ?? l.status_comercial) === 'MORNO').length; },
+    get leadsFrios()   { return this.leads.filter(l => (l.ai_temperatura?.toUpperCase() ?? l.status_comercial) === 'FRIO').length; },
 
     get filteredProducts() {
       let list = this.products;
