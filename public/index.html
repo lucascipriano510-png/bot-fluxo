@@ -942,7 +942,16 @@
               <!-- Análise IA -->
               <div style="border-bottom:1px solid var(--border);padding:12px 20px">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                  <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em">⚡ Análise IA</div>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em">⚡ Análise IA</div>
+                    <!-- badge urgência -->
+                    <span x-show="crmLead.ai_urgencia==='alta'"
+                      style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(239,68,68,.2);color:#ef4444;animation:pulse 1.5s infinite">🔴 Urgente</span>
+                    <span x-show="crmLead.ai_urgencia==='media'"
+                      style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(250,204,21,.2);color:#facc15">🟡 Normal</span>
+                    <span x-show="crmLead.ai_urgencia==='baixa'"
+                      style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(107,114,128,.15);color:#9ca3af">⚪ Baixa</span>
+                  </div>
                   <button class="btn" style="font-size:10px;padding:2px 8px"
                     @click="analyzeLeadAI(crmLead.id)" :disabled="aiAnalyzing"
                     x-text="aiAnalyzing ? 'Analisando...' : 'Re-analisar'"></button>

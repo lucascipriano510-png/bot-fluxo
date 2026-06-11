@@ -1,6 +1,21 @@
 import { supabase } from '../lib/supabase';
+import { SALES_BRAIN_PROMPT } from '../config/salesBrain';
 
 const KANBAN_STAGES = ['novo', 'interessado', 'escolhendo', 'carrinho', 'pagamento', 'finalizado'];
+
+// Normaliza os nomes de coluna que o Gemini pode retornar para os IDs reais
+function normalizeKanbanStage(raw: string): string {
+  const map: Record<string, string> = {
+    'novo lead': 'novo', 'new lead': 'novo',
+    'interessado': 'interessado',
+    'escolhendo': 'escolhendo',
+    'carrinho montado': 'carrinho', 'carrinho': 'carrinho',
+    'aguardando pgto': 'pagamento', 'pagamento': 'pagamento',
+    'fechado': 'finalizado', 'finalizado': 'finalizado',
+    'perdido': 'novo', // não existe no sistema, mantém na entrada
+  };
+  return map[raw.toLowerCase().trim()] || (KANBAN_STAGES.includes(raw) ? raw : 'novo');
+}
 
 export interface LeadIntelligenceResult {
   temperatura:            'quente' | 'morno' | 'frio';
@@ -9,6 +24,7 @@ export interface LeadIntelligenceResult {
   proxima_acao:           string;
   intencao_principal:     string;
   kanban_coluna_sugerida: string;
+  urgencia:               'alta' | 'media' | 'baixa';
   confianca:              number;
 }
 
@@ -18,6 +34,7 @@ const FALLBACK_NO_MESSAGES: LeadIntelligenceResult = {
   resumo:                 'Sem histórico de conversa disponível.',
   proxima_acao:           'Iniciar contato via WhatsApp.',
   intencao_principal:     'sem_intencao_clara',
+  urgencia:               'baixa',
   kanban_coluna_sugerida: 'novo',
   confianca:              1,
 };
@@ -132,34 +149,43 @@ export async function analyzeLeadIntelligence(leadId: string): Promise<LeadIntel
     return FALLBACK_NO_MESSAGES;
   }
 
-  // 6. Montar conversa
+  // 6. Montar conversa e calcular tempo desde última mensagem do cliente
+  const msgsComTs = messages as Array<{ direction: string; text: string; timestamp?: string }>;
+  const ultimaDoCliente = [...msgsComTs]
+    .filter(m => m.direction === 'in' && m.timestamp)
+    .sort((a, b) => new Date(b.timestamp!).getTime() - new Date(a.timestamp!).getTime())[0];
+  const horasDesdeUltimaMensagem = ultimaDoCliente?.timestamp
+    ? Math.floor((Date.now() - new Date(ultimaDoCliente.timestamp).getTime()) / 3_600_000)
+    : 999;
+
   const conversa = messages
     .map(m => `${m.direction === 'out' ? 'Loja' : 'Cliente'}: ${m.text}`)
     .join('\n');
 
-  console.log(`[Intelligence] Conversa montada (${messages.length} msgs, ${conversa.length} chars)`);
+  console.log(`[Intelligence] Conversa montada (${messages.length} msgs, ${horasDesdeUltimaMensagem}h desde última msg do cliente)`);
+  console.log(`[Intelligence] Brain ativo: ${SALES_BRAIN_PROMPT.slice(0, 80).replace(/\n/g, ' ')}...`);
 
-  const prompt = `Você é um analista de CRM especializado em e-commerce de moda no Brasil.
-Analise esta conversa de WhatsApp.
+  const prompt = `${SALES_BRAIN_PROMPT}
 
-INSTRUÇÕES CRÍTICAS:
-- Responda SOMENTE com o JSON abaixo.
-- Sem explicações, sem markdown, sem texto antes ou depois.
-- Apenas o objeto JSON puro, sem blocos de código.
+═══════════════════════════════════
+TAREFA
+═══════════════════════════════════
 
-Conversa:
+Analise a conversa abaixo de uma loja de moda brasileira no WhatsApp.
+Aplique todo o seu conhecimento de vendas e retorne SOMENTE um JSON válido,
+sem markdown, sem explicações, sem texto antes ou depois.
+
+CONVERSA:
 ${conversa}
 
-JSON de retorno (preencha com valores reais):
-{"temperatura":"frio","score":0,"resumo":"","proxima_acao":"","intencao_principal":"sem_intencao_clara","kanban_coluna_sugerida":"novo","confianca":0.5}
+TEMPO DESDE ÚLTIMA MENSAGEM DO CLIENTE: ${horasDesdeUltimaMensagem}h
 
-Critérios de temperatura:
-- "quente" (score 70-100): interesse claro, perguntou preço/tamanho/prazo, quer comprar, pediu link, perguntou sobre desconto
-- "morno" (score 30-69): iniciou conversa, respondeu mas sem intenção clara, pediu mais informações genéricas
-- "frio" (score 0-29): não respondeu após contato, conversa de 1 saudação só, disse que não tem interesse
+Retorne este JSON exato (sem markdown, sem blocos de código):
+{"temperatura":"frio","score":0,"resumo":"","proxima_acao":"","intencao_principal":"sem_intencao_clara","kanban_coluna_sugerida":"novo","urgencia":"baixa","confianca":0.5}
 
 Valores válidos para kanban_coluna_sugerida: novo, interessado, escolhendo, carrinho, pagamento, finalizado
-Valores válidos para intencao_principal: interesse_produto, pergunta_preco, reclamacao, abandono, pronto_comprar, primeiro_contato, sem_intencao_clara`;
+Valores válidos para intencao_principal: primeiro_contato, reconhecimento_anuncio, pesquisa_produto, avaliacao_preco, intencao_compra, fechamento, abandono, reclamacao, retorno
+Valores válidos para urgencia: alta, media, baixa`;
 
   // 7. Chamar Gemini
   const raw = await callGemini(prompt);
@@ -180,8 +206,9 @@ Valores válidos para intencao_principal: interesse_produto, pergunta_preco, rec
     const result = JSON.parse(cleaned) as LeadIntelligenceResult;
 
     // Normalizar e validar
-    if (!['quente', 'morno', 'frio'].includes(result.temperatura)) result.temperatura = 'frio';
-    if (!KANBAN_STAGES.includes(result.kanban_coluna_sugerida))     result.kanban_coluna_sugerida = 'novo';
+    if (!['quente', 'morno', 'frio'].includes(result.temperatura))   result.temperatura = 'frio';
+    if (!['alta', 'media', 'baixa'].includes(result.urgencia))       result.urgencia    = 'baixa';
+    result.kanban_coluna_sugerida = normalizeKanbanStage(result.kanban_coluna_sugerida || '');
     result.score     = Math.max(0, Math.min(100, Number(result.score) || 0));
     result.confianca = Math.max(0, Math.min(1,   Number(result.confianca) || 0.5));
     if (!result.resumo)       result.resumo       = 'Análise concluída.';
@@ -220,6 +247,7 @@ export async function analyzeSingleLead(leadId: string): Promise<LeadIntelligenc
     ai_proxima_acao:    result.proxima_acao,
     ai_temperatura:     result.temperatura,
     ai_kanban_sugerida: result.kanban_coluna_sugerida,
+    ai_urgencia:        result.urgencia,
     ai_confianca:       result.confianca,
     ai_analisado_em:    now,
   };

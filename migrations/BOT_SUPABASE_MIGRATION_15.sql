@@ -15,3 +15,6 @@ ALTER TABLE bot_leads ADD COLUMN IF NOT EXISTS ai_analisado_em   TIMESTAMPTZ;
 ALTER TABLE bot_leads ADD COLUMN IF NOT EXISTS kanban_movido_manualmente_em TIMESTAMPTZ;
 ALTER TABLE bot_leads ADD COLUMN IF NOT EXISTS kanban_movido_por            VARCHAR(10) DEFAULT 'manual';
 ALTER TABLE bot_leads ADD COLUMN IF NOT EXISTS kanban_movimento_log         TEXT;
+
+-- P13 — Sales Brain: urgência da análise IA
+ALTER TABLE bot_leads ADD COLUMN IF NOT EXISTS ai_urgencia VARCHAR(10);
