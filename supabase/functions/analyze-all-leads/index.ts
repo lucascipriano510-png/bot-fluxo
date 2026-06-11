@@ -52,31 +52,43 @@ serve(async (req) => {
       const lead = leads[i]
       console.log(`[AI] ${i + 1}/${leads.length} — ${lead.nome ?? lead.phone}`)
 
-      try {
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/analyze-lead`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({ leadId: lead.id }),
-        })
+      let tentativas = 0
+      while (tentativas < 3) {
+        try {
+          const res = await fetch(`${SUPABASE_URL}/functions/v1/analyze-lead`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({ leadId: lead.id }),
+          })
 
-        if (res.ok) {
-          sucesso++
-        } else {
-          const errText = await res.text()
-          console.error(`[AI] Erro ${lead.nome ?? lead.id}: ${errText}`)
+          if (res.status === 429) {
+            tentativas++
+            console.log(`[AI] Rate limit em ${lead.nome ?? lead.id}, aguardando 10s... (tentativa ${tentativas}/3)`)
+            await new Promise(r => setTimeout(r, 10000))
+            continue
+          }
+
+          if (res.ok) {
+            sucesso++
+          } else {
+            const errText = await res.text()
+            console.error(`[AI] Erro ${lead.nome ?? lead.id}: ${errText}`)
+            erro++
+          }
+          break
+        } catch (e) {
           erro++
+          console.error(`[AI] Exceção ${lead.nome ?? lead.id}:`, e)
+          break
         }
-      } catch (e) {
-        erro++
-        console.error(`[AI] Exceção ${lead.nome ?? lead.id}:`, e)
       }
 
-      // 2s entre chamadas para respeitar rate limit do Gemini free tier
+      // 5s entre chamadas para respeitar rate limit do Gemini free tier
       if (i < leads.length - 1) {
-        await new Promise(r => setTimeout(r, 2000))
+        await new Promise(r => setTimeout(r, 5000))
       }
     }
 
