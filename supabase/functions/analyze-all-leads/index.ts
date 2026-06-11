@@ -74,9 +74,9 @@ serve(async (req) => {
         console.error(`[AI] Exceção ${lead.nome ?? lead.id}:`, e)
       }
 
-      // 300ms entre chamadas para respeitar rate limit do Gemini
+      // 2s entre chamadas para respeitar rate limit do Gemini free tier
       if (i < leads.length - 1) {
-        await new Promise(r => setTimeout(r, 300))
+        await new Promise(r => setTimeout(r, 2000))
       }
     }
 
