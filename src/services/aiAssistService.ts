@@ -3,7 +3,7 @@
 //
 //  Provider atual: Gemini (Google Generative AI REST API)
 //  Ativação: definir AI_ASSIST_PROVIDER=gemini e AI_ASSIST_KEY nas env vars.
-//  Modelo padrão: AI_ASSIST_MODEL=gemini-1.5-flash
+//  Modelo padrão: AI_ASSIST_MODEL=gemini-2.5-flash
 //
 //  Guardrails: nunca inventa preço, estoque, produto, prazo, endereço ou promoção.
 //  Quando não há dados, redireciona para atendimento — nunca diz "não sei".
@@ -216,7 +216,7 @@ async function callGemini(
 export async function testAiConnection(): Promise<{ ok: boolean; reply?: string; error?: string; provider?: string; model?: string }> {
   const provider = (process.env.AI_ASSIST_PROVIDER || '').toLowerCase();
   const key      = process.env.AI_ASSIST_KEY || '';
-  const model    = process.env.AI_ASSIST_MODEL || 'gemini-1.5-flash';
+  const model    = process.env.AI_ASSIST_MODEL || 'gemini-2.5-flash';
 
   if (!provider || !key) {
     return { ok: false, error: 'IA não configurada. Defina AI_ASSIST_PROVIDER e AI_ASSIST_KEY nas variáveis de ambiente.' };
@@ -250,7 +250,7 @@ export async function aiAssist(
 ): Promise<string | null> {
   const provider = (process.env.AI_ASSIST_PROVIDER || '').toLowerCase();
   const key      = process.env.AI_ASSIST_KEY || '';
-  const model    = process.env.AI_ASSIST_MODEL || 'gemini-1.5-flash';
+  const model    = process.env.AI_ASSIST_MODEL || 'gemini-2.5-flash';
 
   if (!provider || !key) return null;
 

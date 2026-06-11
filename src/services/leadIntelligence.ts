@@ -42,7 +42,7 @@ const FALLBACK_NO_MESSAGES: LeadIntelligenceResult = {
 async function callGemini(prompt: string): Promise<string | null> {
   // Aceita tanto AI_ASSIST_KEY quanto GEMINI_API_KEY (nomes comuns no Render)
   const key   = process.env.AI_ASSIST_KEY || process.env.GEMINI_API_KEY || '';
-  const model = process.env.AI_ASSIST_MODEL || 'gemini-1.5-flash';
+  const model = process.env.AI_ASSIST_MODEL || 'gemini-2.5-flash';
 
   if (!key) {
     console.error('[Intelligence] ERRO: Nenhuma API key definida. Configure AI_ASSIST_KEY ou GEMINI_API_KEY no Render → Environment.');

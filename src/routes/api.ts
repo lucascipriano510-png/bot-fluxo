@@ -1119,7 +1119,7 @@ router.get('/channels', async (req, res) => {
 router.get('/integrations/ai', (_req, res) => {
   const provider    = process.env.AI_ASSIST_PROVIDER || '';
   const key         = process.env.AI_ASSIST_KEY      || '';
-  const model       = process.env.AI_ASSIST_MODEL    || 'gemini-1.5-flash';
+  const model       = process.env.AI_ASSIST_MODEL    || 'gemini-2.5-flash';
   const configured  = !!(provider && key);
   res.json({ ok: true, configured, provider: provider || 'gemini', model });
 });

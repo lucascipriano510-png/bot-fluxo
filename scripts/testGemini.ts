@@ -7,7 +7,7 @@ import 'dotenv/config';
 
 async function main() {
   const key   = process.env.AI_ASSIST_KEY || process.env.GEMINI_API_KEY || '';
-  const model = process.env.AI_ASSIST_MODEL || 'gemini-1.5-flash';
+  const model = process.env.AI_ASSIST_MODEL || 'gemini-2.5-flash';
 
   console.log('=== Diagnóstico Gemini ===');
   console.log('AI_ASSIST_KEY presente:   ', !!process.env.AI_ASSIST_KEY);

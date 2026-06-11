@@ -122,7 +122,7 @@ function FluxoCommand() {
     channelsLoading: false,
 
     /* integracoes — ia generativa */
-    aiConfig: { configured: false, provider: 'gemini', model: 'gemini-1.5-flash', testing: false, feedback: null, feedbackMsg: '' },
+    aiConfig: { configured: false, provider: 'gemini', model: 'gemini-2.5-flash', testing: false, feedback: null, feedbackMsg: '' },
 
     /* integracoes — evolution api */
     evoForm: { evolution_url: '', evolution_instance: '', evolution_token: '' },
@@ -1972,7 +1972,7 @@ function FluxoCommand() {
         if (j.ok) {
           this.aiConfig.configured = j.configured || false;
           this.aiConfig.provider   = j.provider   || 'gemini';
-          this.aiConfig.model      = j.model       || 'gemini-1.5-flash';
+          this.aiConfig.model      = j.model       || 'gemini-2.5-flash';
         }
       } catch (_) {}
     },

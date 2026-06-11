@@ -14,7 +14,7 @@ import { loadStoreCategories } from '../inventory/inventoryBridge';
 
 async function callGeminiAnalysis(prompt: string): Promise<string | null> {
   const key   = process.env.AI_ASSIST_KEY || '';
-  const model = process.env.AI_ASSIST_MODEL || 'gemini-1.5-flash';
+  const model = process.env.AI_ASSIST_MODEL || 'gemini-2.5-flash';
   if (!key) return null;
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
