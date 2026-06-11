@@ -40,13 +40,16 @@ const FALLBACK_NO_MESSAGES: LeadIntelligenceResult = {
 };
 
 async function callGemini(prompt: string): Promise<string | null> {
-  const key   = process.env.AI_ASSIST_KEY || '';
+  // Aceita tanto AI_ASSIST_KEY quanto GEMINI_API_KEY (nomes comuns no Render)
+  const key   = process.env.AI_ASSIST_KEY || process.env.GEMINI_API_KEY || '';
   const model = process.env.AI_ASSIST_MODEL || 'gemini-1.5-flash';
 
   if (!key) {
-    console.error('[Intelligence] ERRO: AI_ASSIST_KEY não definida. Configure no Render → Environment.');
+    console.error('[Intelligence] ERRO: Nenhuma API key definida. Configure AI_ASSIST_KEY ou GEMINI_API_KEY no Render → Environment.');
     return null;
   }
+
+  console.log(`[Intelligence] API key encontrada: ${key.substring(0, 8)}... (modelo: ${model})`);
 
   const url  = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
   const body = {
@@ -276,10 +279,9 @@ export async function analyzeSingleLead(leadId: string): Promise<LeadIntelligenc
 export async function processAllLeads(storeId: string): Promise<{ processed: number; errors: number; total: number }> {
   console.log(`[Intelligence] processAllLeads iniciado para store: ${storeId}`);
 
-  // Busca TODOS os leads da loja (não só os com last_message_at)
   const { data: leads, error } = await supabase
     .from('bot_leads')
-    .select('id')
+    .select('id, nome, phone')
     .eq('store_id', storeId);
 
   if (error) { console.error('[Intelligence] Erro ao buscar leads:', error); return { processed: 0, errors: 0, total: 0 }; }
@@ -287,24 +289,30 @@ export async function processAllLeads(storeId: string): Promise<{ processed: num
 
   let processed = 0;
   let errors    = 0;
+  const erros:  string[] = [];
   const total   = leads.length;
   console.log(`[Intelligence] Total de leads a processar: ${total}`);
 
-  for (let i = 0; i < leads.length; i += 5) {
-    const batch = leads.slice(i, i + 5);
-    await Promise.all(batch.map(async lead => {
-      try {
-        await analyzeSingleLead(lead.id);
-        processed++;
-        console.log(`[Intelligence] Progresso: ${processed}/${total}`);
-      } catch (err) {
-        errors++;
-        console.error(`[Intelligence] Erro no lead ${lead.id}:`, err);
-      }
-    }));
+  // Sequencial com 500ms entre cada chamada para respeitar rate limit do Gemini
+  for (let i = 0; i < leads.length; i++) {
+    const lead = leads[i];
+    const label = lead.nome || lead.phone || lead.id;
+    console.log(`[Intelligence] Processando ${i + 1}/${total}: ${label}`);
+    try {
+      await analyzeSingleLead(lead.id);
+      processed++;
+    } catch (err) {
+      errors++;
+      const msg = err instanceof Error ? err.message : String(err);
+      erros.push(`${label}: ${msg}`);
+      console.error(`[Intelligence] ERRO no lead "${label}":`, err);
+    }
+    // Aguarda 500ms entre chamadas (exceto na última)
+    if (i < leads.length - 1) await new Promise(r => setTimeout(r, 500));
   }
 
-  console.log(`[Intelligence] processAllLeads concluído: ${processed} OK, ${errors} erros.`);
+  console.log(`[Intelligence] CONCLUÍDO: ${processed} sucesso, ${errors} erro`);
+  if (erros.length > 0) console.error('[Intelligence] Erros:', erros);
   return { processed, errors, total };
 }
 
