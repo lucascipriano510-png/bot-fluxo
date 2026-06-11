@@ -1500,10 +1500,10 @@ router.post('/intelligence/analyze-all', requireAuth, async (req, res) => {
 router.post('/intelligence/analyze/:leadId', requireAuth, async (req, res) => {
   try {
     const result = await analyzeSingleLead(req.params.leadId);
-    if (!result) return res.json({ ok: false, error: 'Sem mensagens para analisar ou chave AI não configurada.' });
     res.json({ ok: true, data: result });
   } catch (err: unknown) {
-    res.json({ ok: false, error: errMsg(err) });
+    console.error('[Intelligence] /analyze/:leadId error:', err);
+    res.status(500).json({ ok: false, error: errMsg(err), stack: err instanceof Error ? err.stack : undefined });
   }
 });
 
