@@ -840,7 +840,12 @@
         <div class="metric-card"><div class="metric-val" x-text="leadsFrios"></div><div class="metric-label">🧊 Frios</div></div>
         <button class="btn btn-green" @click="openNewLeadModal()"
           style="align-self:center;font-size:12px;white-space:nowrap">+ Novo Lead</button>
+        <button class="btn" @click="analyzeAllLeadsAI()" :disabled="aiAnalyzingAll"
+          style="align-self:center;font-size:12px;white-space:nowrap;gap:5px">
+          ⚡ <span x-text="aiAnalyzingAll ? 'Analisando...' : 'Analisar todos'"></span>
+        </button>
       </div>
+      <div x-show="aiStatus" style="font-size:12px;color:var(--green);margin-bottom:10px" x-text="aiStatus"></div>
 
       <!-- 3-col CRM layout -->
       <div class="crm-shell">
@@ -868,7 +873,16 @@
                 </div>
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
                   <span class="badge" :class="statusColor(l.status_comercial)" style="font-size:9px" x-text="l.status_comercial"></span>
-                  <span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;color:#000" :style="`background:${scoreColor(l.conversion_score||0)}`" x-text="l.conversion_score || 0"></span>
+                  <span x-show="l.ai_score != null"
+                    style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;color:#000"
+                    :style="`background:${scoreColor(l.ai_score||0)}`"
+                    :title="intencaoLabel(l.ai_intencao)">⚡ <span x-text="l.ai_score"></span></span>
+                  <span x-show="l.ai_score == null && !l.ai_analisado_em"
+                    style="font-size:9px;color:var(--mu);padding:1px 4px" title="Análise pendente">🕐</span>
+                  <span x-show="l.ai_score == null && l.ai_analisado_em"
+                    style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;color:#000"
+                    :style="`background:${scoreColor(l.conversion_score||0)}`"
+                    x-text="l.conversion_score || 0"></span>
                   <span style="font-size:10px;color:var(--mu2)" x-text="fmtTime(l.atualizado_em)"></span>
                 </div>
               </div>
@@ -922,6 +936,50 @@
                 <div style="flex:1;text-align:center">
                   <div style="font-size:16px;font-weight:700" x-text="crmMessages.length"></div>
                   <div style="font-size:10px;color:var(--mu)">Mensagens</div>
+                </div>
+              </div>
+
+              <!-- Análise IA -->
+              <div style="border-bottom:1px solid var(--border);padding:12px 20px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                  <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em">⚡ Análise IA</div>
+                  <button class="btn" style="font-size:10px;padding:2px 8px"
+                    @click="analyzeLeadAI(crmLead.id)" :disabled="aiAnalyzing"
+                    x-text="aiAnalyzing ? 'Analisando...' : 'Re-analisar'"></button>
+                </div>
+
+                <!-- pendente -->
+                <div x-show="!crmLead.ai_analisado_em"
+                  style="font-size:12px;color:var(--mu);display:flex;align-items:center;gap:6px">
+                  🕐 Nenhuma análise ainda.
+                  <button class="btn btn-green" style="font-size:10px;padding:2px 8px"
+                    @click="analyzeLeadAI(crmLead.id)" :disabled="aiAnalyzing">Analisar agora</button>
+                </div>
+
+                <!-- resultado -->
+                <div x-show="crmLead.ai_analisado_em" style="display:flex;flex-direction:column;gap:8px">
+
+                  <!-- resumo -->
+                  <div x-show="crmLead.ai_resumo" style="font-size:12px;color:var(--tx);line-height:1.5" x-text="crmLead.ai_resumo"></div>
+
+                  <!-- próxima ação -->
+                  <div x-show="crmLead.ai_proxima_acao"
+                    style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:8px;padding:8px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+                    <div style="font-size:12px;color:var(--green);line-height:1.4" x-text="crmLead.ai_proxima_acao"></div>
+                    <button class="btn" style="font-size:10px;padding:2px 8px;flex-shrink:0"
+                      @click="navigator.clipboard.writeText(crmLead.ai_proxima_acao)">Copiar</button>
+                  </div>
+
+                  <!-- intenção + confiança -->
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <span style="font-size:11px;background:var(--card2);border-radius:6px;padding:2px 8px"
+                      x-text="intencaoLabel(crmLead.ai_intencao)"></span>
+                    <div style="flex:1;height:4px;background:var(--border);border-radius:2px;min-width:60px">
+                      <div style="height:100%;background:var(--green);border-radius:2px;transition:width .3s"
+                        :style="`width:${Math.round((crmLead.ai_confianca||0)*100)}%`"></div>
+                    </div>
+                    <span style="font-size:10px;color:var(--mu)" x-text="`${Math.round((crmLead.ai_confianca||0)*100)}% confiança`"></span>
+                  </div>
                 </div>
               </div>
 
@@ -1604,7 +1662,20 @@
                 <div class="kanban-card-info" style="margin-top:4px" x-text="item.interesse"></div>
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
                   <div class="kanban-card-val" x-text="item.val"></div>
-                  <span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;color:#000" :style="`background:${scoreColor(item.score||0)}`" x-text="item.score || 0"></span>
+                  <div style="display:flex;align-items:center;gap:4px">
+                    <span x-show="item.kanban_movido_por==='ia'"
+                      style="font-size:9px;background:rgba(34,197,94,.15);color:var(--green);border-radius:4px;padding:1px 5px">⚡ Auto</span>
+                    <span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;color:#000"
+                      :style="`background:${scoreColor(item.ai_score!=null?item.ai_score:item.score||0)}`"
+                      x-text="item.ai_score!=null?'⚡'+item.ai_score:item.score||0"></span>
+                  </div>
+                </div>
+                <!-- sugestão de coluna diferente -->
+                <div x-show="item.ai_kanban_sugerida && item.ai_kanban_sugerida !== item.kanban_stage"
+                  @click.stop="kanbanMoveToSuggested(item.id, item.ai_kanban_sugerida)"
+                  style="margin-top:6px;font-size:10px;color:#f97316;cursor:pointer;background:rgba(249,115,22,.08);border-radius:4px;padding:2px 6px"
+                  :title="`IA sugere mover para: ${item.ai_kanban_sugerida}`">
+                  💡 Sugestão: <span x-text="item.ai_kanban_sugerida"></span>
                 </div>
               </div>
             </template>

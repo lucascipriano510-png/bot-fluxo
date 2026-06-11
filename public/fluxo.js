@@ -173,9 +173,14 @@ function FluxoCommand() {
     newLead:        { phone: '', nome: '', interesse: '', status_comercial: 'FRIO', kanban_stage: 'novo', valor_potencial: '', cidade: '' },
     newLeadSaving:  false,
     newLeadError:   null,
-    addingToCrm:     false,
-    addToCrmError:   null,
+    addingToCrm:      false,
+    addToCrmError:    null,
     waCurrentLoading: false,
+
+    /* inteligência AI */
+    aiAnalyzing:    false,
+    aiAnalyzingAll: false,
+    aiStatus:       null,
 
     /* atendimentos */
     atendMessages: [],
@@ -1220,6 +1225,62 @@ function FluxoCommand() {
       }
     },
 
+    /* ── Inteligência AI ─────────────────────────────────────────── */
+    async analyzeLeadAI(leadId) {
+      if (this.aiAnalyzing) return;
+      this.aiAnalyzing = true;
+      try {
+        const r = await this.authFetch(`/api/intelligence/analyze/${leadId}`, { method: 'POST' });
+        const j = await r.json();
+        if (j.ok && this.crmLead?.id === leadId) {
+          this.crmLead = { ...this.crmLead, ...j.data,
+            ai_score:            j.data.score,
+            ai_resumo:           j.data.resumo,
+            ai_proxima_acao:     j.data.proxima_acao,
+            ai_intencao:         j.data.intencao_principal,
+            ai_temperatura:      j.data.temperatura,
+            ai_kanban_sugerida:  j.data.kanban_coluna_sugerida,
+            ai_confianca:        j.data.confianca,
+            ai_analisado_em:     new Date().toISOString(),
+          };
+        }
+        await this.loadLeads();
+        if (this.page === 'kanban') await this.loadKanban();
+      } catch (_) {}
+      finally { this.aiAnalyzing = false; }
+    },
+
+    async analyzeAllLeadsAI() {
+      if (this.aiAnalyzingAll) return;
+      this.aiAnalyzingAll = true;
+      try {
+        const r = await this.authFetch('/api/intelligence/analyze-all', { method: 'POST' });
+        const j = await r.json();
+        if (j.ok) {
+          this.aiStatus = `Analisando ${j.total_leads} leads em background...`;
+          setTimeout(() => {
+            this.aiStatus = null;
+            this.loadLeads();
+            if (this.page === 'kanban') this.loadKanban();
+          }, 15000);
+        }
+      } catch (_) {}
+      finally { this.aiAnalyzingAll = false; }
+    },
+
+    intencaoLabel(intencao) {
+      const map = {
+        interesse_produto:    '🛍️ Interesse em produto',
+        pergunta_preco:       '💰 Perguntou preço',
+        reclamacao:           '😡 Reclamação',
+        abandono:             '👋 Abandono',
+        pronto_comprar:       '🔥 Pronto p/ comprar',
+        primeiro_contato:     '👋 Primeiro contato',
+        sem_intencao_clara:   '❔ Sem intenção clara',
+      };
+      return map[intencao] || intencao || '—';
+    },
+
     openNewLeadModal() {
       this.newLead = { phone: '', nome: '', interesse: '', status_comercial: 'FRIO', kanban_stage: 'novo', valor_potencial: '', cidade: '' };
       this.newLeadError = null;
@@ -1527,6 +1588,11 @@ function FluxoCommand() {
             id: lead.id, name: lead.nome || lead.phone, phone: lead.phone,
             interesse: lead.interesse || '—', val: this.fmtBRL(val), valNum: val,
             status: lead.status_comercial, score: lead.conversion_score || 0,
+            ai_score:           lead.ai_score,
+            ai_analisado_em:    lead.ai_analisado_em,
+            ai_kanban_sugerida: lead.ai_kanban_sugerida,
+            kanban_movido_por:  lead.kanban_movido_por,
+            kanban_stage:       lead.kanban_stage || 'novo',
           });
           col.total += val;
         }
@@ -1541,6 +1607,14 @@ function FluxoCommand() {
     kanbanDragStart(id, stage) {
       this.kanbanDragId    = id;
       this.kanbanDragStage = stage;
+    },
+
+    async kanbanMoveToSuggested(leadId, suggestedStage) {
+      await this.authFetch(`/api/leads/${leadId}/stage`, {
+        method: 'PATCH',
+        body: JSON.stringify({ stage: suggestedStage }),
+      }).catch(() => {});
+      await this.loadKanban();
     },
 
     async kanbanDrop(targetStage) {

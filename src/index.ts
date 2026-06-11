@@ -1,5 +1,6 @@
 import app from './app';
 import { initBaileys } from './whatsapp/baileys';
+import { processNewLeads } from './services/leadIntelligence';
 
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -21,6 +22,16 @@ app.listen(PORT, () => {
     } else {
       console.warn('[boot] STORE_ID não definido — Baileys não inicializado no boot.');
     }
+  }
+
+  // Job de inteligência: re-analisa leads com mensagens novas a cada 30 min
+  const BOOT_STORE_ID = process.env.STORE_ID || '';
+  if (process.env.AI_ASSIST_KEY && BOOT_STORE_ID) {
+    setInterval(() => {
+      processNewLeads(BOOT_STORE_ID).catch(err =>
+        console.error('[Intelligence] job error:', err)
+      );
+    }, 30 * 60 * 1000);
   }
 
   // Self-ping a cada 4 min para evitar sleep do Render free tier

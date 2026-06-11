@@ -20,6 +20,7 @@ import { runStoreAnalysis } from '../services/analysisService';
 import { recordConversion } from '../services/storeBrainService';
 import { initBaileys, getWaState, sendWaMessage, disconnectBaileys } from '../whatsapp/baileys';
 import { updateLeadScore, calculateLeadScore } from '../services/leadScoreService';
+import { analyzeSingleLead, processAllLeads, processNewLeads } from '../services/leadIntelligence';
 
 const router = Router();
 
@@ -807,7 +808,12 @@ router.patch('/leads/:id/stage', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'Stage inválido' });
   }
   try {
-    const patch: Record<string, unknown> = { kanban_stage: stage, atualizado_em: new Date().toISOString() };
+    const patch: Record<string, unknown> = {
+      kanban_stage: stage,
+      atualizado_em: new Date().toISOString(),
+      kanban_movido_manualmente_em: new Date().toISOString(),
+      kanban_movido_por: 'manual',
+    };
     if (stage === 'pagamento' || stage === 'carrinho') patch.status_comercial = 'QUENTE';
     else if (stage === 'interessado' || stage === 'escolhendo') patch.status_comercial = 'MORNO';
     else if (stage === 'finalizado') { patch.status = 'concluido'; patch.status_comercial = 'QUENTE'; }
@@ -1474,6 +1480,69 @@ router.post('/wa/send', async (req, res) => {
 router.post('/wa/disconnect', async (_req, res) => {
   await disconnectBaileys().catch(() => {});
   res.json({ ok: true });
+});
+
+// ── Intelligence (Gemini AI) ──────────────────────────────────────────────────
+
+router.post('/intelligence/analyze-all', requireAuth, async (req, res) => {
+  const storeId = req.storeId!;
+  const { data: leads } = await supabase
+    .from('bot_leads')
+    .select('id', { count: 'exact', head: true })
+    .eq('store_id', storeId)
+    .not('last_message_at', 'is', null);
+  const total = (leads as any)?.length ?? 0;
+  // Roda em background sem bloquear a response
+  processAllLeads(storeId).catch(err => console.error('[Intelligence] processAllLeads error:', err));
+  res.json({ ok: true, status: 'processing', total_leads: total });
+});
+
+router.post('/intelligence/analyze/:leadId', requireAuth, async (req, res) => {
+  try {
+    const result = await analyzeSingleLead(req.params.leadId);
+    if (!result) return res.json({ ok: false, error: 'Sem mensagens para analisar ou chave AI não configurada.' });
+    res.json({ ok: true, data: result });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
+router.get('/intelligence/status', requireAuth, async (req, res) => {
+  try {
+    const storeId = req.storeId!;
+    const { count: total } = await supabase
+      .from('bot_leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('store_id', storeId)
+      .not('last_message_at', 'is', null) as any;
+    const { count: analisados } = await supabase
+      .from('bot_leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('store_id', storeId)
+      .not('ai_analisado_em', 'is', null) as any;
+    const { data: ultima } = await supabase
+      .from('bot_leads')
+      .select('ai_analisado_em')
+      .eq('store_id', storeId)
+      .not('ai_analisado_em', 'is', null)
+      .order('ai_analisado_em', { ascending: false })
+      .limit(1)
+      .single();
+    res.json({
+      ok: true,
+      total:     total || 0,
+      analisados: analisados || 0,
+      pendentes: (total || 0) - (analisados || 0),
+      ultima_analise: ultima?.ai_analisado_em || null,
+    });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
+// Endpoint para sugestão de resposta (UI no P12)
+router.post('/intelligence/suggest-reply/:leadId', requireAuth, async (_req, res) => {
+  res.json({ ok: false, error: 'UI a implementar no P12.' });
 });
 
 // ── Backfill: cria leads para conversas existentes sem lead no CRM ─────────
