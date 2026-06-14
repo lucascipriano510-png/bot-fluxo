@@ -804,7 +804,8 @@ router.put('/leads/:id', async (req, res) => {
 
 router.patch('/leads/:id/stage', async (req, res) => {
   const { stage } = req.body as { stage?: string };
-  const validStages = ['novo','interessado','escolhendo','carrinho','pagamento','finalizado'];
+  // Funil novo + estágios legados (compat com dados antigos).
+  const validStages = ['novo','interessado','negociando','comprou','perdido','escolhendo','carrinho','pagamento','finalizado'];
   if (!stage || !validStages.includes(stage)) {
     return res.status(400).json({ ok: false, error: 'Stage inválido' });
   }
@@ -815,9 +816,11 @@ router.patch('/leads/:id/stage', async (req, res) => {
       kanban_movido_manualmente_em: new Date().toISOString(),
       kanban_movido_por: 'manual',
     };
-    if (stage === 'pagamento' || stage === 'carrinho') patch.status_comercial = 'QUENTE';
+    // Sincroniza calor/status com o estágio escolhido manualmente.
+    if (stage === 'negociando' || stage === 'pagamento' || stage === 'carrinho') patch.status_comercial = 'QUENTE';
     else if (stage === 'interessado' || stage === 'escolhendo') patch.status_comercial = 'MORNO';
-    else if (stage === 'finalizado') { patch.status = 'concluido'; patch.status_comercial = 'QUENTE'; }
+    else if (stage === 'comprou' || stage === 'finalizado') { patch.status = 'concluido'; patch.status_comercial = 'QUENTE'; }
+    else if (stage === 'perdido') { patch.status = 'perdido'; patch.status_comercial = 'FRIO'; }
 
     const { data, error } = await supabase
       .from('bot_leads')

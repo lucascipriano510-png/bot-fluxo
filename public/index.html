@@ -793,14 +793,11 @@
           <!-- Kanban -->
           <div style="padding:16px;border-bottom:1px solid #2a3942">
             <div class="inbox-section-label">Kanban</div>
-            <select x-show="atendLead" :value="atendLead?.kanban_stage||'novo'" @change="updateLeadStage($event.target.value)"
+            <select x-show="atendLead" :value="atendLead ? stageOf(atendLead) : 'novo'" @change="updateLeadStage($event.target.value)"
               class="inbox-field" style="cursor:pointer">
-              <option value="novo">Novo Lead</option>
-              <option value="interessado">Interessado</option>
-              <option value="escolhendo">Escolhendo</option>
-              <option value="carrinho">Carrinho</option>
-              <option value="pagamento">Aguardando Pgto</option>
-              <option value="finalizado">Finalizado</option>
+              <template x-for="s in stages" :key="s.id">
+                <option :value="s.id" x-text="s.emoji + ' ' + s.label"></option>
+              </template>
             </select>
             <div x-show="!atendLead" style="font-size:12px;color:#8696a0;font-style:italic">Adicione ao CRM primeiro.</div>
           </div>
@@ -855,8 +852,20 @@
           <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px">
             <input type="text" x-model="crmSearch" placeholder="Buscar nome, telefone, interesse..."
               style="background:var(--card2);border:1px solid var(--border2);border-radius:8px;color:var(--tx);padding:7px 12px;font-size:12px;font-family:var(--font);outline:none;width:100%">
+            <!-- Filtro rápido por ESTÁGIO do funil -->
             <div style="display:flex;gap:6px;flex-wrap:wrap">
-              <button @click="crmFilter=''" :class="crmFilter==='' ? 'btn btn-green' : 'btn btn-ghost'" style="font-size:10px;padding:3px 9px">Todos</button>
+              <button @click="crmStageFilter=''" :class="crmStageFilter==='' ? 'btn btn-green' : 'btn btn-ghost'" style="font-size:10px;padding:3px 9px">Todos (<span x-text="leads.length"></span>)</button>
+              <template x-for="s in stages" :key="s.id">
+                <button @click="crmStageFilter = (crmStageFilter===s.id ? '' : s.id)"
+                  :class="crmStageFilter===s.id ? 'btn' : 'btn btn-ghost'"
+                  :style="`font-size:10px;padding:3px 9px;${crmStageFilter===s.id?('background:'+s.color+'22;border-color:'+s.color+';color:'+s.color):''}`">
+                  <span x-text="s.emoji"></span> <span x-text="s.label"></span> (<span x-text="stageCounts[s.id]"></span>)
+                </button>
+              </template>
+            </div>
+            <!-- Filtro rápido por TEMPERATURA -->
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button @click="crmFilter=''" :class="crmFilter==='' ? 'btn btn-green' : 'btn btn-ghost'" style="font-size:10px;padding:3px 9px">Todas</button>
               <button @click="crmFilter='QUENTE'" :class="crmFilter==='QUENTE' ? 'btn' : 'btn btn-ghost'" style="font-size:10px;padding:3px 9px;color:#ef4444">🔥 Quentes</button>
               <button @click="crmFilter='MORNO'" :class="crmFilter==='MORNO' ? 'btn' : 'btn btn-ghost'" style="font-size:10px;padding:3px 9px;color:var(--gold)">🌡️ Mornos</button>
               <button @click="crmFilter='FRIO'" :class="crmFilter==='FRIO' ? 'btn' : 'btn btn-ghost'" style="font-size:10px;padding:3px 9px;color:var(--mu)">🧊 Frios</button>
@@ -869,7 +878,12 @@
                 <div class="conv-avatar" style="width:32px;height:32px;font-size:12px;flex-shrink:0" x-text="(l.nome||l.phone).charAt(0).toUpperCase()"></div>
                 <div style="flex:1;min-width:0">
                   <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="l.nome || dispPhone(l.phone)"></div>
-                  <div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="l.interesse || dispPhone(l.phone)"></div>
+                  <div style="display:flex;align-items:center;gap:5px;margin-top:2px">
+                    <span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:8px;flex-shrink:0"
+                      :style="`background:${stageMeta(stageOf(l)).color}22;color:${stageMeta(stageOf(l)).color}`"
+                      x-text="stageMeta(stageOf(l)).emoji + ' ' + stageMeta(stageOf(l)).label"></span>
+                    <span style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="l.interesse || ''"></span>
+                  </div>
                 </div>
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
                   <span class="badge"
@@ -1677,8 +1691,9 @@
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
                   <div class="kanban-card-val" x-text="item.val"></div>
                   <div style="display:flex;align-items:center;gap:4px">
-                    <span x-show="item.kanban_movido_por==='ia'"
-                      style="font-size:9px;background:rgba(34,197,94,.15);color:var(--green);border-radius:4px;padding:1px 5px">⚡ Auto</span>
+                    <span x-show="item.auto"
+                      style="font-size:9px;background:rgba(56,189,248,.15);color:#38BDF8;border-radius:4px;padding:1px 5px"
+                      title="Classificado automaticamente pelos sinais do lead">⚡ Auto</span>
                     <span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;color:#000"
                       :style="`background:${scoreColor(item.ai_score!=null?item.ai_score:item.score||0)}`"
                       x-text="item.ai_score!=null?'⚡'+item.ai_score:item.score||0"></span>
@@ -2639,11 +2654,9 @@
         <select x-model="newLead.kanban_stage"
           style="background:var(--card2);border:1px solid var(--border2);border-radius:8px;
                  color:var(--tx);padding:8px 12px;font-size:13px;font-family:var(--font);outline:none">
-          <option value="novo">Novo Lead</option>
-          <option value="interessado">Interessado</option>
-          <option value="escolhendo">Escolhendo</option>
-          <option value="carrinho">Carrinho Montado</option>
-          <option value="pagamento">Aguardando Pgto.</option>
+          <template x-for="s in stages" :key="s.id">
+            <option :value="s.id" x-text="s.emoji + ' ' + s.label"></option>
+          </template>
         </select>
       </div>
     </div>

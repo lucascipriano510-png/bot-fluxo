@@ -2,23 +2,20 @@
    FLUXO COMMAND — App Logic + Mock Data
    ═══════════════════════════════════════════════════ */
 
-const MOCK = {
-  kanban: [
-    { id: 'novo',        label: 'Novo Lead',        color: '#38BDF8', items: [] },
-    { id: 'interessado', label: 'Interessado',       color: '#A855F7', items: [] },
-    { id: 'escolhendo',  label: 'Escolhendo',        color: '#FACC15', items: [] },
-    { id: 'carrinho',    label: 'Carrinho Montado',  color: '#F97316', items: [] },
-    { id: 'pagamento',   label: 'Aguardando Pgto.',  color: '#22C55E', items: [] },
-    { id: 'finalizado',  label: 'Finalizado',        color: '#6B7280', items: [] },
-  ],
-
-  chartData: {
-    labels: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'],
-    atendimentos: [18, 22, 31, 27, 35, 41, 27],
-    leads: [5, 8, 11, 9, 14, 18, 14],
-  },
-
-};
+/* ─────────────────────────────────────────────────────
+   Funil comercial — estágios canônicos do pipeline.
+   O estágio é DERIVADO de sinais reais do lead (compra, calor, score,
+   engajamento). O arraste manual no Kanban grava um override que prevalece.
+───────────────────────────────────────────────────── */
+const STAGES = [
+  { id: 'novo',        label: 'Novo',        emoji: '🆕', color: '#38BDF8', desc: 'Chegou agora, sem engajamento' },
+  { id: 'interessado', label: 'Interessado', emoji: '👀', color: '#A855F7', desc: 'Engajou / demonstrou interesse' },
+  { id: 'negociando',  label: 'Negociando',  emoji: '🔥', color: '#F97316', desc: 'Quente, perto de fechar' },
+  { id: 'comprou',     label: 'Comprou',     emoji: '✅', color: '#22C55E', desc: 'Cliente — já comprou' },
+  { id: 'perdido',     label: 'Perdido',     emoji: '✖️', color: '#6B7280', desc: 'Sem interesse / não respondeu' },
+];
+// Mapeia estágios antigos (modelo de e-commerce) para o novo funil.
+const LEGACY_STAGE = { escolhendo: 'interessado', carrinho: 'negociando', pagamento: 'negociando', finalizado: 'comprou' };
 
 /* ─────────────────────────────────────────────────────
    FluxoCommand — Alpine.js app factory
@@ -91,14 +88,8 @@ function FluxoCommand() {
     crmHistoryTab: 'timeline',
 
     /* kanban */
-    kanban: [
-      { id: 'novo',        label: 'Novo Lead',        color: '#38BDF8', items: [] },
-      { id: 'interessado', label: 'Interessado',       color: '#A855F7', items: [] },
-      { id: 'escolhendo',  label: 'Escolhendo',        color: '#FACC15', items: [] },
-      { id: 'carrinho',    label: 'Carrinho Montado',  color: '#F97316', items: [] },
-      { id: 'pagamento',   label: 'Aguardando Pgto.',  color: '#22C55E', items: [] },
-      { id: 'finalizado',  label: 'Finalizado',        color: '#6B7280', items: [] },
-    ],
+    crmStageFilter: '',
+    kanban: STAGES.map(s => ({ ...s, items: [], total: 0 })),
     kanbanDragId: null,
     kanbanDragStage: null,
     kanbanDragOver: null,
@@ -350,8 +341,42 @@ function FluxoCommand() {
       const q = this.crmSearch.trim().toLowerCase();
       if (q) list = list.filter(l => (l.nome||'').toLowerCase().includes(q) || (l.phone||'').includes(q) || (l.phone_real||'').includes(q) || (l.interesse||'').toLowerCase().includes(q));
       if (this.crmFilter) list = list.filter(l => (l.ai_temperatura?.toUpperCase() ?? l.status_comercial) === this.crmFilter);
+      if (this.crmStageFilter) list = list.filter(l => this.stageOf(l) === this.crmStageFilter);
       return list;
     },
+
+    // Estágios do funil expostos aos templates.
+    get stages() { return STAGES; },
+
+    // Contagem de leads por estágio (para os chips de filtro rápido).
+    get stageCounts() {
+      const c = { novo: 0, interessado: 0, negociando: 0, comprou: 0, perdido: 0 };
+      for (const l of this.leads) { const s = this.stageOf(l); if (c[s] != null) c[s]++; }
+      return c;
+    },
+
+    // Estágio efetivo do lead: respeita override manual REAL; senão, deriva dos sinais.
+    // O override real é marcado por kanban_movido_manualmente_em (o flag
+    // kanban_movido_por='manual' aparece falso/legado em toda a base).
+    stageOf(lead) {
+      if (lead.kanban_movido_manualmente_em && lead.kanban_stage) {
+        return LEGACY_STAGE[lead.kanban_stage] || lead.kanban_stage;
+      }
+      return this.deriveStage(lead);
+    },
+
+    // Classificação determinística por sinais reais (compra > calor > engajamento).
+    deriveStage(lead) {
+      if (lead.status === 'concluido' || (lead.total_purchases || 0) > 0) return 'comprou';
+      if (lead.status === 'perdido' || (lead.status_comercial || '').toUpperCase() === 'PERDIDO' || lead.kanban_stage === 'perdido') return 'perdido';
+      const temp  = (lead.ai_temperatura || lead.status_comercial || '').toUpperCase();
+      const score = lead.ai_score != null ? lead.ai_score : (lead.conversion_score || 0);
+      if (temp === 'QUENTE' || score >= 70) return 'negociando';
+      if (temp === 'MORNO'  || score >= 35 || (lead.message_count || 0) > 2) return 'interessado';
+      return 'novo';
+    },
+
+    stageMeta(id) { return STAGES.find(s => s.id === id) || STAGES[0]; },
 
     // botOn e ignorarHorario são aliases para os campos de cfg (única fonte de verdade)
     get botOn()           { return this.cfg.bot_ativo; },
@@ -1602,35 +1627,31 @@ function FluxoCommand() {
         const r = await this.authFetch('/api/leads');
         const j = await r.json();
         if (!j.ok) return;
-        const cols = [
-          { id: 'novo',        label: 'Novo Lead',       color: '#38BDF8', items: [], total: 0 },
-          { id: 'interessado', label: 'Interessado',      color: '#A855F7', items: [], total: 0 },
-          { id: 'escolhendo',  label: 'Escolhendo',       color: '#FACC15', items: [], total: 0 },
-          { id: 'carrinho',    label: 'Carrinho Montado', color: '#F97316', items: [], total: 0 },
-          { id: 'pagamento',   label: 'Aguardando Pgto.', color: '#22C55E', items: [], total: 0 },
-          { id: 'finalizado',  label: 'Finalizado',       color: '#6B7280', items: [], total: 0 },
-        ];
+        const cols  = STAGES.map(s => ({ ...s, items: [], total: 0 }));
+        const byId  = Object.fromEntries(cols.map(c => [c.id, c]));
         for (const lead of j.data) {
-          const stage = lead.kanban_stage || 'novo';
-          const col   = cols.find(c => c.id === stage) || cols[0];
+          const stage = this.stageOf(lead);
+          const col   = byId[stage] || cols[0];
           const val   = Number(lead.valor_potencial) || 0;
           col.items.push({
-            id: lead.id, name: lead.nome || lead.phone, phone: lead.phone,
+            id: lead.id, name: lead.nome || this.dispPhone(lead.phone), phone: lead.phone,
             interesse: lead.interesse || '—', val: this.fmtBRL(val), valNum: val,
             status: lead.status_comercial, score: lead.conversion_score || 0,
             ai_score:           lead.ai_score,
             ai_analisado_em:    lead.ai_analisado_em,
             ai_kanban_sugerida: lead.ai_kanban_sugerida,
             kanban_movido_por:  lead.kanban_movido_por,
-            kanban_stage:       lead.kanban_stage || 'novo',
+            kanban_stage:       stage,
+            auto:               !lead.kanban_movido_manualmente_em,
           });
           col.total += val;
         }
         this.kanban = cols;
         this.pipelineCount = cols.reduce((s, c) => s + c.items.length, 0);
         this.pipelineTotal = cols.reduce((s, c) => s + c.total, 0);
-        const finalizados  = cols.find(c => c.id === 'finalizado')?.items.length || 0;
-        this.pipelineConversion = this.pipelineCount > 0 ? Math.round((finalizados / this.pipelineCount) * 100) : 0;
+        const comprou = byId['comprou']?.items.length || 0;
+        const ativos  = this.pipelineCount - (byId['perdido']?.items.length || 0);
+        this.pipelineConversion = ativos > 0 ? Math.round((comprou / ativos) * 100) : 0;
       } catch (_) {}
     },
 
@@ -1657,7 +1678,16 @@ function FluxoCommand() {
       const item = src.items.find(i => i.id === id);
       if (!item) return;
       src.items = src.items.filter(i => i.id !== id);
+      item.kanban_stage = targetStage;
+      item.kanban_movido_por = 'manual';
+      item.auto = false;
       tgt.items.push(item);
+      // Recalcula totais das colunas afetadas.
+      src.total = src.items.reduce((s, i) => s + (i.valNum || 0), 0);
+      tgt.total = tgt.items.reduce((s, i) => s + (i.valNum || 0), 0);
+      // Reflete o override no array de leads (CRM list / contadores).
+      const lead = this.leads.find(l => l.id === id);
+      if (lead) { lead.kanban_stage = targetStage; lead.kanban_movido_por = 'manual'; lead.kanban_movido_manualmente_em = new Date().toISOString(); }
       this.kanbanDragId = null;
       this.kanbanDragStage = null;
       await this.authFetch(`/api/leads/${id}/stage`, { method: 'PATCH', body: JSON.stringify({ stage: targetStage }) });
@@ -1788,7 +1818,10 @@ function FluxoCommand() {
           method: 'PATCH',
           body: JSON.stringify({ stage }),
         });
-        this.atendLead = { ...this.atendLead, kanban_stage: stage };
+        const nowIso = new Date().toISOString();
+        this.atendLead = { ...this.atendLead, kanban_stage: stage, kanban_movido_por: 'manual', kanban_movido_manualmente_em: nowIso };
+        const lead = this.leads.find(l => l.id === this.atendLead.id);
+        if (lead) { lead.kanban_stage = stage; lead.kanban_movido_por = 'manual'; lead.kanban_movido_manualmente_em = nowIso; }
         this.loadKanban();
       } catch (_) {}
     },
