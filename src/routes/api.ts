@@ -25,6 +25,16 @@ import { syncSitePurchases } from '../services/sitePurchaseService';
 
 const router = Router();
 
+// Auth de cron: aceita header x-cron-secret (chamada manual/Render) OU
+// Authorization: Bearer <CRON_SECRET> (formato que o Vercel Cron envia).
+function cronAuthorized(req: { headers: Record<string, unknown> }): boolean {
+  const secret = process.env.CRON_SECRET || '';
+  if (!secret) return false;
+  if (req.headers['x-cron-secret'] === secret) return true;
+  const auth = String(req.headers['authorization'] || '');
+  return auth === `Bearer ${secret}`;
+}
+
 function errMsg(err: unknown): string {
   if (!err) return 'Erro desconhecido';
   if (err instanceof Error) return err.message;
@@ -1368,8 +1378,7 @@ router.post('/brain/analyze', async (req, res) => {
 });
 
 router.post('/brain/cron', async (req, res) => {
-  const secret = req.headers['x-cron-secret'];
-  if (secret !== process.env.CRON_SECRET) {
+  if (!cronAuthorized(req)) {
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
   }
   try {
@@ -1382,7 +1391,9 @@ router.post('/brain/cron', async (req, res) => {
       const result = await runStoreAnalysis(store.id);
       results.push({ storeId: store.id, ...result });
     }
-    res.json({ ok: true, results });
+    // Sincroniza compras do site → CRM no mesmo ciclo agendado (idempotente).
+    const siteSync = await syncSitePurchases().catch((e) => ({ ok: false, error: String(e?.message || e) }));
+    res.json({ ok: true, results, siteSync });
   } catch (err: unknown) {
     res.json({ ok: false, error: errMsg(err) });
   }
@@ -1392,8 +1403,7 @@ router.post('/brain/cron', async (req, res) => {
 // Lê os pedidos finalizados/cancelados do site (read-only) e liga aos leads do
 // CRM pelo telefone. Idempotente. Autenticado por CRON_SECRET, igual a /brain/cron.
 router.post('/integrations/site-purchases/sync', async (req, res) => {
-  const secret = req.headers['x-cron-secret'];
-  if (secret !== process.env.CRON_SECRET) {
+  if (!cronAuthorized(req)) {
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
   }
   try {
