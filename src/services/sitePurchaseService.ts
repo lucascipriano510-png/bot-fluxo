@@ -16,7 +16,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { supabase } from '../lib/supabase';
-import { normalizePhone } from '../utils/phone';
+import { normalizePhone, phoneVariants } from '../utils/phone';
 import { updateLeadScore } from '../services/leadScoreService';
 import { recordConversion } from '../services/storeBrainService';
 import { fetchSiteOrders, summarizeOrderItems } from '../inventory/sitePurchasesBridge';
@@ -116,14 +116,16 @@ export async function linkSitePurchaseToLead(input: SitePurchaseInput): Promise<
     .maybeSingle();
   if (dup) return { status: 'duplicate' };
 
-  // Acha o lead pelo TELEFONE REAL (phone_real). Fallback para `phone` cobre
-  // leads que já nasceram com número real (ex: origem 'site'). Leads de
-  // WhatsApp guardam o LID em `phone`, por isso o casamento é via phone_real.
+  // Acha o lead pelo TELEFONE REAL (phone_real), tolerante ao 9º dígito.
+  // Fallback para `phone` cobre leads que já nasceram com número real (origem
+  // 'site'). Leads de WhatsApp guardam o LID em `phone` e o número em phone_real.
+  const variants = phoneVariants(phone);
+  const inList = `(${variants.join(',')})`;
   const { data: matches } = await supabase
     .from('bot_leads')
     .select('id, total_purchases, lifetime_value')
     .eq('store_id', storeId)
-    .or(`phone_real.eq.${phone},phone.eq.${phone}`)
+    .or(`phone_real.in.${inList},phone.in.${inList}`)
     .limit(1);
   let lead = matches?.[0] || null;
 

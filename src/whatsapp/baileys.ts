@@ -36,17 +36,6 @@ function formatPhone(raw: string): string {
   return digits ? `+${digits}` : raw;
 }
 
-function resolveName(msg: any, phone: string): string {
-  if (msg.pushName) return msg.pushName;
-  const jid = msg.key.remoteJid || '';
-  if (_socket?.contacts) {
-    const c = _socket.contacts[jid];
-    if (c?.name) return c.name;
-    if (c?.notify) return c.notify;
-  }
-  return formatPhone(phone);
-}
-
 // Resolve o TELEFONE REAL (PN) a partir da mensagem, mesmo quando o WhatsApp
 // endereça por LID (remoteJid termina em @lid e esconde o número).
 //   1) Se remoteJid já é @s.whatsapp.net → é o próprio número.
@@ -95,10 +84,7 @@ async function upsertLeadFromInbox(
         last_message_at: now,
         message_count:   (existing.message_count || 0) + 1,
       };
-      // Atualiza nome se antes era só o número e agora temos pushName
-      if (name && name !== phone && (!existing.nome || existing.nome === phone)) {
-        updates.nome = name;
-      }
+      // MODO TEMPORÁRIO: não sobrescrever/auto-preencher o nome — fica manual.
       // Preenche o telefone real assim que conseguimos resolvê-lo (backfill incremental)
       if (phoneReal && !existing.phone_real) {
         updates.phone_real = phoneReal;
@@ -311,8 +297,10 @@ export async function initBaileys(storeId: string): Promise<void> {
         }
 
         // Mensagem recebida — comportamento completo
-        const name = resolveName(msg, phone);
         const phoneReal = await resolvePhoneReal(msg);
+        // MODO TEMPORÁRIO: não puxar o pushName do WhatsApp. O lead chega só com o
+        // número (real, quando resolvido); o nome é preenchido manualmente no inbox.
+        const name = formatPhone(phoneReal || phone);
         const leadId = await upsertLeadFromInbox(storeId, phone, name, text, phoneReal);
 
         await supabase.from('wa_messages').insert({
