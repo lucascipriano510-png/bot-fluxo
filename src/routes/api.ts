@@ -441,7 +441,7 @@ router.post('/leads/:id/convert', async (req, res) => {
   try {
     const { error } = await supabase
       .from('bot_leads')
-      .update({ status: 'concluido', status_comercial: 'CONVERTIDO', kanban_stage: 'finalizado', atualizado_em: new Date().toISOString() })
+      .update({ status: 'concluido', status_comercial: 'QUENTE', kanban_stage: 'finalizado', atualizado_em: new Date().toISOString() })
       .eq('id', req.params.id)
       .eq('store_id', req.storeId!);
     if (error) throw error;

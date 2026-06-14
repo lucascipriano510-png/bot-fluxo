@@ -140,7 +140,7 @@ export async function linkSitePurchaseToLead(input: SitePurchaseInput): Promise<
         nome:             input.name?.trim() || null,
         origem:           'site',
         status:           'concluido',
-        status_comercial: 'CONVERTIDO',
+        status_comercial: 'QUENTE',
         kanban_stage:     'finalizado',
         first_contact_at: when,
         last_interaction_at: when,
@@ -178,7 +178,7 @@ export async function linkSitePurchaseToLead(input: SitePurchaseInput): Promise<
       total_purchases:  (lead.total_purchases || 0) + 1,
       lifetime_value:   Number(lead.lifetime_value || 0) + Number(input.value || 0),
       status:           'concluido',
-      status_comercial: 'CONVERTIDO',
+      status_comercial: 'QUENTE',
       kanban_stage:     'finalizado',
       atualizado_em:    new Date().toISOString(),
     })
