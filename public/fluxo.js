@@ -390,6 +390,18 @@ function FluxoCommand() {
     get leadsMornos()  { return this.leads.filter(l => (l.ai_temperatura?.toUpperCase() ?? l.status_comercial) === 'MORNO').length; },
     get leadsFrios()   { return this.leads.filter(l => (l.ai_temperatura?.toUpperCase() ?? l.status_comercial) === 'FRIO').length; },
 
+    /* KPIs comerciais — faturamento e clientes (vindos das compras ligadas) */
+    get totalRevenue()  { return this.leads.reduce((s, l) => s + Number(l.lifetime_value || 0), 0); },
+    get totalClientes() { return this.leads.filter(l => (l.total_purchases || 0) > 0).length; },
+    get ticketMedio()   { const c = this.totalClientes; return c > 0 ? this.totalRevenue / c : 0; },
+    get taxaConversao() { return this.leads.length > 0 ? Math.round((this.totalClientes / this.leads.length) * 100) : 0; },
+    // Leads "pra agir agora": quentes/negociando que ainda não compraram.
+    get leadsParaAgir() {
+      return this.leads
+        .filter(l => (l.total_purchases || 0) === 0 && this.stageOf(l) === 'negociando')
+        .sort((a, b) => (b.ai_score ?? b.conversion_score ?? 0) - (a.ai_score ?? a.conversion_score ?? 0));
+    },
+
     get filteredProducts() {
       let list = this.products;
       const q = this.productSearch.trim().toLowerCase();

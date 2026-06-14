@@ -281,6 +281,25 @@
 
       <!-- Metrics -->
       <div class="metrics-row">
+        <div class="metric-card" style="cursor:pointer" @click="navigate('leads'); crmStageFilter='comprou'">
+          <div class="metric-top">
+            <div class="metric-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+          </div>
+          <div class="metric-val" x-text="fmtBRL(totalRevenue)"></div>
+          <div class="metric-label">Faturamento</div>
+          <div class="metric-sub" x-text="totalClientes + ' clientes · ticket ' + fmtBRL(ticketMedio)"></div>
+        </div>
+
+        <div class="metric-card blue" style="cursor:pointer" @click="navigate('leads'); crmStageFilter='comprou'">
+          <div class="metric-top">
+            <div class="metric-icon"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+            <span class="metric-delta" x-text="taxaConversao + '%'"></span>
+          </div>
+          <div class="metric-val" x-text="totalClientes"></div>
+          <div class="metric-label">Clientes</div>
+          <div class="metric-sub" x-text="taxaConversao + '% de conversão dos leads'"></div>
+        </div>
+
         <div class="metric-card">
           <div class="metric-top">
             <div class="metric-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
@@ -335,6 +354,30 @@
               <a :href="crmWhatsApp(lead.phone)" target="_blank" class="btn btn-green" style="font-size:11px;padding:4px 10px">WhatsApp</a>
               <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" @click="navigate('leads'); $nextTick(() => { const l = leads.find(x=>x.id===lead.id); if(l) selectCrmLead(l); })">CRM</button>
               <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" @click="followupDone(lead.id, 3)">✓ Feito</button>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Agir agora: leads quentes em negociação prontos pra fechar -->
+      <div x-show="leadsParaAgir.length > 0"
+        style="background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.3);border-radius:12px;padding:16px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:13px;font-weight:700;color:#f97316">🔥 Pra fechar agora — <span x-text="leadsParaAgir.length"></span> em negociação</div>
+          <button class="btn btn-ghost" @click="navigate('leads'); crmStageFilter='negociando'" style="font-size:11px;padding:4px 10px">Ver todos</button>
+        </div>
+        <template x-for="lead in leadsParaAgir.slice(0,5)" :key="lead.id">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+            <div style="min-width:0">
+              <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="lead.nome || dispPhone(lead.phone)"></div>
+              <div style="font-size:11px;color:var(--mu)" x-text="(lead.interesse || 'Sem interesse registrado') + (lead.valor_potencial ? ' · ' + fmtBRL(lead.valor_potencial) : '')"></div>
+            </div>
+            <div style="display:flex;gap:6px;flex-shrink:0">
+              <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;color:#000;align-self:center"
+                :style="`background:${scoreColor(lead.ai_score!=null?lead.ai_score:lead.conversion_score||0)}`"
+                x-text="'⚡' + (lead.ai_score!=null?lead.ai_score:lead.conversion_score||0)"></span>
+              <a :href="crmWhatsApp(lead.phone)" target="_blank" class="btn btn-green" style="font-size:11px;padding:4px 10px">WhatsApp</a>
+              <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" @click="navigate('leads'); $nextTick(() => { const l = leads.find(x=>x.id===lead.id); if(l) selectCrmLead(l); })">CRM</button>
             </div>
           </div>
         </template>
@@ -437,9 +480,24 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">Produtos mais perguntados</div></div>
-          <div style="padding:24px;text-align:center;color:var(--mu);font-size:12px;line-height:1.6">
-            Disponível após as primeiras conversas.<br>Os produtos mais buscados aparecem aqui automaticamente.
+          <div class="card-header">
+            <div class="card-title">Funil de vendas</div>
+            <button class="btn btn-ghost" @click="navigate('kanban')" style="font-size:11px;padding:5px 10px">Abrir Kanban</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:11px;padding-top:2px">
+            <template x-for="s in stages" :key="s.id">
+              <div style="cursor:pointer" @click="navigate('leads'); crmStageFilter = s.id"
+                :title="s.desc">
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">
+                  <span x-text="s.emoji + ' ' + s.label"></span>
+                  <span style="font-weight:700" x-text="stageCounts[s.id]"></span>
+                </div>
+                <div style="height:8px;background:rgba(255,255,255,.05);border-radius:6px;overflow:hidden">
+                  <div style="height:100%;border-radius:6px;transition:width .35s ease"
+                    :style="`width:${leads.length ? Math.round(stageCounts[s.id]/leads.length*100) : 0}%;background:${s.color}`"></div>
+                </div>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -1701,7 +1759,7 @@
                   </div>
                 </div>
                 <!-- sugestão de coluna diferente -->
-                <div x-show="item.ai_kanban_sugerida && item.ai_kanban_sugerida !== item.kanban_stage"
+                <div x-show="item.ai_kanban_sugerida && item.ai_kanban_sugerida !== 'novo' && item.ai_kanban_sugerida !== item.kanban_stage"
                   @click.stop="kanbanMoveToSuggested(item.id, item.ai_kanban_sugerida)"
                   style="margin-top:6px;font-size:10px;color:#f97316;cursor:pointer;background:rgba(249,115,22,.08);border-radius:4px;padding:2px 6px"
                   :title="`IA sugere mover para: ${item.ai_kanban_sugerida}`">
