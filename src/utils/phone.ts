@@ -7,6 +7,20 @@ export function normalizePhone(raw: string): string {
   return digits;
 }
 
+// Canonicaliza um celular BR para o formato de 13 dígitos COM o 9º dígito
+// (55 + DDD + 9 + 8 dígitos). O WhatsApp às vezes devolve o número sem o 9
+// (12 dígitos) — como WhatsApp é sempre celular, reinserimos o 9. É o formato
+// que o WhatsApp/Meta usam. Números já com 9 (13 díg) ou não-BR passam intactos.
+export function canonicalMobileBR(raw: string): string {
+  const d = normalizePhone(raw);
+  if (d.startsWith('55')) {
+    const ddd = d.slice(2, 4);
+    const sub = d.slice(4);
+    if (sub.length === 8) return '55' + ddd + '9' + sub;
+  }
+  return d;
+}
+
 // Variantes de um telefone BR tolerantes ao 9º dígito do celular.
 // O site guarda 13 dígitos (55+DDD+9XXXXXXXX) e o WhatsApp às vezes devolve 12
 // (55+DDD+XXXXXXXX, sem o 9). Para casar os dois, geramos ambas as formas.

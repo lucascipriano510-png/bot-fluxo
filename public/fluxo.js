@@ -1198,10 +1198,16 @@ function FluxoCommand() {
     realPhone(p) {
       if (!p) return '';
       const lead = (this.leadByPhone && this.leadByPhone[p]) || this.leads.find(l => l.phone === p);
-      if (lead && lead.phone_real) return lead.phone_real;
-      const digits = String(p).replace(/\D/g, '');
-      if (digits.length >= 14) return digits; // LID puro sem mapeamento conhecido
-      return this.normalizePhone(p);
+      let real = (lead && lead.phone_real) ? lead.phone_real : '';
+      if (!real) {
+        const digits = String(p).replace(/\D/g, '');
+        if (digits.length >= 14) return digits; // LID puro sem mapeamento conhecido
+        real = this.normalizePhone(p);
+      }
+      // Canonicaliza celular BR: reinsere o 9º dígito se vier sem (12 → 13 díg).
+      const d = String(real).replace(/\D/g, '');
+      if (d.startsWith('55') && d.length === 12) return '55' + d.slice(2, 4) + '9' + d.slice(4);
+      return d;
     },
     fmtPhone(raw) {
       const d = String(raw || '').replace(/\D/g, '');
@@ -1209,7 +1215,7 @@ function FluxoCommand() {
         const ddd = d.slice(2, 4);
         const num = d.slice(4);
         const f = num.length === 9 ? `${num.slice(0, 5)}-${num.slice(5)}` : `${num.slice(0, 4)}-${num.slice(4)}`;
-        return `(${ddd}) ${f}`;
+        return `+55 ${ddd} ${f}`;
       }
       return raw || '';
     },

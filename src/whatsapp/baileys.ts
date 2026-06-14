@@ -4,7 +4,7 @@
 
 import { supabase } from '../lib/supabase';
 import qrcode from 'qrcode';
-import { normalizePhone } from '../utils/phone';
+import { normalizePhone, canonicalMobileBR } from '../utils/phone';
 
 export type WaStatus = 'connected' | 'qr_pending' | 'disconnected' | 'unavailable';
 
@@ -46,14 +46,14 @@ async function resolvePhoneReal(msg: any): Promise<string | null> {
   try {
     const jid: string = msg?.key?.remoteJid || '';
     if (!jid) return null;
-    if (jid.endsWith('@s.whatsapp.net')) return normalizePhone(jid);
+    if (jid.endsWith('@s.whatsapp.net')) return canonicalMobileBR(jid);
 
     if (jid.endsWith('@lid')) {
       const alt: string = msg?.key?.remoteJidAlt || '';
-      if (alt.endsWith('@s.whatsapp.net')) return normalizePhone(alt);
+      if (alt.endsWith('@s.whatsapp.net')) return canonicalMobileBR(alt);
 
       const pnJid: string | null = await _socket?.signalRepository?.lidMapping?.getPNForLID?.(jid);
-      if (pnJid && pnJid.endsWith('@s.whatsapp.net')) return normalizePhone(pnJid);
+      if (pnJid && pnJid.endsWith('@s.whatsapp.net')) return canonicalMobileBR(pnJid);
     }
   } catch (err) {
     console.warn('[Baileys] resolvePhoneReal falhou:', (err as Error)?.message);
