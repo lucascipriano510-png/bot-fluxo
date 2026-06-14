@@ -5,7 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "node scripts/build-html.js && tsc",
+    "build:html": "node scripts/build-html.js",
     "start": "node dist/index.js",
     "simulate": "tsx src/simulate.ts",
     "safe-ship": "node scripts/safe-ship.js",

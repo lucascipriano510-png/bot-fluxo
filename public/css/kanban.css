@@ -1,0 +1,85 @@
+/* ── Kanban — estilos da feature (pareado com js/kanban.js) ───────────────── */
+.kanban-wrap {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  align-items: flex-start;
+  padding-bottom: 12px;
+  /* Altura de viewport: mantém a barra horizontal sempre acessível e
+     evita que uma coluna cheia estique a página inteira. */
+  height: calc(100dvh - var(--hh) - 150px);
+  min-height: 360px;
+}
+
+.kanban-col {
+  flex: 0 0 280px;
+  min-width: 280px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+/* Área rolável dos cards — cada coluna rola por conta própria. */
+.kanban-col-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 -6px;
+  padding: 0 6px;
+}
+
+.kanban-col-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.kanban-col-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tx);
+}
+
+.kanban-count {
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255,255,255,.07);
+  color: var(--mu);
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+.kanban-card {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 11px 12px;
+  margin-bottom: 8px;
+  cursor: grab;
+  transition: all .15s;
+}
+
+.kanban-card:hover { border-color: var(--border2); transform: translateY(-1px); }
+.kanban-card-name { font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+.kanban-card-info { font-size: 11px; color: var(--mu); }
+.kanban-card-val { font-size: 12px; font-weight: 700; color: var(--gold); margin-top: 8px; }
+
+/* Drag-over highlight */
+.kanban-drag-over {
+  border-color: var(--accent-border) !important;
+  background: var(--accent-bg) !important;
+  border-style: dashed !important;
+}
+
+.kanban-card { user-select: none; }
+.kanban-card:active { opacity: .7; cursor: grabbing; }
+
+@media (max-width: 768px) {
+  .kanban-wrap { padding-bottom: 16px; }
+}
