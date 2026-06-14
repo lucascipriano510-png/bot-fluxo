@@ -328,7 +328,7 @@
         <template x-for="lead in followupToday.slice(0,5)" :key="lead.id">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)">
             <div>
-              <div style="font-size:13px;font-weight:600" x-text="lead.nome || lead.phone"></div>
+              <div style="font-size:13px;font-weight:600" x-text="lead.nome || dispPhone(lead.phone)"></div>
               <div style="font-size:11px;color:var(--mu)" x-text="lead.interesse || '—'"></div>
             </div>
             <div style="display:flex;gap:6px">
@@ -404,7 +404,7 @@
               <div class="conv-item" @click="navigate('atendimentos'); selectedConv = c.id">
                 <div class="conv-avatar" x-text="c.avatar || c.name?.charAt(0)"></div>
                 <div class="conv-info">
-                  <div class="conv-name" x-text="c.name || c.phone"></div>
+                  <div class="conv-name" x-text="c.name || dispPhone(c.phone)"></div>
                   <div class="conv-msg" x-text="c.msg || c.node"></div>
                 </div>
                 <div class="conv-meta">
@@ -601,7 +601,7 @@
                   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
                     <div style="display:flex;align-items:center;gap:5px;min-width:0">
                       <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:#25d366;flex-shrink:0"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.106.549 4.085 1.513 5.8L0 24l6.37-1.49A11.96 11.96 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.854 0-3.6-.502-5.1-1.378l-.364-.217-3.78.885.914-3.686-.236-.374A9.94 9.94 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-                      <span style="font-size:17px;font-weight:400;color:#e9edef;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" x-text="c.name||c.phone"></span>
+                      <span style="font-size:17px;font-weight:400;color:#e9edef;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" x-text="c.name||dispPhone(c.phone)"></span>
                     </div>
                     <span style="font-size:12px;color:#8696a0;flex-shrink:0;margin-left:8px" x-text="fmtTime(c.last_time||c.atualizado_em)"></span>
                   </div>
@@ -651,7 +651,7 @@
                 <div style="width:40px;height:40px;border-radius:50%;background:#2a3942;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#e9edef;flex-shrink:0"
                   x-text="(currentConv?.name||currentConv?.phone||'?').charAt(0).toUpperCase()"></div>
                 <div style="flex:1;min-width:0">
-                  <div style="font-size:15px;font-weight:600;color:#e9edef;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" x-text="currentConv?.name||currentConv?.phone||atendPhone"></div>
+                  <div style="font-size:15px;font-weight:600;color:#e9edef;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" x-text="currentConv?.name||dispPhone(currentConv?.phone||atendPhone)"></div>
                   <div style="font-size:13px;color:#8696a0" x-text="atendHumano?'Humano ativo':'Bot respondendo'"></div>
                 </div>
                 <div style="display:flex;gap:10px;align-items:center">
@@ -723,8 +723,8 @@
           <div style="padding:24px 16px;border-bottom:1px solid #2a3942;text-align:center">
             <div style="width:80px;height:80px;border-radius:50%;background:#6b7280;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#fff;margin:0 auto 12px"
               x-text="(currentConv?.name||currentConv?.phone||'?').charAt(0).toUpperCase()"></div>
-            <div style="font-size:20px;font-weight:700;color:#e9edef;margin-bottom:4px" x-text="currentConv?.name||currentConv?.phone||atendPhone"></div>
-            <div style="font-size:14px;color:#8696a0;margin-bottom:10px" x-text="currentConv?.phone||atendPhone||'—'"></div>
+            <div style="font-size:20px;font-weight:700;color:#e9edef;margin-bottom:4px" x-text="currentConv?.name||dispPhone(currentConv?.phone||atendPhone)"></div>
+            <div style="font-size:14px;color:#8696a0;margin-bottom:10px" x-text="dispPhone(currentConv?.phone||atendPhone)||'—'"></div>
             <span class="badge" :class="statusColor(atendLead?.status_comercial)" style="font-size:13px;padding:4px 14px;border-radius:12px" x-text="atendLead?.status_comercial||'FRIO'"></span>
           </div>
 
@@ -868,8 +868,8 @@
               <div class="crm-lead-item" :class="{ selected: crmLead?.id === l.id }" @click="selectCrmLead(l)">
                 <div class="conv-avatar" style="width:32px;height:32px;font-size:12px;flex-shrink:0" x-text="(l.nome||l.phone).charAt(0).toUpperCase()"></div>
                 <div style="flex:1;min-width:0">
-                  <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="l.nome || l.phone"></div>
-                  <div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="l.interesse || l.phone"></div>
+                  <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="l.nome || dispPhone(l.phone)"></div>
+                  <div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="l.interesse || dispPhone(l.phone)"></div>
                 </div>
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
                   <span class="badge"
@@ -916,8 +916,8 @@
                   <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700" x-text="crmLead.ai_score ?? crmLead.conversion_score ?? 0"></div>
                 </div>
                 <div style="flex:1">
-                  <div style="font-size:15px;font-weight:700" x-text="crmLead.nome || crmLead.phone"></div>
-                  <div style="font-size:12px;color:var(--mu)" x-text="crmLead.phone"></div>
+                  <div style="font-size:15px;font-weight:700" x-text="crmLead.nome || dispPhone(crmLead.phone)"></div>
+                  <div style="font-size:12px;color:var(--mu)" x-text="dispPhone(crmLead.phone)"></div>
                   <div style="font-size:11px;font-weight:600;margin-top:2px"
                     :style="`color:${scoreColor(crmLead.ai_score ?? crmLead.conversion_score ?? 0)}`"
                     x-text="(crmLead.ai_temperatura ?? crmLead.status_comercial ?? 'Frio') + ' · score ' + (crmLead.ai_score ?? crmLead.conversion_score ?? 0)"></div>
@@ -1672,7 +1672,7 @@
                   <div class="kanban-card-name" x-text="item.name"></div>
                   <span class="badge" :class="statusColor(item.status)" style="font-size:9px" x-text="item.status"></span>
                 </div>
-                <div class="kanban-card-info" x-text="item.phone"></div>
+                <div class="kanban-card-info" x-text="dispPhone(item.phone)"></div>
                 <div class="kanban-card-info" style="margin-top:4px" x-text="item.interesse"></div>
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
                   <div class="kanban-card-val" x-text="item.val"></div>
@@ -2373,7 +2373,7 @@
                   x-text="(c.name||c.phone).charAt(0).toUpperCase()"></div>
                 <div style="flex:1;min-width:0">
                   <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">
-                    <div style="font-size:15px;font-weight:500;color:#e9edef;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" x-text="c.name||c.phone"></div>
+                    <div style="font-size:15px;font-weight:500;color:#e9edef;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" x-text="c.name||dispPhone(c.phone)"></div>
                     <div style="font-size:12px;flex-shrink:0;margin-left:8px" :style="c.unread_count>0?'color:#00a884':'color:#8696a0'" x-text="fmtTime(c.last_time)"></div>
                   </div>
                   <div style="display:flex;justify-content:space-between;align-items:center">
@@ -2404,7 +2404,7 @@
                       </div>
                       <div style="flex:1;min-width:0">
                         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">
-                          <div style="font-size:15px;font-weight:500;color:#e9edef;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" x-text="c.name||c.phone"></div>
+                          <div style="font-size:15px;font-weight:500;color:#e9edef;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" x-text="c.name||dispPhone(c.phone)"></div>
                           <div style="font-size:12px;flex-shrink:0;margin-left:8px;color:#8696a0" x-text="fmtTime(c.last_time)"></div>
                         </div>
                         <div style="font-size:13px;color:#8696a0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="c.last_message||'—'"></div>

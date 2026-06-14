@@ -293,7 +293,7 @@ function FluxoCommand() {
       );
       const q = this.inboxSearch.trim().toLowerCase();
       if (q) result = result.filter(c =>
-        (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q)
+        (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q) || (this.realPhone(c.phone) || '').includes(q)
       );
       if (this.inboxFilter === 'nao_lidos') result = result.filter(c => (c.unread || 0) > 0);
       if (this.inboxFilter === 'bot')       result = result.filter(c => !c.humano_ativo);
@@ -348,7 +348,7 @@ function FluxoCommand() {
     get crmFilteredLeads() {
       let list = this.leads;
       const q = this.crmSearch.trim().toLowerCase();
-      if (q) list = list.filter(l => (l.nome||'').toLowerCase().includes(q) || (l.phone||'').includes(q) || (l.interesse||'').toLowerCase().includes(q));
+      if (q) list = list.filter(l => (l.nome||'').toLowerCase().includes(q) || (l.phone||'').includes(q) || (l.phone_real||'').includes(q) || (l.interesse||'').toLowerCase().includes(q));
       if (this.crmFilter) list = list.filter(l => (l.ai_temperatura?.toUpperCase() ?? l.status_comercial) === this.crmFilter);
       return list;
     },
@@ -1192,6 +1192,29 @@ function FluxoCommand() {
       return digits;
     },
 
+    // O WhatsApp endereça por LID: a coluna `phone` guarda o LID, e o número real
+    // fica em `phone_real`. Estes helpers resolvem/formatam o número REAL para exibição
+    // (o `phone`/LID continua sendo a chave técnica de seleção das conversas).
+    realPhone(p) {
+      if (!p) return '';
+      const lead = (this.leadByPhone && this.leadByPhone[p]) || this.leads.find(l => l.phone === p);
+      if (lead && lead.phone_real) return lead.phone_real;
+      const digits = String(p).replace(/\D/g, '');
+      if (digits.length >= 14) return digits; // LID puro sem mapeamento conhecido
+      return this.normalizePhone(p);
+    },
+    fmtPhone(raw) {
+      const d = String(raw || '').replace(/\D/g, '');
+      if (d.startsWith('55') && d.length >= 12) {
+        const ddd = d.slice(2, 4);
+        const num = d.slice(4);
+        const f = num.length === 9 ? `${num.slice(0, 5)}-${num.slice(5)}` : `${num.slice(0, 4)}-${num.slice(4)}`;
+        return `(${ddd}) ${f}`;
+      }
+      return raw || '';
+    },
+    dispPhone(p) { return this.fmtPhone(this.realPhone(p)); },
+
     async addConvToCrm() {
       if (!this.atendPhone || this.addingToCrm) return;
       this.addingToCrm   = true;
@@ -1475,7 +1498,8 @@ function FluxoCommand() {
     },
 
     crmWhatsApp(phone) {
-      let n = (phone || '').replace(/\D/g, '');
+      // Usa o número REAL (não o LID) para o link funcionar no WhatsApp.
+      let n = (this.realPhone(phone) || '').replace(/\D/g, '');
       if (n && !n.startsWith('55')) n = '55' + n;
       return n ? `https://wa.me/${n}` : '#';
     },
