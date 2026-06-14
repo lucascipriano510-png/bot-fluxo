@@ -854,15 +854,18 @@ router.get('/reports', async (req, res) => {
     const storeId = req.storeId!;
     const since7  = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    const [{ data: msgs7 }, { data: leads7 }, { data: allLeads }] = await Promise.all([
+    const [{ data: msgs7 }, { data: leads7 }, { data: allLeads }, { data: purch7 }, { data: allPurch }] = await Promise.all([
       supabase.from('bot_mensagens').select('criado_em,direcao').eq('store_id', storeId).gte('criado_em', since7),
       supabase.from('bot_leads').select('criado_em').eq('store_id', storeId).gte('criado_em', since7),
-      supabase.from('bot_leads').select('status').eq('store_id', storeId),
+      supabase.from('bot_leads').select('status, total_purchases, lifetime_value').eq('store_id', storeId),
+      supabase.from('lead_purchases').select('valor, data_compra, refunded_at').eq('store_id', storeId).gte('data_compra', since7),
+      supabase.from('lead_purchases').select('valor, refunded_at').eq('store_id', storeId),
     ]);
 
     const labels: string[]  = [];
     const atendArr: number[] = [];
     const leadsArr: number[] = [];
+    const fatArr: number[]   = [];
     const daysOfWeek = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
     for (let i = 6; i >= 0; i--) {
       const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
@@ -870,7 +873,16 @@ router.get('/reports', async (req, res) => {
       const day = d.toISOString().slice(0, 10);
       atendArr.push((msgs7 || []).filter(m => m.direcao === 'entrada' && m.criado_em?.startsWith(day)).length);
       leadsArr.push((leads7 || []).filter(l => l.criado_em?.startsWith(day)).length);
+      fatArr.push((purch7 || [])
+        .filter(p => !p.refunded_at && p.data_compra?.startsWith(day))
+        .reduce((s, p) => s + Number(p.valor || 0), 0));
     }
+
+    // Resumo comercial (vendas ligadas pelo CRM)
+    const revenueTotal = (allPurch || []).filter(p => !p.refunded_at).reduce((s, p) => s + Number(p.valor || 0), 0);
+    const clientes     = (allLeads || []).filter(l => (l.total_purchases || 0) > 0).length;
+    const ticketMedio  = clientes > 0 ? revenueTotal / clientes : 0;
+    const conversao    = (allLeads || []).length > 0 ? Math.round((clientes / (allLeads || []).length) * 100) : 0;
 
     const inbound  = (msgs7 || []).filter(m => m.direcao === 'entrada').length;
     const outbound = (msgs7 || []).filter(m => m.direcao === 'saida').length;
@@ -894,10 +906,15 @@ router.get('/reports', async (req, res) => {
         labels,
         atendimentos: atendArr,
         leads: leadsArr,
+        faturamento: fatArr,
         taxaResposta,
         peakHour: peakHour !== null ? `${peakHour}h` : '—',
         pctEncaminhados: pctEncam,
         totalMensagens: inbound,
+        revenueTotal,
+        clientes,
+        ticketMedio,
+        conversao,
       },
     });
   } catch (err: unknown) {

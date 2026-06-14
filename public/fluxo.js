@@ -1952,6 +1952,31 @@ function FluxoCommand() {
           options: opts,
         });
       }
+
+      const c3 = document.getElementById('chart-receita');
+      if (c3) {
+        if (c3._chart) { c3._chart.destroy(); c3._chart = null; }
+        c3._chart = new Chart(c3, {
+          type: 'bar',
+          data: {
+            labels: d.labels,
+            datasets: [{
+              data: d.faturamento || [0,0,0,0,0,0,0],
+              backgroundColor: 'rgba(56,189,248,0.30)',
+              borderColor: '#38BDF8',
+              borderWidth: 2,
+              borderRadius: 6,
+            }],
+          },
+          options: {
+            ...opts,
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: (ctx) => 'R$ ' + Number(ctx.raw || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) } },
+            },
+          },
+        });
+      }
     },
 
     /* helpers */
