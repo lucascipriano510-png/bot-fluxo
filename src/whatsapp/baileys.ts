@@ -47,18 +47,44 @@ function resolveName(msg: any, phone: string): string {
   return formatPhone(phone);
 }
 
+// Resolve o TELEFONE REAL (PN) a partir da mensagem, mesmo quando o WhatsApp
+// endereça por LID (remoteJid termina em @lid e esconde o número).
+//   1) Se remoteJid já é @s.whatsapp.net → é o próprio número.
+//   2) Se é @lid → usa remoteJidAlt (o JID de telefone que o servidor manda junto).
+//   3) Fallback → consulta o mapeamento LID→PN do Baileys.
+// Retorna dígitos normalizados (55+DDD+número) ou null se não conseguir resolver.
+async function resolvePhoneReal(msg: any): Promise<string | null> {
+  try {
+    const jid: string = msg?.key?.remoteJid || '';
+    if (!jid) return null;
+    if (jid.endsWith('@s.whatsapp.net')) return normalizePhone(jid);
+
+    if (jid.endsWith('@lid')) {
+      const alt: string = msg?.key?.remoteJidAlt || '';
+      if (alt.endsWith('@s.whatsapp.net')) return normalizePhone(alt);
+
+      const pnJid: string | null = await _socket?.signalRepository?.lidMapping?.getPNForLID?.(jid);
+      if (pnJid && pnJid.endsWith('@s.whatsapp.net')) return normalizePhone(pnJid);
+    }
+  } catch (err) {
+    console.warn('[Baileys] resolvePhoneReal falhou:', (err as Error)?.message);
+  }
+  return null;
+}
+
 async function upsertLeadFromInbox(
   storeId: string,
   phone: string,
   name: string,
   firstMessage: string,
+  phoneReal?: string | null,
 ): Promise<string | null> {
   try {
     const now = new Date().toISOString();
 
     const { data: existing } = await supabase
       .from('bot_leads')
-      .select('id, nome, message_count')
+      .select('id, nome, message_count, phone_real')
       .eq('store_id', storeId)
       .eq('phone', phone)
       .maybeSingle();
@@ -73,6 +99,10 @@ async function upsertLeadFromInbox(
       if (name && name !== phone && (!existing.nome || existing.nome === phone)) {
         updates.nome = name;
       }
+      // Preenche o telefone real assim que conseguimos resolvê-lo (backfill incremental)
+      if (phoneReal && !existing.phone_real) {
+        updates.phone_real = phoneReal;
+      }
       await supabase.from('bot_leads').update(updates).eq('id', existing.id);
       console.log('[CRM] Lead atualizado:', phone, '| msgs:', updates.message_count);
       return existing.id as string;
@@ -81,6 +111,7 @@ async function upsertLeadFromInbox(
     const { data: created, error: insertErr } = await supabase.from('bot_leads').insert({
       store_id:         storeId,
       phone,
+      phone_real:       phoneReal || null,
       nome:             name,
       origem:           'whatsapp_inbox',
       status_comercial: 'FRIO',
@@ -281,7 +312,8 @@ export async function initBaileys(storeId: string): Promise<void> {
 
         // Mensagem recebida — comportamento completo
         const name = resolveName(msg, phone);
-        const leadId = await upsertLeadFromInbox(storeId, phone, name, text);
+        const phoneReal = await resolvePhoneReal(msg);
+        const leadId = await upsertLeadFromInbox(storeId, phone, name, text, phoneReal);
 
         await supabase.from('wa_messages').insert({
           store_id: storeId, phone, direction: 'in', text, timestamp: ts, lead_id: leadId,

@@ -21,6 +21,7 @@ import { recordConversion } from '../services/storeBrainService';
 import { initBaileys, getWaState, sendWaMessage, disconnectBaileys } from '../whatsapp/baileys';
 import { updateLeadScore, calculateLeadScore } from '../services/leadScoreService';
 import { analyzeSingleLead, processAllLeads, processNewLeads } from '../services/leadIntelligence';
+import { syncSitePurchases } from '../services/sitePurchaseService';
 
 const router = Router();
 
@@ -1379,6 +1380,23 @@ router.post('/brain/cron', async (req, res) => {
       results.push({ storeId: store.id, ...result });
     }
     res.json({ ok: true, results });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
+  }
+});
+
+// ── Integração de compras do site (Fase A: pull/cron) ──────────────────────────
+// Lê os pedidos finalizados/cancelados do site (read-only) e liga aos leads do
+// CRM pelo telefone. Idempotente. Autenticado por CRON_SECRET, igual a /brain/cron.
+router.post('/integrations/site-purchases/sync', async (req, res) => {
+  const secret = req.headers['x-cron-secret'];
+  if (secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  }
+  try {
+    const limit = Number((req.body as { limit?: number })?.limit) || 500;
+    const summary = await syncSitePurchases(limit);
+    res.json(summary);
   } catch (err: unknown) {
     res.json({ ok: false, error: errMsg(err) });
   }
