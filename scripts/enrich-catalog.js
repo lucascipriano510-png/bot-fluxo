@@ -58,18 +58,21 @@ async function callVision(b64, mime) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${KEY}`;
   const body = {
     contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: mime, data: b64 } }] }],
-    generationConfig: { temperature: 0.2, maxOutputTokens: 300 },
+    generationConfig: { temperature: 0.2, maxOutputTokens: 500, responseMimeType: 'application/json' },
   };
   let r;
   try {
     r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   } catch (e) { return { ok: false, error: 'network: ' + e.message }; }
-  if (r.status === 429) return { ok: false, rateLimited: true, error: 'rate limit/quota (429)' };
   const j = await r.json().catch(() => null);
-  if (!r.ok) {
+  if (r.status === 429 || !r.ok) {
     const msg = j?.error?.message || `HTTP ${r.status}`;
-    const quota = /quota|rate|resource has been exhausted/i.test(msg);
-    return { ok: false, rateLimited: quota, error: msg };
+    // Cota real esgotada → parar a rodada. Transitório (sobrecarga/503) → re-tentar.
+    const quota     = /quota|exhausted|billing|per day|daily limit/i.test(msg) || (r.status === 429 && /quota|exhausted/i.test(msg));
+    const transient = !quota && (/high demand|overloaded|try again later|unavailable|temporar|deadline|500|502|503/i.test(msg) || r.status >= 500 || r.status === 429);
+    const m = msg.match(/retry in ([\d.]+)s/i);
+    const retryAfterMs = m ? Math.ceil(parseFloat(m[1]) * 1000) : null;
+    return { ok: false, rateLimited: quota, transient, retryAfterMs, error: msg };
   }
   const text = j?.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
   const m = text.match(/\{[\s\S]*\}/);
@@ -89,6 +92,8 @@ async function callVision(b64, mime) {
   console.log(`Catálogo: ${products.length} | já enriquecidos: ${Object.keys(done).length} | pendentes: ${pending.length} | lote: ${LIMIT === Infinity ? 'todos' : LIMIT}`);
 
   let okCount = 0, errCount = 0, processed = 0;
+  let quotaPauses = 0;
+  const MAX_QUOTA_PAUSES = 60; // ~auto-pausas no limite por minuto antes de desistir
   for (const p of pending) {
     if (processed >= LIMIT) break;
     processed++;
@@ -98,20 +103,28 @@ async function callVision(b64, mime) {
     try { img = await fetchImageB64(p.image || p.image_url); }
     catch (e) { console.log(`  ⚠️ ${tag}: falha ao baixar imagem (${e.message}) — pulado`); errCount++; continue; }
 
-    // até 3 tentativas com backoff em rate limit
-    let res, attempt = 0;
-    const waits = [12000, 35000, 70000];
+    // Re-tentativas: cota real → backoff longo e PARA a rodada; transitório
+    // (sobrecarga/503) → backoff curto e, se persistir, pula (fica pendente).
+    const transientWaits = [5000, 12000, 25000];
+    let res, tAttempt = 0;
     while (true) {
       res = await callVision(img.data, img.mime);
-      if (res.ok || !res.rateLimited) break;
-      if (attempt >= waits.length) {
-        console.log(`\n🛑 LIMITE DO GEMINI atingido (${res.error}).`);
-        console.log(`   Progresso salvo: ${Object.keys(done).length}/${products.length}. Rode de novo mais tarde para continuar de onde parou.`);
-        console.log(`   ✅ nesta rodada: ${okCount} | ⚠️ erros: ${errCount}`);
-        process.exit(0);
+      if (res.ok) break;
+      if (res.rateLimited) {
+        // Limite por minuto: espera o tempo que a própria API pede e RETOMA o mesmo item.
+        const ra = res.retryAfterMs && res.retryAfterMs <= 120000 ? res.retryAfterMs : 45000;
+        if (quotaPauses >= MAX_QUOTA_PAUSES) {
+          console.log(`\n🛑 Cota persistente — parando em ${Object.keys(done).length}/${products.length}. Rode de novo depois (continua de onde parou).`);
+          process.exit(0);
+        }
+        quotaPauses++;
+        await sleep(ra + 3000); continue;
       }
-      console.log(`  ⏳ ${tag}: limite — aguardando ${waits[attempt] / 1000}s (tentativa ${attempt + 1})`);
-      await sleep(waits[attempt]); attempt++;
+      if (res.transient) {
+        if (tAttempt >= transientWaits.length) break; // desiste deste; fica pendente
+        await sleep(transientWaits[tAttempt]); tAttempt++; continue;
+      }
+      break; // erro não recuperável → pula
     }
 
     if (res.ok) {
