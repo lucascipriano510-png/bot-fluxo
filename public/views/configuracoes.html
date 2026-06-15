@@ -1,0 +1,607 @@
+    <div x-show="page === 'configuracoes'" class="page-section">
+
+      <!-- Banner: tabela bot_settings não existe -->
+      <div x-show="cfgSetupNeeded" style="
+        background:rgba(250,204,21,.08);border:1px solid rgba(250,204,21,.35);
+        border-radius:10px;padding:16px 20px;margin-bottom:20px
+      ">
+        <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:6px">
+          Configuração inicial pendente
+        </div>
+        <div style="font-size:12px;color:var(--mu);margin-bottom:12px;line-height:1.6">
+          O painel está sendo configurado. Se isso persistir por mais de alguns minutos,
+          entre em contato com o suporte para resolver rapidamente.
+        </div>
+        <button class="btn" style="font-size:12px;margin-bottom:10px" @click="loadSettings()">
+          Tentar novamente
+        </button>
+        <details style="margin-top:4px">
+          <summary style="font-size:11px;color:var(--mu2);cursor:pointer;user-select:none">Detalhes técnicos (suporte)</summary>
+          <div style="font-size:11px;color:var(--mu);margin:8px 0 4px">
+            Tabela <code>bot_settings</code> não encontrada. Execute no Supabase SQL Editor:
+          </div>
+          <pre style="
+            background:var(--bg);border:1px solid var(--border);border-radius:8px;
+            padding:12px;font-size:11px;color:#a0c4ff;overflow-x:auto;line-height:1.6
+          ">CREATE TABLE IF NOT EXISTS bot_settings (
+  store_id        uuid PRIMARY KEY REFERENCES stores(id),
+  nome_loja       text,
+  whatsapp        text,
+  saudacao        text,
+  horario_inicio  text DEFAULT '09:00',
+  horario_fim     text DEFAULT '18:00',
+  bot_ativo       boolean DEFAULT true,
+  ignorar_horario boolean DEFAULT false,
+  fallback_humano boolean DEFAULT true,
+  delay_resposta  boolean DEFAULT true,
+  updated_at      timestamptz DEFAULT now()
+);</pre>
+        </details>
+      </div>
+
+      <!-- Feedback toast -->
+      <div x-show="cfgFeedback !== null" x-transition
+        :style="`
+          position:fixed;bottom:28px;right:28px;z-index:999;
+          background:${cfgFeedback==='ok'?'var(--green)':'#ef4444'};
+          color:#fff;padding:12px 20px;border-radius:10px;
+          font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.4)
+        `"
+        x-text="cfgFeedbackMsg">
+      </div>
+
+      <div class="grid-2">
+
+        <!-- COLUNA ESQUERDA -->
+        <div style="display:flex;flex-direction:column;gap:20px">
+
+          <!-- Informações da loja -->
+          <div class="settings-section">
+            <h3>Informações da loja</h3>
+            <div class="field">
+              <label>Nome da loja</label>
+              <input type="text" x-model="cfg.nome_loja" placeholder="Ex: Meu Negócio">
+            </div>
+            <div class="field">
+              <label>WhatsApp principal</label>
+              <input type="text" x-model="cfg.whatsapp" placeholder="5534999999999">
+              <small style="font-size:11px;color:var(--mu2);margin-top:4px;display:block">Código do país + DDD + número, sem espaços ou +</small>
+            </div>
+            <div class="field">
+              <label>Mensagem de saudação</label>
+              <textarea x-model="cfg.saudacao" rows="3" placeholder="Texto que aparece quando o cliente inicia a conversa..."></textarea>
+              <small style="font-size:11px;color:var(--mu2);margin-top:4px;display:block">Referência para personalização do fluxo. Para alterar o bot, edite também o nó INICIO em Respostas Rápidas.</small>
+            </div>
+          </div>
+
+          <!-- Horário de atendimento -->
+          <div class="settings-section">
+            <h3>Horário de atendimento</h3>
+            <p style="font-size:12px;color:var(--mu2);margin-bottom:14px">
+              Define quando o bot responde automaticamente. Fora desse horário, o bot envia mensagem de encerramento.
+            </p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="field"><label>Abertura</label><input type="time" x-model="cfg.horario_inicio"></div>
+              <div class="field"><label>Fechamento</label><input type="time" x-model="cfg.horario_fim"></div>
+            </div>
+
+            <!-- Preview horário -->
+            <div style="margin-top:14px;padding:12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--mu)">
+              <span style="font-weight:600;color:var(--tx)">Horário ativo:</span>
+              seg–sáb das <span style="color:var(--green)" x-text="cfg.horario_inicio || '09:00'"></span>
+              às <span style="color:var(--green)" x-text="cfg.horario_fim || '18:00'"></span>
+              <span x-show="cfg.ignorar_horario" style="margin-left:8px;color:var(--gold);font-weight:600">· Modo 24/7 ativo</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- COLUNA DIREITA -->
+        <div style="display:flex;flex-direction:column;gap:20px">
+
+          <!-- Comportamento do bot -->
+          <div class="settings-section">
+            <h3>Comportamento do bot</h3>
+
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <h4>Bot ativo</h4>
+                <p>Responder mensagens automaticamente. Desativando, o bot ignora todas as mensagens recebidas.</p>
+              </div>
+              <button class="toggle" :class="{ on: cfg.bot_ativo }" @click="cfg.bot_ativo = !cfg.bot_ativo"></button>
+            </div>
+
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <h4>Ignorar horário <span x-show="cfg.ignorar_horario" style="font-size:10px;background:var(--gold2);color:var(--gold);padding:1px 6px;border-radius:4px;margin-left:4px">24/7</span></h4>
+                <p>Responder mesmo fora do horário configurado. Útil para testes e campanhas.</p>
+              </div>
+              <button class="toggle" :class="{ on: cfg.ignorar_horario }" @click="cfg.ignorar_horario = !cfg.ignorar_horario"></button>
+            </div>
+
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <h4>Fallback para humano</h4>
+                <p>Acionar atendente quando o bot não conseguir resolver a situação do cliente.</p>
+              </div>
+              <button class="toggle" :class="{ on: cfg.fallback_humano }" @click="cfg.fallback_humano = !cfg.fallback_humano"></button>
+            </div>
+
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <h4>Delay de resposta</h4>
+                <p>Simular ~800ms de "digitando..." antes de cada resposta do bot (mais natural).</p>
+              </div>
+              <button class="toggle" :class="{ on: cfg.delay_resposta }" @click="cfg.delay_resposta = !cfg.delay_resposta"></button>
+            </div>
+          </div>
+
+          <!-- Status resumido -->
+          <div class="settings-section" style="background:var(--card2)">
+            <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mu2)">Resumo atual</h3>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+              <div style="display:flex;justify-content:space-between;font-size:12px">
+                <span style="color:var(--mu)">Bot</span>
+                <span :style="`font-weight:600;color:${cfg.bot_ativo?'var(--green)':'#ef4444'}`" x-text="cfg.bot_ativo ? 'Ativo' : 'Desativado'"></span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:12px">
+                <span style="color:var(--mu)">Horário</span>
+                <span style="font-weight:600;color:var(--tx)" x-text="cfg.ignorar_horario ? '24/7' : cfg.horario_inicio + ' – ' + cfg.horario_fim"></span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:12px">
+                <span style="color:var(--mu)">Fallback humano</span>
+                <span :style="`font-weight:600;color:${cfg.fallback_humano?'var(--green)':'var(--mu2)'}`" x-text="cfg.fallback_humano ? 'Sim' : 'Não'"></span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:12px">
+                <span style="color:var(--mu)">Delay digitação</span>
+                <span :style="`font-weight:600;color:${cfg.delay_resposta?'var(--green)':'var(--mu2)'}`" x-text="cfg.delay_resposta ? 'Sim' : 'Não'"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Botão salvar -->
+          <button class="btn btn-green" style="width:100%;justify-content:center;padding:14px;font-size:14px;font-weight:700"
+            @click="saveSettings()" :disabled="cfgSaving">
+            <span x-text="cfgSaving ? 'Salvando...' : 'Salvar configurações'"></span>
+          </button>
+
+        </div>
+      </div>
+
+      <!-- ── Perfil da Loja ──────────────────────────────────── -->
+      <div style="margin-top:28px">
+        <div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px">
+          Perfil da loja — alimenta a inteligência do bot
+        </div>
+
+        <div class="grid-2">
+
+          <!-- Localização e contato -->
+          <div style="display:flex;flex-direction:column;gap:20px">
+            <div class="settings-section">
+              <h3>Localização e contato</h3>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div class="field">
+                  <label>Cidade</label>
+                  <input type="text" x-model="cfg.city" placeholder="Ex: Uberaba">
+                </div>
+                <div class="field">
+                  <label>Estado (UF)</label>
+                  <input type="text" x-model="cfg.state" placeholder="Ex: MG" maxlength="2">
+                </div>
+              </div>
+              <div class="field">
+                <label>Instagram</label>
+                <input type="text" x-model="cfg.instagram" placeholder="@minhaloja">
+              </div>
+              <div class="field">
+                <label>Tipo de negócio</label>
+                <input type="text" x-model="cfg.business_type" placeholder="Ex: outlet de roupas masculinas">
+              </div>
+              <div class="field">
+                <label>Site da loja</label>
+                <input type="url" x-model="cfg.site_url" placeholder="https://meusite.com">
+                <small style="font-size:11px;color:var(--mu2);margin-top:4px;display:block">Substitui a variável de ambiente SITE_URL.</small>
+              </div>
+              <div class="field">
+                <label>URL do catálogo (opcional)</label>
+                <input type="url" x-model="cfg.catalog_url" placeholder="https://meusite.com/catalogo">
+              </div>
+            </div>
+          </div>
+
+          <!-- Informações comerciais -->
+          <div style="display:flex;flex-direction:column;gap:20px">
+            <div class="settings-section">
+              <h3>Informações comerciais</h3>
+              <div class="field">
+                <label>Informações de entrega</label>
+                <textarea x-model="cfg.delivery_info" rows="2" placeholder="Ex: Enviamos para todo o Brasil via Correios e transportadoras."></textarea>
+              </div>
+              <div class="field">
+                <label>Formas de pagamento</label>
+                <textarea x-model="cfg.payment_info" rows="2" placeholder="Ex: Pix, cartão de crédito/débito, boleto."></textarea>
+              </div>
+              <div class="field">
+                <label>Política de troca</label>
+                <textarea x-model="cfg.return_policy" rows="2" placeholder="Ex: Trocas em até 7 dias após o recebimento."></textarea>
+              </div>
+              <div class="field">
+                <label>Regras de desconto</label>
+                <textarea x-model="cfg.discount_rules" rows="2" placeholder="Ex: 5% de desconto no Pix acima de R$200."></textarea>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Tom de voz (full-width) -->
+        <div class="settings-section" style="margin-top:20px">
+          <h3>Tom de voz e instruções do bot</h3>
+          <div class="grid-2">
+            <div class="field">
+              <label>Tom de voz</label>
+              <input type="text" x-model="cfg.sales_tone" placeholder="Ex: direto, humano, vendedor, sem enrolação">
+              <small style="font-size:11px;color:var(--mu2);margin-top:4px;display:block">Como o bot deve se comunicar com o cliente.</small>
+            </div>
+            <div class="field">
+              <label>Instruções extras para o bot</label>
+              <textarea x-model="cfg.sales_instructions" rows="3" placeholder="Ex: Sempre mencionar o frete grátis acima de R$300. Não mencionar concorrentes."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Botão salvar perfil -->
+        <button class="btn btn-green" style="width:100%;justify-content:center;padding:14px;font-size:14px;font-weight:700;margin-top:16px"
+          @click="saveSettings()" :disabled="cfgSaving">
+          <span x-text="cfgSaving ? 'Salvando...' : 'Salvar perfil da loja'"></span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- WhatsApp standalone removido — inbox unificado em Atendimentos -->
+    <div x-show="false" style="display:none">
+      <div style="display:flex;height:100%;font-family:'Segoe UI',sans-serif">
+
+        <!-- Coluna esquerda: lista de conversas -->
+        <div style="width:340px;flex-shrink:0;background:#111b21;border-right:1px solid #2a2d3e;display:flex;flex-direction:column">
+
+          <!-- Barra de status -->
+          <div style="padding:12px 16px;background:#202c33;display:flex;align-items:center;gap:10px;border-bottom:1px solid #2a2d3e">
+            <div style="width:10px;height:10px;border-radius:50%;flex-shrink:0"
+              :style="waStatus==='connected' ? 'background:#00a884;box-shadow:0 0 0 3px rgba(0,168,132,.25)' : waStatus==='qr_pending' ? 'background:#f59e0b' : 'background:#ef4444'"></div>
+            <div style="flex:1;font-size:13px;font-weight:500;color:#e9edef"
+              x-text="waStatus==='connected' ? 'WhatsApp conectado' : waStatus==='qr_pending' ? 'Aguardando QR' : 'Desconectado'"></div>
+            <button x-show="waStatus==='connected'" @click="waDisconnect()"
+              style="font-size:10px;padding:3px 8px;background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);border-radius:6px;cursor:pointer">
+              Desconectar
+            </button>
+          </div>
+
+          <!-- Busca -->
+          <div style="padding:8px 12px;background:#111b21;border-bottom:1px solid #2a2d3e">
+            <div style="background:#2a3942;border-radius:8px;display:flex;align-items:center;gap:8px;padding:6px 12px">
+              <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:#8696a0;stroke-width:2;flex-shrink:0"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input type="text" x-model="waSearch" placeholder="Pesquisar conversas"
+                style="background:transparent;border:none;outline:none;color:#d1d7db;font-size:13px;width:100%;font-family:inherit"
+                placeholder="Pesquisar conversas">
+            </div>
+          </div>
+
+          <!-- Lista de conversas -->
+          <div style="flex:1;overflow-y:auto">
+            <div x-show="waStatus==='disconnected' && waConversations.length===0"
+              style="padding:32px 16px;text-align:center;color:#8696a0;font-size:13px;line-height:1.6">
+              Conecte seu WhatsApp para ver as conversas.
+            </div>
+            <div x-show="waStatus==='qr_pending' && waConversations.length===0"
+              style="padding:32px 16px;text-align:center;color:#8696a0;font-size:13px;line-height:1.6">
+              Escaneie o QR code ao lado.
+            </div>
+
+            <!-- Seção: Conversas privadas -->
+            <div x-show="waPrivateConvs.length > 0"
+              style="padding:6px 16px 3px;font-size:10px;font-weight:700;color:#8696a0;letter-spacing:.08em;text-transform:uppercase">Conversas</div>
+            <template x-for="c in waPrivateConvs" :key="c.phone">
+              <div @click="waSelectConv(c.phone)"
+                style="display:flex;align-items:center;gap:12px;padding:10px 16px;cursor:pointer;border-bottom:1px solid #2a2d3e;transition:background .15s"
+                :style="waSelectedPhone===c.phone ? 'background:#2a3942' : ''"
+                @mouseenter="$el.style.background='#2a3942'"
+                @mouseleave="$el.style.background=waSelectedPhone===c.phone?'#2a3942':''">
+                <div style="width:49px;height:49px;border-radius:50%;background:#00a884;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff;flex-shrink:0"
+                  x-text="(c.name||c.phone).charAt(0).toUpperCase()"></div>
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">
+                    <div style="font-size:15px;font-weight:500;color:#e9edef;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" x-text="c.name||dispPhone(c.phone)"></div>
+                    <div style="font-size:12px;flex-shrink:0;margin-left:8px" :style="c.unread_count>0?'color:#00a884':'color:#8696a0'" x-text="fmtTime(c.last_time)"></div>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div style="font-size:13px;color:#8696a0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px" x-text="c.last_message||'—'"></div>
+                    <div x-show="c.unread_count>0" style="background:#00a884;color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-left:6px" x-text="c.unread_count"></div>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Seção: Grupos (colapsível) -->
+            <div x-show="waGroupConvs.length > 0">
+              <div @click="waGroupsOpen=!waGroupsOpen"
+                style="padding:6px 16px 3px;font-size:10px;font-weight:700;color:#8696a0;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none">
+                <span>Grupos</span>
+                <svg :style="waGroupsOpen?'transform:rotate(180deg)':''" style="width:10px;height:10px;fill:#8696a0;transition:transform .2s" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+              </div>
+              <template x-if="waGroupsOpen">
+                <div>
+                  <template x-for="c in waGroupConvs" :key="c.phone">
+                    <div @click="waSelectConv(c.phone)"
+                      style="display:flex;align-items:center;gap:12px;padding:10px 16px;cursor:pointer;border-bottom:1px solid #2a2d3e;transition:background .15s"
+                      :style="waSelectedPhone===c.phone ? 'background:#2a3942' : ''"
+                      @mouseenter="$el.style.background='#2a3942'"
+                      @mouseleave="$el.style.background=waSelectedPhone===c.phone?'#2a3942':''">
+                      <div style="width:49px;height:49px;border-radius:50%;background:#6b7280;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                        <svg viewBox="0 0 24 24" style="width:26px;height:26px;fill:#fff"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                      </div>
+                      <div style="flex:1;min-width:0">
+                        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">
+                          <div style="font-size:15px;font-weight:500;color:#e9edef;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" x-text="c.name||dispPhone(c.phone)"></div>
+                          <div style="font-size:12px;flex-shrink:0;margin-left:8px;color:#8696a0" x-text="fmtTime(c.last_time)"></div>
+                        </div>
+                        <div style="font-size:13px;color:#8696a0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="c.last_message||'—'"></div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- Coluna direita: chat / QR / vazio -->
+        <div style="flex:1;display:flex;flex-direction:column;background:#0b141a;position:relative;overflow:hidden">
+
+          <!-- QR code panel -->
+          <div x-show="waStatus==='qr_pending'" style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;padding:40px">
+            <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 4px 32px rgba(0,0,0,.4)">
+              <img x-show="waQr" :src="waQr" style="width:240px;height:240px;display:block">
+              <div x-show="!waQr" style="width:240px;height:240px;display:flex;align-items:center;justify-content:center;color:#6b7280;font-size:13px">Gerando QR...</div>
+            </div>
+            <div style="text-align:center;color:#8696a0;font-size:13px;line-height:1.7;max-width:320px">
+              Abra o WhatsApp no celular<br>
+              → <strong style="color:#e9edef">Dispositivos conectados</strong><br>
+              → <strong style="color:#e9edef">Conectar dispositivo</strong><br>
+              → Escaneie este QR code
+            </div>
+            <div style="font-size:11px;color:#8696a0">Atualizando automaticamente a cada 3s</div>
+          </div>
+
+          <!-- Unavailable (Vercel serverless) -->
+          <div x-show="waStatus==='unavailable'"
+            style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px;text-align:center">
+            <svg viewBox="0 0 24 24" style="width:56px;height:56px;opacity:.3" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.106.549 4.085 1.513 5.8L0 24l6.37-1.49A11.96 11.96 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.854 0-3.6-.502-5.1-1.378l-.364-.217-3.78.885.914-3.686-.236-.374A9.94 9.94 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+            <div style="color:#e9edef;font-size:15px;font-weight:600">WhatsApp requer servidor dedicado</div>
+            <div style="color:#8696a0;font-size:13px;max-width:360px;line-height:1.7">
+              A integração Baileys precisa de um processo Node.js persistente.<br>
+              <strong style="color:#e9edef">Vercel serverless não suporta conexões WebSocket de longa duração.</strong><br><br>
+              Para ativar: hospede o backend em <strong style="color:#00a884">Railway</strong>, <strong style="color:#00a884">Render</strong> ou <strong style="color:#00a884">VPS</strong>.
+            </div>
+          </div>
+
+          <!-- Empty (sem conversa) -->
+          <div x-show="waStatus!=='qr_pending' && waStatus!=='unavailable' && !waSelectedPhone"
+            style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#8696a0">
+            <svg viewBox="0 0 24 24" style="width:80px;height:80px;opacity:.18" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.106.549 4.085 1.513 5.8L0 24l6.37-1.49A11.96 11.96 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.854 0-3.6-.502-5.1-1.378l-.364-.217-3.78.885.914-3.686-.236-.374A9.94 9.94 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+            <div style="font-size:14px" x-text="waStatus==='disconnected'?'Conecte seu WhatsApp para começar':'Clique em uma conversa para abrir'"></div>
+          </div>
+
+          <!-- Chat -->
+          <div x-show="waSelectedPhone && waStatus!=='qr_pending'" :key="waSelectedPhone" style="display:flex;flex-direction:column;height:100%">
+
+              <!-- Header do chat -->
+              <div style="height:60px;background:#202c33;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid #2a2d3e;flex-shrink:0">
+                <div style="width:40px;height:40px;border-radius:50%;background:#6b7280;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;color:#fff;flex-shrink:0"
+                  x-text="(waCurrentConv?.name||waSelectedPhone).charAt(0).toUpperCase()"></div>
+                <div style="flex:1">
+                  <div style="font-size:15px;font-weight:500;color:#e9edef" x-text="waCurrentConv?.name||waSelectedPhone"></div>
+                  <div style="font-size:13px;color:#8696a0">online</div>
+                </div>
+                <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:none;stroke:#aebac1;stroke-width:2;cursor:pointer"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              </div>
+
+              <!-- Mensagens -->
+              <div id="wa-messages" style="flex:1;overflow-y:auto;padding:20px 5%;display:flex;flex-direction:column;gap:4px">
+                <div x-show="waCurrentLoading" style="text-align:center;padding:40px 0;color:#8696a0;font-size:13px">Carregando...</div>
+                <div x-show="waMessages.length===0 && !waCurrentLoading" style="text-align:center;padding:40px 0;color:#8696a0;font-size:13px">Sem mensagens.</div>
+                <template x-for="(m, i) in waMessages" :key="i">
+                  <div :style="(m.direction==='out'||m.from_me===true) ? 'display:flex;justify-content:flex-end' : 'display:flex;justify-content:flex-start'">
+                    <div :style="(m.direction==='out'||m.from_me===true)
+                      ? 'background:#005c4b;border-radius:8px 0 8px 8px;max-width:65%;padding:6px 10px'
+                      : 'background:#202c33;border-radius:0 8px 8px 8px;max-width:65%;padding:6px 10px'">
+                      <div style="font-size:14px;color:#e9edef;white-space:pre-wrap;word-break:break-word" x-text="m.text"></div>
+                      <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;margin-top:2px">
+                        <div style="font-size:11px;color:#8696a0" x-text="fmtTime(m.timestamp)"></div>
+                        <span x-show="m.direction==='out'||m.from_me===true" style="font-size:11px;color:#53bdeb">✓✓</span>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <!-- Input bar -->
+              <div style="height:62px;background:#202c33;display:flex;align-items:center;gap:10px;padding:0 16px;flex-shrink:0;border-top:1px solid #2a2d3e">
+                <svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:#aebac1;stroke-width:2;flex-shrink:0;cursor:pointer"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                <input type="text" x-model="waInput" @keydown="waKeydown($event)"
+                  placeholder="Digite uma mensagem"
+                  style="flex:1;background:#2a3942;border:none;outline:none;border-radius:8px;padding:9px 14px;color:#d1d7db;font-size:15px;font-family:inherit">
+                <button @click="waSend()" :disabled="waSending || !waInput.trim()"
+                  style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;flex-shrink:0"
+                  :style="waInput.trim() ? 'background:#00a884' : 'background:#2a3942'">
+                  <svg x-show="waInput.trim()" viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  <svg x-show="!waInput.trim()" viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:#8696a0;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Painel lateral CRM (280px) -->
+        <div x-show="waSelectedPhone" style="width:280px;flex-shrink:0;background:#111b21;border-left:1px solid #2a2d3e;display:flex;flex-direction:column;overflow-y:auto;padding:20px 16px;gap:0">
+
+          <!-- Contato -->
+          <div style="font-size:10px;font-weight:700;color:#8696a0;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">Contato</div>
+          <div style="font-size:15px;font-weight:600;color:#e9edef;margin-bottom:2px" x-text="waCurrentConv?.name||waSelectedPhone"></div>
+          <div style="font-size:12px;color:#8696a0;margin-bottom:16px" x-text="waSelectedPhone"></div>
+
+          <!-- CRM info -->
+          <div style="border-top:1px solid #2a2d3e;padding-top:14px;margin-bottom:14px">
+            <div style="font-size:10px;font-weight:700;color:#8696a0;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">CRM</div>
+            <template x-if="waCrmInfo">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <span class="badge" :class="statusColor(waCrmInfo.status_comercial)" x-text="waCrmInfo.status_comercial||'FRIO'"></span>
+                  <span x-show="waCrmInfo.conversion_score != null" style="font-size:12px;color:#8696a0">Score: <span style="color:#e9edef" x-text="waCrmInfo.conversion_score"></span></span>
+                </div>
+                <div x-show="waCrmInfo.interesse" style="font-size:12px;color:#aebac1;line-height:1.5">
+                  <span style="color:#8696a0">Interesse: </span><span x-text="waCrmInfo.interesse"></span>
+                </div>
+              </div>
+            </template>
+            <template x-if="!waCrmInfo">
+              <div style="font-size:12px;color:#8696a0;font-style:italic;line-height:1.5">Lead será criado automaticamente ao receber mensagem.</div>
+            </template>
+          </div>
+
+          <!-- Botões -->
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button x-show="waCrmInfo" class="btn btn-green" style="justify-content:center;font-size:12px;gap:6px"
+              @click="navigate('leads'); $nextTick(() => { const l = leads.find(x=>x.phone===waSelectedPhone); if(l) selectCrmLead(l); })">
+              <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Ver no CRM
+            </button>
+            <button class="btn" style="justify-content:center;font-size:12px;gap:6px" @click="navigate('kanban')">
+              <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="3"/></svg>
+              Ver no Kanban
+            </button>
+            <a :href="(() => { let n=(waSelectedPhone||'').replace(/\D/g,''); if(n&&!n.startsWith('55'))n='55'+n; return n?'https://wa.me/'+n:'#'; })()"
+              target="_blank" class="btn" style="justify-content:center;font-size:12px;gap:6px;text-decoration:none">
+              <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:#e9edef"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.106.549 4.085 1.513 5.8L0 24l6.37-1.49A11.96 11.96 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.854 0-3.6-.502-5.1-1.378l-.364-.217-3.78.885.914-3.686-.236-.374A9.94 9.94 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+              WhatsApp externo
+            </a>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /cmd-content -->
+</div><!-- /cmd-main -->
+
+<!-- Modal QR — Reconectar WhatsApp -->
+<div x-show="waReconnectModal" x-transition
+  style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;display:flex;align-items:center;justify-content:center"
+  @click.self="waCloseReconnect()">
+  <div style="background:#fff;border-radius:16px;padding:32px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="font-size:18px;font-weight:700;color:#111b21;margin-bottom:6px">Reconectar WhatsApp</div>
+    <div style="font-size:13px;color:#667781;margin-bottom:24px;line-height:1.5">
+      Abra o WhatsApp no celular<br>
+      → <strong>Dispositivos conectados</strong><br>
+      → <strong>Conectar dispositivo</strong><br>
+      → Escaneie o QR code abaixo
+    </div>
+    <!-- QR ou loading -->
+    <div style="display:flex;align-items:center;justify-content:center;min-height:200px">
+      <img x-show="waQr" :src="waQr" style="width:200px;height:200px;border-radius:8px">
+      <div x-show="!waQr && waStatus==='qr_pending'" style="color:#667781;font-size:13px">Gerando QR code...</div>
+      <div x-show="waStatus==='connected'" style="color:#00a884;font-size:15px;font-weight:600">✓ Conectado!</div>
+      <div x-show="waStatus==='disconnected'" style="color:#667781;font-size:13px">Iniciando conexão...</div>
+    </div>
+    <div style="font-size:11px;color:#8696a0;margin-top:12px">Atualiza automaticamente a cada 3s</div>
+    <button @click="waCloseReconnect()"
+      style="margin-top:20px;width:100%;padding:10px;border-radius:8px;background:#f0f2f5;border:none;color:#54656f;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+      Fechar
+    </button>
+  </div>
+</div>
+
+<!-- ── Modal: Novo Lead ─────────────────────────────────────────────────── -->
+<div x-show="newLeadModal"
+  style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.65);
+         display:flex;align-items:center;justify-content:center;padding:20px"
+  @click.self="newLeadModal=false">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;
+              width:100%;max-width:440px;padding:24px;display:flex;flex-direction:column;gap:16px">
+
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:15px;font-weight:700">+ Novo Lead</div>
+      <button @click="newLeadModal=false"
+        style="background:none;border:none;color:var(--mu);cursor:pointer;font-size:18px">×</button>
+    </div>
+
+    <div x-show="newLeadError"
+      style="background:#ef444420;border:1px solid #ef4444;border-radius:8px;
+             padding:8px 12px;font-size:12px;color:#ef4444"
+      x-text="newLeadError"></div>
+
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <label style="font-size:11px;color:var(--mu)">Telefone *</label>
+      <input x-model="newLead.phone" placeholder="+55 (34) 99999-9999"
+        style="background:var(--card2);border:1px solid var(--border2);border-radius:8px;
+               color:var(--tx);padding:8px 12px;font-size:13px;font-family:var(--font);outline:none">
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <label style="font-size:11px;color:var(--mu)">Nome *</label>
+      <input x-model="newLead.nome" placeholder="Nome do cliente"
+        style="background:var(--card2);border:1px solid var(--border2);border-radius:8px;
+               color:var(--tx);padding:8px 12px;font-size:13px;font-family:var(--font);outline:none">
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <label style="font-size:11px;color:var(--mu)">Interesse / produto</label>
+      <input x-model="newLead.interesse" placeholder="Ex: Tênis Nike Air Max"
+        style="background:var(--card2);border:1px solid var(--border2);border-radius:8px;
+               color:var(--tx);padding:8px 12px;font-size:13px;font-family:var(--font);outline:none">
+    </div>
+
+    <div style="display:flex;gap:12px">
+      <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;color:var(--mu)">Temperatura</label>
+        <select x-model="newLead.status_comercial"
+          style="background:var(--card2);border:1px solid var(--border2);border-radius:8px;
+                 color:var(--tx);padding:8px 12px;font-size:13px;font-family:var(--font);outline:none">
+          <option value="FRIO">🧊 Frio</option>
+          <option value="MORNO">🌡️ Morno</option>
+          <option value="QUENTE">🔥 Quente</option>
+        </select>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;color:var(--mu)">Estágio Kanban</label>
+        <select x-model="newLead.kanban_stage"
+          style="background:var(--card2);border:1px solid var(--border2);border-radius:8px;
+                 color:var(--tx);padding:8px 12px;font-size:13px;font-family:var(--font);outline:none">
+          <template x-for="s in stages" :key="s.id">
+            <option :value="s.id" x-text="s.emoji + ' ' + s.label"></option>
+          </template>
+        </select>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px">
+      <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;color:var(--mu)">Valor potencial (R$)</label>
+        <input x-model="newLead.valor_potencial" type="number" placeholder="0"
+          style="background:var(--card2);border:1px solid var(--border2);border-radius:8px;
+                 color:var(--tx);padding:8px 12px;font-size:13px;font-family:var(--font);outline:none">
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;color:var(--mu)">Cidade</label>
+        <input x-model="newLead.cidade" placeholder="Ex: Uberaba"
+          style="background:var(--card2);border:1px solid var(--border2);border-radius:8px;
+                 color:var(--tx);padding:8px 12px;font-size:13px;font-family:var(--font);outline:none">
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
+      <button class="btn btn-ghost" @click="newLeadModal=false">Cancelar</button>
+      <button class="btn btn-green" @click="saveNewLead()" :disabled="newLeadSaving"
+        x-text="newLeadSaving ? 'Salvando...' : 'Criar Lead'"></button>
+    </div>
