@@ -1,70 +1,62 @@
     <div x-show="page === 'atendimentos'" class="page-section" style="padding:0;overflow:hidden">
       <div class="inbox-shell">
 
-        <!-- Coluna 1: Lista (400px) -->
-        <div class="inbox-list">
+        <!-- ═══════════ Coluna 1: Lista de conversas ═══════════ -->
+        <aside class="inbox-list">
 
           <!-- Header -->
-          <div style="height:56px;background:#202c33;display:flex;align-items:center;padding:0 16px;flex-shrink:0;border-bottom:1px solid #2a3942">
-            <span style="font-size:20px;font-weight:700;color:#fff;flex:1">Inbox</span>
-            <div style="display:flex;gap:20px;align-items:center">
-              <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:#aebac1;stroke-width:2;cursor:pointer"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:#aebac1;stroke-width:2;cursor:pointer"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+          <header class="inbox-list-header">
+            <h2 class="inbox-list-title">Conversas</h2>
+            <div class="inbox-list-actions">
+              <button type="button" class="inbox-icon-btn" title="Nova conversa">
+                <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              </button>
+              <button type="button" class="inbox-icon-btn" title="Menu">
+                <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+              </button>
             </div>
-          </div>
+          </header>
 
           <!-- Busca -->
-          <div style="margin:8px 12px;flex-shrink:0">
-            <div style="background:#2a3942;border-radius:8px;height:35px;display:flex;align-items:center;padding:0 12px;gap:8px">
-              <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:#8696a0;stroke-width:2;flex-shrink:0"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input type="text" x-model="inboxSearch" placeholder="Pesquisar ou iniciar conversa"
-                style="background:transparent;border:none;outline:none;color:#d1d7db;font-size:14px;width:100%;font-family:inherit">
+          <div class="inbox-search">
+            <div class="inbox-search-box">
+              <svg class="inbox-search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input type="text" x-model="inboxSearch" placeholder="Pesquisar ou começar nova conversa" class="inbox-search-input">
             </div>
           </div>
 
           <!-- Pills filtro -->
-          <div style="margin:0 12px 8px;display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap">
-            <button @click="inboxFilter='todos'"
-              :style="inboxFilter==='todos'?'background:#00a884;color:#fff;border-color:#00a884':'background:transparent;color:#e9edef;border-color:#2a3942'"
-              style="border-radius:20px;padding:4px 14px;font-size:13px;font-weight:600;border:1px solid;cursor:pointer;font-family:inherit">Tudo</button>
-            <button @click="inboxFilter='nao_lidos'"
-              :style="inboxFilter==='nao_lidos'?'background:#00a884;color:#fff;border-color:#00a884':'background:transparent;color:#e9edef;border-color:#2a3942'"
-              style="border-radius:20px;padding:4px 14px;font-size:13px;font-weight:600;border:1px solid;cursor:pointer;font-family:inherit">Nao lidas</button>
-            <button @click="inboxFilter='bot'"
-              :style="inboxFilter==='bot'?'background:#00a884;color:#fff;border-color:#00a884':'background:transparent;color:#e9edef;border-color:#2a3942'"
-              style="border-radius:20px;padding:4px 14px;font-size:13px;font-weight:600;border:1px solid;cursor:pointer;font-family:inherit">Bot ativo</button>
+          <div class="inbox-filters">
+            <button type="button" class="inbox-pill" :class="inboxFilter==='todos' && 'is-active'" @click="inboxFilter='todos'">Tudo</button>
+            <button type="button" class="inbox-pill" :class="inboxFilter==='nao_lidos' && 'is-active'" @click="inboxFilter='nao_lidos'">Não lidas</button>
+            <button type="button" class="inbox-pill" :class="inboxFilter==='bot' && 'is-active'" @click="inboxFilter='bot'">Bot ativo</button>
           </div>
 
           <!-- Lista de conversas -->
-          <div style="flex:1;overflow-y:auto">
-            <div x-show="inboxConversations.length===0" style="padding:40px 16px;text-align:center;color:#8696a0;font-size:13px;line-height:1.7">
+          <div class="inbox-conv-list">
+            <div x-show="inboxConversations.length===0" class="inbox-empty-list">
               Nenhuma conversa ainda.<br>Aguardando mensagens do WhatsApp.
             </div>
             <template x-for="c in inboxConversations" :key="c.phone">
-              <div @click="selectConv(c);$el.closest('.inbox-list')?.classList.add('conv-open');$el.closest('.inbox-shell')?.querySelector('.inbox-chat')?.classList.add('conv-open')"
-                style="height:72px;padding:0 16px;display:flex;align-items:center;gap:13px;cursor:pointer;transition:background .15s"
-                :style="atendPhone===c.phone ? 'background:#2a3942;border-bottom:none' : 'border-bottom:1px solid #2a2d3e'"
-                @mouseenter="if(atendPhone!==c.phone) $el.style.background='#2a3942'"
-                @mouseleave="if(atendPhone!==c.phone) $el.style.background=''">
+              <div class="inbox-conv-item"
+                :class="atendPhone===c.phone && 'is-active'"
+                @click="selectConv(c);$el.closest('.inbox-list')?.classList.add('conv-open');$el.closest('.inbox-shell')?.querySelector('.inbox-chat')?.classList.add('conv-open')">
                 <!-- Avatar -->
-                <div style="width:49px;height:49px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;background:#6b7280">
+                <div class="inbox-avatar">
                   <span x-show="!c.is_group" x-text="(c.name && !/^\+?\d+$/.test(c.name)) ? c.name.charAt(0).toUpperCase() : '?'"></span>
-                  <svg x-show="c.is_group" viewBox="0 0 24 24" style="width:24px;height:24px;fill:#fff"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                  <svg x-show="c.is_group" viewBox="0 0 24 24" class="inbox-avatar-group"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
                 </div>
-                <!-- Conteudo -->
-                <div style="flex:1;min-width:0">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-                    <div style="display:flex;align-items:center;gap:5px;min-width:0">
-                      <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:#25d366;flex-shrink:0"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.106.549 4.085 1.513 5.8L0 24l6.37-1.49A11.96 11.96 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.854 0-3.6-.502-5.1-1.378l-.364-.217-3.78.885.914-3.686-.236-.374A9.94 9.94 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-                      <span style="font-size:17px;font-weight:400;color:#e9edef;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" x-text="c.name||dispPhone(c.phone)"></span>
-                    </div>
-                    <span style="font-size:12px;color:#8696a0;flex-shrink:0;margin-left:8px" x-text="fmtTime(c.last_time||c.atualizado_em)"></span>
+                <!-- Conteúdo -->
+                <div class="inbox-conv-body">
+                  <div class="inbox-conv-row1">
+                    <span class="inbox-conv-name" x-text="c.name||dispPhone(c.phone)"></span>
+                    <span class="inbox-conv-time" x-text="fmtTime(c.last_time||c.atualizado_em)"></span>
                   </div>
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-                    <span style="font-size:14px;color:#8696a0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1" x-text="c.msg||'—'"></span>
-                    <div x-show="(c.unread||0)>0" style="width:20px;height:20px;border-radius:50%;background:#00a884;color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:6px" x-text="c.unread"></div>
+                  <div class="inbox-conv-row2">
+                    <span class="inbox-conv-msg" x-text="c.msg||'—'"></span>
+                    <span x-show="(c.unread||0)>0" class="inbox-conv-badge" x-text="c.unread"></span>
                   </div>
-                  <div style="display:flex;gap:4px;flex-wrap:wrap">
+                  <div class="inbox-conv-tags">
                     <span class="conv-item-tag" :class="c.humano_ativo?'tag-humano':'tag-bot'" x-text="c.humano_ativo?'HUMANO':'BOT'"></span>
                     <template x-if="leadByPhone[c.phone]">
                       <span class="conv-item-tag" :class="{
@@ -81,61 +73,68 @@
               </div>
             </template>
           </div>
-        </div>
+        </aside>
 
-        <!-- Coluna 2: Chat -->
-        <div class="inbox-chat" :class="atendPhone?'wa-bg':''">
+        <!-- ═══════════ Coluna 2: Chat ═══════════ -->
+        <section class="inbox-chat" :class="atendPhone?'wa-bg':''">
 
           <!-- Estado vazio -->
-          <div x-show="!atendPhone" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
-            <svg viewBox="0 0 24 24" style="width:80px;height:80px;fill:#d1d7db"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.106.549 4.085 1.513 5.8L0 24l6.37-1.49A11.96 11.96 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.854 0-3.6-.502-5.1-1.378l-.364-.217-3.78.885.914-3.686-.236-.374A9.94 9.94 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-            <div style="font-size:19px;color:#41525d">Selecione uma conversa para comecar</div>
+          <div x-show="!atendPhone" class="inbox-empty-chat">
+            <svg viewBox="0 0 303 172" class="inbox-empty-illus"><defs><linearGradient id="wa-eg" x1="50%" x2="50%" y1="0%" y2="100%"><stop offset="0%" stop-color="#364147"/><stop offset="100%" stop-color="#283139"/></linearGradient></defs><path fill="url(#wa-eg)" d="M229.6 21.5C223.2 9.6 209.4 0 192.5 0H40.3C16.3 0 0 16.4 0 40.4v92c0 24 16.3 40.4 40.3 40.4h152.2c24 0 40.3-16.4 40.3-40.4v-22.9l52.6 30.3c4.7 2.7 10.6 2.7 15.3 0 4.7-2.7 7.6-7.8 7.6-13.2V45.8c0-5.4-2.9-10.5-7.6-13.2-4.7-2.7-10.6-2.7-15.3 0L232.8 62.9V41.3c0-7.1-1.2-13.8-3.2-19.8Z"/></svg>
+            <h3 class="inbox-empty-title">Bot Fluxo Atendimento</h3>
+            <p class="inbox-empty-text">Selecione uma conversa para começar a responder.<br>Suas mensagens são sincronizadas em tempo real com o WhatsApp.</p>
           </div>
 
           <!-- Chat ativo -->
           <template x-if="atendPhone">
-            <div style="display:flex;flex-direction:column;height:100%">
+            <div class="inbox-chat-pane">
 
               <!-- Header do chat -->
-              <div style="height:60px;background:#202c33;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid #2a3942;flex-shrink:0">
-                <!-- Botão voltar mobile -->
+              <header class="inbox-chat-header">
                 <button @click="atendPhone=null;$el.closest('.inbox-chat').classList.remove('conv-open');document.querySelector('.inbox-list')?.classList.remove('conv-open')"
-                  style="display:none;background:none;border:none;cursor:pointer;padding:4px;color:#aebac1;flex-shrink:0" class="inbox-back-btn">
-                  <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2"><polyline points="15 18 9 12 15 6"/></svg>
+                  class="inbox-back-btn" type="button" aria-label="Voltar">
+                  <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
                 </button>
-                <div style="width:40px;height:40px;border-radius:50%;background:#2a3942;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#e9edef;flex-shrink:0"
-                  x-text="(currentConv?.name||currentConv?.phone||'?').charAt(0).toUpperCase()"></div>
-                <div style="flex:1;min-width:0">
-                  <div style="font-size:15px;font-weight:600;color:#e9edef;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" x-text="currentConv?.name||dispPhone(currentConv?.phone||atendPhone)"></div>
-                  <div style="font-size:13px;color:#8696a0" x-text="atendHumano?'Humano ativo':'Bot respondendo'"></div>
+                <button type="button" class="inbox-chat-avatar" @click="fichaOpen=true"
+                  x-text="(currentConv?.name||currentConv?.phone||'?').charAt(0).toUpperCase()"></button>
+                <button type="button" class="inbox-chat-titles" @click="fichaOpen=true">
+                  <span class="inbox-chat-name" x-text="currentConv?.name||dispPhone(currentConv?.phone||atendPhone)"></span>
+                  <span class="inbox-chat-sub">
+                    <span class="inbox-status-dot" :class="atendHumano?'is-human':'is-bot'"></span>
+                    <span x-text="atendHumano?'Humano ativo':'Bot respondendo'"></span>
+                  </span>
+                </button>
+                <div class="inbox-chat-actions">
+                  <button type="button" class="inbox-icon-btn" title="Pesquisar">
+                    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                  </button>
+                  <button type="button" class="inbox-icon-btn" title="Informações" @click="fichaOpen=!fichaOpen">
+                    <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+                  </button>
                 </div>
-                <div style="display:flex;gap:10px;align-items:center">
-                  <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:#aebac1;stroke-width:2;cursor:pointer"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-                  <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:#aebac1;stroke-width:2;cursor:pointer"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
-                </div>
-              </div>
+              </header>
 
               <!-- Mensagens -->
               <div id="atend-messages" class="inbox-messages">
-                <div x-show="atendLoading" style="display:flex;align-items:center;justify-content:center;padding:40px;color:#8696a0;gap:8px;font-size:13px">
-                  <svg style="width:16px;height:16px;animation:spin 1s linear infinite" viewBox="0 0 24 24" fill="none" stroke="#8696a0" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                <div x-show="atendLoading" class="inbox-msg-loading">
+                  <svg viewBox="0 0 24 24" class="inbox-spinner"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
                   Carregando mensagens...
                 </div>
-                <div x-show="!atendLoading && atendMessages.length===0" style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:12px;padding:40px;text-align:center">
-                  <svg viewBox="0 0 24 24" style="width:48px;height:48px;fill:#2a3942"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.106.549 4.085 1.513 5.8L0 24l6.37-1.49A11.96 11.96 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.854 0-3.6-.502-5.1-1.378l-.364-.217-3.78.885.914-3.686-.236-.374A9.94 9.94 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-                  <span style="font-size:14px;color:#8696a0">Nenhuma mensagem ainda nesta conversa.</span>
+                <div x-show="!atendLoading && atendMessages.length===0" class="inbox-msg-empty">
+                  <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.106.549 4.085 1.513 5.8L0 24l6.37-1.49A11.96 11.96 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.854 0-3.6-.502-5.1-1.378l-.364-.217-3.78.885.914-3.686-.236-.374A9.94 9.94 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+                  <span>Nenhuma mensagem ainda nesta conversa.</span>
                 </div>
                 <template x-for="(m, i) in atendMessagesWithDates" :key="i">
                   <div>
                     <div x-show="m._sep" class="date-separator">
                       <span class="date-pill" x-text="m.label"></span>
                     </div>
-                    <div x-show="!m._sep" style="display:flex" :style="m.direction==='out'||m.from==='bot'?'justify-content:flex-end;margin:2px 0':'justify-content:flex-start;margin:2px 0'">
+                    <div x-show="!m._sep" class="bubble-row" :class="(m.direction==='out'||m.from==='bot') ? 'is-out' : 'is-in'">
                       <div :class="m.direction==='out'||m.from==='bot'?'bubble-out':'bubble-in'">
                         <div class="bubble-text" x-text="m.text"></div>
-                        <div>
+                        <div class="bubble-meta">
                           <span class="bubble-time" x-text="m.time"></span>
-                          <span x-show="m.direction==='out'||m.from==='bot'" style="font-size:11px;color:#53bdeb;float:right;margin-left:4px;margin-top:4px">vv</span>
+                          <span x-show="m.direction==='out'||m.from==='bot'" class="bubble-check">✓✓</span>
                         </div>
                       </div>
                     </div>
@@ -144,67 +143,70 @@
               </div>
 
               <!-- Barra de input -->
-              <div style="background:#202c33;padding:10px 16px;display:flex;align-items:flex-end;gap:8px;flex-shrink:0;border-top:1px solid #2a3942">
-                <svg viewBox="0 0 24 24" style="width:28px;height:28px;fill:none;stroke:#aebac1;stroke-width:2;flex-shrink:0;cursor:pointer;margin-bottom:7px"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-                <svg viewBox="0 0 24 24" style="width:28px;height:28px;fill:none;stroke:#aebac1;stroke-width:2;flex-shrink:0;cursor:pointer;margin-bottom:7px"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                <div style="flex:1;background:#2a3942;border-radius:8px;padding:9px 12px;min-height:42px;display:flex;align-items:flex-end">
+              <footer class="inbox-composer">
+                <button type="button" class="inbox-icon-btn lg" title="Emoji">
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                </button>
+                <button type="button" class="inbox-icon-btn lg" title="Anexar">
+                  <svg viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                </button>
+                <div class="inbox-composer-input">
                   <textarea id="inbox-textarea" x-model="atendReply" @keydown="atendKeydown($event)"
                     @input="$el.style.height='auto';$el.style.height=Math.min($el.scrollHeight,120)+'px'"
                     :disabled="!atendPhone||atendSending"
                     placeholder="Digite uma mensagem"
-                    rows="1"
-                    style="flex:1;background:transparent;border:none;outline:none;font-size:15px;color:#e9edef;font-family:inherit;resize:none;max-height:120px;width:100%;line-height:1.5;padding:0"></textarea>
+                    rows="1"></textarea>
                 </div>
-                <button @click="sendAtendReply()" :disabled="atendSending"
-                  style="width:52px;height:52px;border-radius:50%;background:#00a884;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                  <svg x-show="atendReply.trim()" viewBox="0 0 24 24" style="width:26px;height:26px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                  <svg x-show="!atendReply.trim()" viewBox="0 0 24 24" style="width:26px;height:26px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                <button type="button" @click="sendAtendReply()" :disabled="atendSending" class="inbox-send-btn">
+                  <svg x-show="atendReply.trim()" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  <svg x-show="!atendReply.trim()" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
                 </button>
-              </div>
+              </footer>
             </div>
           </template>
-        </div>
+        </section>
 
-        <!-- Coluna 3: Ficha (300px) -->
-        <div class="inbox-ficha" x-show="atendPhone && fichaOpen">
+        <!-- ═══════════ Coluna 3: Ficha do contato ═══════════ -->
+        <aside class="inbox-ficha" x-show="atendPhone && fichaOpen">
 
           <!-- Header ficha -->
-          <div style="height:60px;background:#202c33;display:flex;align-items:center;padding:0 16px;border-bottom:1px solid #2a3942;flex-shrink:0">
-            <span style="font-size:16px;font-weight:700;color:#e9edef;flex:1">Informacoes</span>
-            <svg @click="fichaOpen=false" viewBox="0 0 24 24" style="width:20px;height:20px;fill:none;stroke:#aebac1;stroke-width:2;cursor:pointer"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </div>
+          <header class="inbox-ficha-header">
+            <button type="button" class="inbox-icon-btn" @click="fichaOpen=false" aria-label="Fechar">
+              <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            <span class="inbox-ficha-title">Dados do contato</span>
+          </header>
 
-          <!-- Contato -->
-          <div style="padding:24px 16px;border-bottom:1px solid #2a3942;text-align:center">
-            <div style="width:80px;height:80px;border-radius:50%;background:#6b7280;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#fff;margin:0 auto 12px"
-              x-text="(currentConv?.name||currentConv?.phone||'?').charAt(0).toUpperCase()"></div>
-            <div style="font-size:20px;font-weight:700;color:#e9edef;margin-bottom:4px" x-text="currentConv?.name||dispPhone(currentConv?.phone||atendPhone)"></div>
-            <div style="font-size:14px;color:#8696a0;margin-bottom:10px" x-text="dispPhone(currentConv?.phone||atendPhone)||'—'"></div>
-            <span class="badge" :class="statusColor(atendLead?.status_comercial)" style="font-size:13px;padding:4px 14px;border-radius:12px" x-text="atendLead?.status_comercial||'FRIO'"></span>
+          <!-- Identidade -->
+          <div class="inbox-ficha-identity">
+            <div class="inbox-ficha-avatar" x-text="(currentConv?.name||currentConv?.phone||'?').charAt(0).toUpperCase()"></div>
+            <div class="inbox-ficha-name" x-text="currentConv?.name||dispPhone(currentConv?.phone||atendPhone)"></div>
+            <div class="inbox-ficha-phone" x-text="dispPhone(currentConv?.phone||atendPhone)||'—'"></div>
+            <span class="badge inbox-ficha-status" :class="statusColor(atendLead?.status_comercial)" x-text="atendLead?.status_comercial||'FRIO'"></span>
           </div>
 
           <!-- Atendimento -->
-          <div style="padding:16px;border-bottom:1px solid #2a3942">
+          <section class="inbox-ficha-section">
             <div class="inbox-section-label">Atendimento</div>
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-              <div style="width:8px;height:8px;border-radius:50%" :style="atendHumano?'background:#f59e0b':'background:#00a884'"></div>
-              <span style="font-size:14px;color:#e9edef" x-text="atendHumano?'Humano ativo':'Bot respondendo'"></span>
+            <div class="inbox-status-row">
+              <span class="inbox-status-dot" :class="atendHumano?'is-human':'is-bot'"></span>
+              <span x-text="atendHumano?'Humano ativo':'Bot respondendo'"></span>
             </div>
-            <button class="inbox-btn-full" style="margin-bottom:8px" @click="assumeConv()" :disabled="!atendPhone||atendHumano" :style="atendHumano?'opacity:.4':''">
-              <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <button class="inbox-btn-full" @click="assumeConv()" :disabled="!atendPhone||atendHumano" :style="atendHumano?'opacity:.4':''">
+              <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               Assumir conversa
             </button>
             <button class="inbox-btn-full green" @click="releaseConv()" :disabled="!atendPhone||!atendHumano" :style="!atendHumano?'opacity:.4':''">
-              <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
               Devolver ao bot
             </button>
-          </div>
+          </section>
 
           <!-- CRM -->
-          <div style="padding:16px;border-bottom:1px solid #2a3942">
+          <section class="inbox-ficha-section">
             <div class="inbox-section-label">CRM</div>
-            <div x-show="atendLead" style="display:flex;flex-direction:column;gap:8px">
-              <div x-show="atendLead?.conversion_score!=null" style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+            <div x-show="atendLead" class="inbox-ficha-stack">
+              <div x-show="atendLead?.conversion_score!=null" class="inbox-score">
                 <svg viewBox="0 0 48 48" width="48" height="48">
                   <circle cx="24" cy="24" r="20" fill="none" stroke="#2a3942" stroke-width="4"/>
                   <circle cx="24" cy="24" r="20" fill="none" stroke-width="4" stroke-linecap="round" stroke-dasharray="125.6"
@@ -215,63 +217,62 @@
                     :fill="(atendLead?.conversion_score||0)>=70?'#22c55e':(atendLead?.conversion_score||0)>=40?'#f59e0b':'#ef4444'"
                     x-text="atendLead?.conversion_score||0"></text>
                 </svg>
-                <span style="font-size:12px;color:#8696a0">Score de conversao</span>
+                <span class="inbox-score-label">Score de conversão</span>
               </div>
-              <div>
-                <div style="font-size:11px;color:#8696a0;margin-bottom:3px">Interesse</div>
+              <label class="inbox-field-group">
+                <span>Interesse</span>
                 <input type="text" class="inbox-field" :value="atendLead?.interesse||''"
                   @change="if(atendLead){atendLead.interesse=$event.target.value;saveCrmField('interesse',$event.target.value);}">
-              </div>
-              <div>
-                <div style="font-size:11px;color:#8696a0;margin-bottom:3px">Valor potencial</div>
+              </label>
+              <label class="inbox-field-group">
+                <span>Valor potencial</span>
                 <input type="number" class="inbox-field" :value="atendLead?.valor_potencial||''"
                   @change="if(atendLead){atendLead.valor_potencial=Number($event.target.value);saveCrmField('valor_potencial',Number($event.target.value));}">
-              </div>
-              <div>
-                <div style="font-size:11px;color:#8696a0;margin-bottom:3px">Proxima acao</div>
+              </label>
+              <label class="inbox-field-group">
+                <span>Próxima ação</span>
                 <input type="text" class="inbox-field" :value="atendLead?.proxima_acao||''"
                   @change="if(atendLead){atendLead.proxima_acao=$event.target.value;saveCrmField('proxima_acao',$event.target.value);}">
-              </div>
-              <button class="inbox-btn-full" style="margin-top:4px"
+              </label>
+              <button class="inbox-btn-full"
                 @click="navigate('leads');$nextTick(()=>{const l=leads.find(x=>x.phone===atendPhone);if(l)selectCrmLead(l);})">Ver no CRM</button>
             </div>
-            <div x-show="!atendLead" style="display:flex;flex-direction:column;gap:8px">
-              <div style="font-size:12px;color:#8696a0;font-style:italic">Lead não vinculado a esta conversa.</div>
-              <div x-show="addToCrmError" style="font-size:11px;color:#ef4444" x-text="addToCrmError"></div>
-              <button @click="addConvToCrm()" :disabled="addingToCrm"
-                style="width:100%;padding:8px;border-radius:8px;border:none;cursor:pointer;
-                       background:#22c55e;color:#fff;font-size:13px;font-weight:600;font-family:inherit"
+            <div x-show="!atendLead" class="inbox-ficha-stack">
+              <div class="inbox-ficha-hint">Lead não vinculado a esta conversa.</div>
+              <div x-show="addToCrmError" class="inbox-ficha-error" x-text="addToCrmError"></div>
+              <button @click="addConvToCrm()" :disabled="addingToCrm" class="inbox-btn-full primary"
                 x-text="addingToCrm ? 'Adicionando...' : '+ Adicionar ao CRM'"></button>
             </div>
-          </div>
+          </section>
 
           <!-- Kanban -->
-          <div style="padding:16px;border-bottom:1px solid #2a3942">
+          <section class="inbox-ficha-section">
             <div class="inbox-section-label">Kanban</div>
             <select x-show="atendLead" :value="atendLead ? stageOf(atendLead) : 'novo'" @change="updateLeadStage($event.target.value)"
-              class="inbox-field" style="cursor:pointer">
+              class="inbox-field inbox-field-select">
               <template x-for="s in stages" :key="s.id">
                 <option :value="s.id" x-text="s.emoji + ' ' + s.label"></option>
               </template>
             </select>
-            <div x-show="!atendLead" style="font-size:12px;color:#8696a0;font-style:italic">Adicione ao CRM primeiro.</div>
-          </div>
+            <div x-show="!atendLead" class="inbox-ficha-hint">Adicione ao CRM primeiro.</div>
+          </section>
 
-          <!-- Acoes -->
-          <div style="padding:16px;display:flex;flex-direction:column;gap:8px">
-            <div class="inbox-section-label">Acoes</div>
+          <!-- Ações -->
+          <section class="inbox-ficha-section">
+            <div class="inbox-section-label">Ações</div>
             <a x-show="atendPhone" :href="(()=>{let n=(atendPhone||'').replace(/\D/g,'');if(n&&!n.startsWith('55'))n='55'+n;return n?'https://wa.me/'+n:'#';})()"
-              target="_blank" class="inbox-btn-full green" style="text-decoration:none">
-              <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.106.549 4.085 1.513 5.8L0 24l6.37-1.49A11.96 11.96 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.854 0-3.6-.502-5.1-1.378l-.364-.217-3.78.885.914-3.686-.236-.374A9.94 9.94 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+              target="_blank" class="inbox-btn-full green">
+              <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.106.549 4.085 1.513 5.8L0 24l6.37-1.49A11.96 11.96 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.854 0-3.6-.502-5.1-1.378l-.364-.217-3.78.885.914-3.686-.236-.374A9.94 9.94 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
               Abrir no WhatsApp
             </a>
-            <div x-show="atendLead && !atendLead._fromSession" style="display:flex;gap:6px">
-              <button style="flex:1;border-radius:8px;height:36px;font-size:12px;border:none;cursor:pointer;background:rgba(34,197,94,.15);color:#22c55e;font-family:inherit" @click="convertLead(atendLead.id)">Convertido</button>
-              <button style="flex:1;border-radius:8px;height:36px;font-size:12px;border:none;cursor:pointer;background:rgba(239,68,68,.15);color:#ef4444;font-family:inherit" @click="loseLead(atendLead.id)">Perdido</button>
+            <div x-show="atendLead && !atendLead._fromSession" class="inbox-action-split">
+              <button class="inbox-btn-full success" @click="convertLead(atendLead.id)">Convertido</button>
+              <button class="inbox-btn-full danger" @click="loseLead(atendLead.id)">Perdido</button>
             </div>
             <button class="inbox-btn-full" x-show="atendLead && !atendLead._fromSession" @click="addNoteLead(atendLead.id)">Adicionar nota</button>
-          </div>
-        </div>
+          </section>
+
+        </aside>
 
       </div>
     </div>
