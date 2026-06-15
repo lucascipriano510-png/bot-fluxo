@@ -20,7 +20,9 @@ const { createClient } = require('@supabase/supabase-js');
 
 const LIMIT = Number(process.argv[2]) || Infinity;
 const KEY = process.env.GEMINI_API_KEY || process.env.AI_ASSIST_KEY;
-const MODEL = process.env.AI_ASSIST_MODEL || 'gemini-2.5-flash';
+// Modelo do enriquecimento (separado do bot). 2.0-flash tem free tier bem maior
+// que o 2.5-flash, com a mesma capacidade de visão. Override via ENRICH_MODEL.
+const MODEL = process.env.ENRICH_MODEL || 'gemini-2.0-flash';
 const THROTTLE_MS = Number(process.env.ENRICH_THROTTLE_MS) || 4500; // ~13 req/min
 const OUT = path.join(__dirname, 'enrich-suggestions.json');
 
