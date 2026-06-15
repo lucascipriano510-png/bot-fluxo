@@ -1,0 +1,95 @@
+    <div x-show="page === 'simulador'" class="page-section">
+      <div class="sim-wrap">
+        <div class="wa-sim-shell">
+
+          <!-- WA status bar (decorativo) -->
+          <div class="wa-status-bar">
+            <span x-text="simPhone || '5511999990000'"></span>
+            <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+              <svg style="width:12px;height:12px;fill:rgba(255,255,255,.7)" viewBox="0 0 24 24"><path d="M1 6l5 5 5-5 5 5 5-5M1 12l5 5 5-5 5 5 5-5"/></svg>
+              <svg style="width:12px;height:12px;fill:rgba(255,255,255,.7)" viewBox="0 0 24 24"><rect x="3" y="8" width="4" height="12"/><rect x="10" y="4" width="4" height="16"/><rect x="17" y="1" width="4" height="19"/></svg>
+              🔋
+            </span>
+          </div>
+
+          <!-- WA header -->
+          <div class="wa-header">
+            <div class="wa-back">
+              <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:rgba(255,255,255,.85);stroke-width:2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            </div>
+            <div class="wa-avatar-lg">
+              <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:rgba(255,255,255,.8)"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div class="wa-contact-name" x-text="cfg.nome_loja ? 'Bot · ' + cfg.nome_loja : 'Bot Fluxo'"></div>
+              <div class="wa-contact-status" x-text="simLoading ? 'digitando...' : 'online'"></div>
+            </div>
+            <div style="display:flex;gap:16px;align-items:center;color:rgba(255,255,255,.8)">
+              <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.06 6.06l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+            </div>
+          </div>
+
+          <!-- Setup bar (só quando não iniciado) -->
+          <div x-show="!simStarted" class="wa-setup-bar">
+            <input type="tel" x-model="simPhone" placeholder="Número do simulador (ex: 5511999990000)"
+              style="flex:1;background:transparent;border:none;color:rgba(255,255,255,.85);font-size:13px;outline:none"
+              @keydown.enter="simStart()">
+            <button class="btn btn-green" @click="simStart()" :disabled="!simPhone"
+              style="font-size:12px;padding:6px 14px">Iniciar</button>
+          </div>
+          <div x-show="simStarted" class="wa-setup-bar">
+            <span style="font-size:12px;color:rgba(255,255,255,.6)" x-text="'Simulando: ' + simPhone"></span>
+            <button class="btn" @click="simStarted = false; simMessages = []"
+              style="font-size:11px;padding:4px 10px;margin-left:auto">↺ Reiniciar</button>
+          </div>
+
+          <!-- Messages area -->
+          <div class="wa-messages" id="sim-messages">
+            <div x-show="!simStarted && simMessages.length === 0" style="text-align:center;padding:40px 20px;color:rgba(255,255,255,.35);font-size:13px">
+              🔒 As mensagens são criptografadas de ponta a ponta.<br>
+              <span style="font-size:12px;opacity:.7">Insira o número e clique em Iniciar para testar.</span>
+            </div>
+
+            <template x-for="(m, i) in simMessages" :key="i">
+              <div>
+                <div x-show="m.from === 'system'" class="wa-sys-msg" x-text="m.text"></div>
+                <div x-show="m.from !== 'system'"
+                     :class="m.from === 'user' ? 'wa-bubble wa-out' : 'wa-bubble wa-in'">
+                  <span style="white-space:pre-wrap" x-text="m.text"></span>
+                  <div x-show="m.from === 'bot' && m.intent" style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px" x-text="`🧠 ${m.intent} · ${Math.round((m.confidence||0)*100)}%`"></div>
+                  <div class="wa-bubble-meta">
+                    <span x-text="m.time"></span>
+                    <span x-show="m.from === 'user'" style="margin-left:4px;color:#53bdeb">✓✓</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <div class="wa-bubble wa-in" x-show="simLoading">
+              <div class="bubble-typing">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Input bar -->
+          <div class="wa-input-bar">
+            <div class="wa-emoji-btn">
+              <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:#8696a0;stroke-width:2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg>
+            </div>
+            <textarea class="wa-input" x-model="simInput" placeholder="Mensagem" rows="1"
+              @keydown="simKeydown($event)" :disabled="!simStarted || simLoading"></textarea>
+            <button class="wa-send-btn" @click="simSend()" :disabled="!simStarted || simLoading || !simInput.trim()">
+              <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:var(--mu2);text-align:center">
+          Enter envia · Shift+Enter quebra linha · Conectado à API real do bot
+        </div>
+      </div>
+    </div>

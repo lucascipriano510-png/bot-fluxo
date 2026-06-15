@@ -1,0 +1,426 @@
+    <div x-show="page === 'produtos'" class="page-section">
+
+      <!-- Product feedback toast -->
+      <div x-show="productFeedback !== null" x-transition
+        :style="`position:fixed;bottom:28px;right:28px;z-index:999;background:${productFeedback==='ok'?'var(--green)':'#ef4444'};color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.4)`"
+        x-text="productFeedbackMsg"></div>
+
+      <!-- Product modal -->
+      <div x-show="productModal" style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px" @click.self="productModal=false">
+        <div class="modal-panel" style="background:var(--card);border:1px solid var(--border2);border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto">
+          <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:15px;font-weight:700" x-text="productEditId ? 'Editar item' : 'Novo item vendável'"></div>
+            <button @click="productModal=false" style="background:none;border:none;color:var(--mu);cursor:pointer;font-size:18px;line-height:1">×</button>
+          </div>
+          <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+
+            <!-- Tipo de item -->
+            <div class="field">
+              <label>Tipo de item</label>
+              <select x-model="productForm.item_type" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px">
+                <option value="produto_fisico">Produto físico</option>
+                <option value="servico">Serviço</option>
+                <option value="pacote_combo">Oferta composta</option>
+                <option value="orcamento">Orçamento</option>
+              </select>
+            </div>
+
+            <!-- Banner contextual por tipo -->
+            <div x-show="productForm.item_type!=='produto_fisico'" class="form-hint"
+              :class="{'form-hint-servico':productForm.item_type==='servico','form-hint-pacote':productForm.item_type==='pacote_combo','form-hint-orcamento':productForm.item_type==='orcamento'}">
+              <span x-show="productForm.item_type==='servico'">💡 <strong>Serviço:</strong> descreva o que está incluído, duração e como o bot deve apresentar. Campos de estoque, SKU e variações não são aplicáveis.</span>
+              <span x-show="productForm.item_type==='pacote_combo'">📦 <strong>Oferta composta:</strong> liste o que está incluso no campo abaixo. Se não houver estoque definido, o bot informará que a disponibilidade deve ser confirmada com o atendente.</span>
+              <span x-show="productForm.item_type==='orcamento'">🎯 <strong>Orçamento:</strong> o bot qualificará o cliente com as perguntas definidas abaixo antes de apresentar valor ou encaminhar para atendimento humano.</span>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+
+              <!-- Nome -->
+              <div class="field" style="grid-column:span 2">
+                <label>Nome *</label>
+                <input type="text" x-model="productForm.name"
+                  :placeholder="productForm.item_type==='servico'?'Ex: Corte masculino simples':productForm.item_type==='pacote_combo'?'Ex: Pacote premium, Plano mensal':productForm.item_type==='orcamento'?'Ex: Projeto sob medida':'Ex: Nome do produto'">
+              </div>
+
+              <!-- Descrição -->
+              <div class="field" style="grid-column:span 2">
+                <label>Descrição</label>
+                <textarea x-model="productForm.description" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;resize:vertical"
+                  :placeholder="productForm.item_type==='servico'?'O que está incluído nesse serviço?':productForm.item_type==='pacote_combo'?'O que está incluído nessa oferta?':productForm.item_type==='orcamento'?'Como funciona o orçamento?':'Descrição breve do item'"></textarea>
+              </div>
+
+              <!-- Itens inclusos — oferta composta (destaque imediato) -->
+              <div class="field" x-show="productForm.item_type==='pacote_combo'" style="grid-column:span 2">
+                <label style="color:var(--gold)">O que está incluso nessa oferta? *</label>
+                <textarea x-model="productForm.included_items" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;resize:vertical" placeholder="Ex: corte + barba + sobrancelha  •  lavagem completa + cera + aspiração  •  consulta + retorno + plano alimentar"></textarea>
+                <div style="font-size:11px;color:var(--mu);margin-top:4px">Se não houver estoque definido, o bot informará que a disponibilidade deve ser confirmada com o atendente.</div>
+              </div>
+
+              <!-- Perguntas de qualificação — orçamento (destaque imediato) -->
+              <div class="field" x-show="productForm.item_type==='orcamento'" style="grid-column:span 2">
+                <label style="color:var(--red)">O que o bot deve perguntar antes de apresentar o preço? *</label>
+                <textarea x-model="productForm.qualification_questions" rows="3" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;resize:vertical" placeholder='["Qual o tamanho desejado?","Qual o prazo de entrega?","Qual a cidade?","Qual o objetivo?"]'></textarea>
+                <div style="font-size:11px;color:var(--mu);margin-top:4px">Lista JSON de perguntas. O bot fará cada uma antes de passar o valor final ou encaminhar para atendimento.</div>
+              </div>
+
+              <!-- Categoria e tipo de preço -->
+              <div class="field">
+                <label>Categoria</label>
+                <input type="text" x-model="productForm.category"
+                  :placeholder="productForm.item_type==='servico'?'Ex: Cabelo, Estética, Automotivo':productForm.item_type==='pacote_combo'?'Ex: Pacotes, Planos':productForm.item_type==='orcamento'?'Ex: Projetos, Sob medida':'Ex: Categoria do produto'">
+              </div>
+              <div class="field">
+                <label>Tipo de preço</label>
+                <select x-model="productForm.price_type" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px">
+                  <option value="fixo">Preço fixo</option>
+                  <option value="a_partir_de">A partir de</option>
+                  <option value="sob_consulta">Sob consulta</option>
+                </select>
+              </div>
+
+              <!-- Preço -->
+              <div class="field" x-show="productForm.price_type !== 'sob_consulta'">
+                <label>Preço (R$)</label>
+                <input type="number" x-model="productForm.price" placeholder="0.00" step="0.01">
+              </div>
+
+              <!-- Preço promocional — físico e combo -->
+              <div class="field" x-show="productForm.item_type==='produto_fisico'||productForm.item_type==='pacote_combo'">
+                <label>Preço promocional (R$)</label>
+                <input type="number" x-model="productForm.promotional_price" placeholder="Opcional" step="0.01">
+              </div>
+
+              <!-- Produto físico -->
+              <div class="field" x-show="productForm.item_type==='produto_fisico'"><label>SKU</label><input type="text" x-model="productForm.sku" placeholder="Código único"></div>
+              <div class="field" x-show="productForm.item_type==='produto_fisico'"><label>Subcategoria / Marca</label><input type="text" x-model="productForm.subcategory" placeholder="Ex: Marca ou referência"></div>
+              <div class="field" x-show="productForm.item_type==='produto_fisico'"><label>Tipo / Material</label><input type="text" x-model="productForm.product_type" placeholder="Ex: tipo, material ou variação"></div>
+              <div class="field" x-show="productForm.item_type==='produto_fisico'"><label>Cor</label><input type="text" x-model="productForm.color" placeholder="Ex: Azul marinho"></div>
+              <div class="field" x-show="productForm.item_type==='produto_fisico'"><label>Estoque</label><input type="number" x-model="productForm.stock" placeholder="0"></div>
+
+              <!-- Serviço -->
+              <div class="field" x-show="productForm.item_type==='servico'"><label>Duração (minutos)</label><input type="number" x-model="productForm.duration_minutes" placeholder="Ex: 30"></div>
+              <div class="field" x-show="productForm.item_type==='servico'"><label>Local de atendimento</label><input type="text" x-model="productForm.service_location" placeholder="Ex: Na loja, Em domicílio"></div>
+              <div class="field" x-show="productForm.item_type==='servico'" style="grid-column:span 2">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" x-model="productForm.requires_scheduling"> Requer agendamento</label>
+              </div>
+
+              <!-- Instruções para o bot -->
+              <div class="field" style="grid-column:span 2">
+                <label>Instruções para o bot <span style="font-weight:400;color:var(--mu)">(opcional)</span></label>
+                <textarea x-model="productForm.bot_instructions" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;resize:vertical"
+                  :placeholder="productForm.item_type==='orcamento'?'Ex: Pedir WhatsApp e informar que consultor entrará em contato':productForm.item_type==='pacote_combo'?'Ex: Destacar o que está incluso e mencionar condições':'Ex: Informações relevantes que o bot deve mencionar ao apresentar esse item'"></textarea>
+              </div>
+
+              <!-- Tags -->
+              <div class="field" style="grid-column:span 2">
+                <label>Tags <span style="font-weight:400;color:var(--mu)">(separadas por vírgula)</span></label>
+                <input type="text" x-model="productForm.tags"
+                  :placeholder="productForm.item_type==='servico'?'Ex: manicure, unhas, gel':productForm.item_type==='pacote_combo'?'Ex: pacote, combo, oferta':productForm.item_type==='orcamento'?'Ex: personalizado, projeto':'Ex: promocao, destaque, novidade'">
+              </div>
+
+              <!-- URL imagem -->
+              <div class="field" style="grid-column:span 2">
+                <label>URL da imagem</label>
+                <input type="text" x-model="productForm.image_url" placeholder="https://...">
+              </div>
+
+            </div>
+
+            <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+                <input type="checkbox" x-model="productForm.featured"> ★ Em destaque
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+                <input type="checkbox" x-model="productForm.is_active"> ✓ Ativo
+              </label>
+            </div>
+          </div>
+          <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px">
+            <button class="btn btn-ghost" @click="productModal=false">Cancelar</button>
+            <button class="btn btn-green" @click="saveProduct()" :disabled="productSaving || !productForm.name.trim()">
+              <span x-text="productSaving ? 'Salvando...' : (productEditId ? 'Salvar alterações' : 'Criar item')"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="card-header" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+        <div style="display:flex;gap:10px;flex:1;flex-wrap:wrap">
+          <input type="text" x-model="productSearch" placeholder="Buscar nome, marca, SKU..."
+            style="background:var(--card);border:1px solid var(--border2);border-radius:8px;color:var(--tx);padding:8px 14px;font-size:13px;font-family:var(--font);outline:none;flex:1;min-width:160px">
+          <select x-model="productCategory"
+            style="background:var(--card);border:1px solid var(--border2);border-radius:8px;color:var(--tx);padding:8px 12px;font-size:13px;font-family:var(--font);outline:none">
+            <option value="">Todas categorias</option>
+            <template x-for="cat in productCategories" :key="cat">
+              <option :value="cat" x-text="cat"></option>
+            </template>
+          </select>
+        </div>
+        <button class="btn" @click="loadProducts()" :disabled="productsLoading" style="white-space:nowrap">
+          <span x-text="productsLoading ? 'Carregando...' : '↺ Atualizar'"></span>
+        </button>
+        <button class="btn btn-green" @click="openProductModal(null)" style="white-space:nowrap">+ Adicionar item</button>
+      </div>
+
+      <!-- Motor de Catálogo -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header" style="cursor:pointer;user-select:none;margin-bottom:0" @click="ingestOpen=!ingestOpen">
+          <div>
+            <div class="card-title">⚙️ Motor de Catálogo</div>
+            <div class="card-sub">Traga itens de várias fontes, normalize e ative para o bot vender</div>
+          </div>
+          <span x-text="ingestOpen?'▲':'▼'" style="color:var(--mu);font-size:11px;flex-shrink:0"></span>
+        </div>
+
+        <div x-show="ingestOpen" x-transition style="padding:0 22px 22px">
+
+          <!-- Cards de origem -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-top:18px;margin-bottom:18px">
+            <div class="motor-source" :class="{'motor-source-active':ingestSource==='list'}" @click="ingestSource='list'">
+              <div style="font-size:22px;margin-bottom:5px">📋</div>
+              <div style="font-weight:700;font-size:12px">Colar lista</div>
+              <div style="font-size:10px;color:var(--mu);margin-top:2px">Texto ou itens</div>
+            </div>
+            <div class="motor-source" :class="{'motor-source-active':ingestSource==='csv'}" @click="ingestSource='csv'">
+              <div style="font-size:22px;margin-bottom:5px">📄</div>
+              <div style="font-weight:700;font-size:12px">Upload CSV/TXT</div>
+              <div style="font-size:10px;color:var(--mu);margin-top:2px">Arquivo local</div>
+            </div>
+            <div class="motor-source motor-source-soon">
+              <div style="font-size:22px;margin-bottom:5px">📦</div>
+              <div style="font-weight:700;font-size:12px">Catálogo atual</div>
+              <div style="font-size:10px;margin-top:2px">em breve</div>
+            </div>
+            <div class="motor-source motor-source-soon">
+              <div style="font-size:22px;margin-bottom:5px">🌐</div>
+              <div style="font-weight:700;font-size:12px">Site / API</div>
+              <div style="font-size:10px;margin-top:2px">em breve</div>
+            </div>
+            <div class="motor-source" @click="openProductModal(null);ingestOpen=false">
+              <div style="font-size:22px;margin-bottom:5px">✍️</div>
+              <div style="font-weight:700;font-size:12px">Manual</div>
+              <div style="font-size:10px;color:var(--mu);margin-top:2px">Formulário</div>
+            </div>
+          </div>
+
+          <!-- Colar lista -->
+          <div x-show="ingestSource==='list'">
+            <textarea x-model="ingestText" rows="5"
+              placeholder="Cole sua lista aqui, um item por linha:&#10;Corte masculino - R$40&#10;Corte + barba + sobrancelha - R$80&#10;Lavagem completa com cera - R$120&#10;Consulta nutricional - R$150&#10;Camiseta preta - R$79,90&#10;Plano mensal com consulta + retorno - R$350&#10;Projeto sob medida - orçamento"
+              style="width:100%;padding:10px 12px;background:var(--card2);border:1px solid var(--border2);border-radius:8px;color:var(--tx);font-size:13px;font-family:var(--font);resize:vertical;outline:none"></textarea>
+            <div style="display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap">
+              <button class="btn btn-accent" @click="parseIngestText()" :disabled="!ingestText.trim()">🔍 Analisar lista</button>
+              <button class="btn btn-ghost" x-show="ingestParsed" @click="ingestText='';ingestItems=[];ingestParsed=false">Limpar</button>
+              <span x-show="ingestParsed" style="font-size:12px;color:var(--mu)" x-text="ingestItems.length + ' item(ns) detectado(s)'"></span>
+            </div>
+          </div>
+
+          <!-- Upload CSV/TXT -->
+          <div x-show="ingestSource==='csv'">
+            <input type="file" x-ref="fileInput" accept=".csv,.txt" style="display:none" @change="loadIngestFile($event)">
+            <div class="motor-upload-area" @click="$refs.fileInput.click()">
+              <div style="font-size:36px;margin-bottom:8px">📁</div>
+              <div style="font-weight:600;font-size:13px">Clique para selecionar arquivo</div>
+              <div style="font-size:11px;color:var(--mu);margin-top:4px">Formatos aceitos: .csv ou .txt — um item por linha</div>
+              <div style="font-size:11px;color:var(--mu2);margin-top:4px">CSV: nome;preço ou nome,preço (cabeçalho opcional)</div>
+            </div>
+          </div>
+
+          <!-- Tabela de preview -->
+          <div x-show="ingestParsed && ingestItems.length > 0" style="margin-top:18px">
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+              <div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.06em"
+                x-text="'Preview — ' + ingestItems.length + ' item(ns) detectado(s)'"></div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <span style="font-size:12px;color:var(--mu)" x-text="ingestItems.filter(i=>i.selected&&i.status==='pronto').length + ' pronto(s) selecionado(s)'"></span>
+                <span x-show="ingestItems.some(i=>i.selected&&i.status==='revisar'&&!i.savedOk)"
+                  style="font-size:12px;color:var(--gold)" x-text="ingestItems.filter(i=>i.selected&&i.status==='revisar'&&!i.savedOk).length + ' revisar'"></span>
+                <button class="btn btn-green" style="padding:6px 14px;font-size:12px"
+                  @click="saveIngestSelected()"
+                  :disabled="ingestSaving || !ingestItems.some(i=>i.selected&&!i.savedOk)">
+                  <span x-text="ingestSaving?'Salvando...':'💾 Salvar selecionados'"></span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Aviso itens revisar selecionados -->
+            <div x-show="ingestItems.some(i=>i.selected&&i.status==='revisar'&&!i.savedOk)"
+              style="margin-bottom:10px;padding:8px 12px;background:rgba(250,204,21,.08);border:1px solid rgba(250,204,21,.2);border-radius:6px;font-size:12px;color:var(--gold)">
+              ⚠️ Itens marcados como <strong>revisar</strong> não serão salvos. Clique em <strong>↗</strong> para corrigir cada um antes de salvar.
+            </div>
+
+            <div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border)">
+              <table class="tbl" style="min-width:580px">
+                <thead>
+                  <tr>
+                    <th style="width:36px;padding:8px 10px">
+                      <input type="checkbox" :checked="ingestItems.length>0&&ingestItems.every(i=>i.selected)"
+                        @change="ingestItems.forEach(i=>i.selected=$event.target.checked)">
+                    </th>
+                    <th>Nome</th>
+                    <th>Tipo</th>
+                    <th>Preço</th>
+                    <th>Composição</th>
+                    <th>Status</th>
+                    <th style="width:50px">Ver</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="(item,idx) in ingestItems" :key="idx">
+                    <tr :style="item.savedOk?'opacity:.4':''">
+                      <td style="padding:8px 10px"><input type="checkbox" x-model="item.selected" :disabled="item.savedOk"></td>
+                      <td>
+                        <div style="font-weight:600;font-size:13px" x-text="item.name"></div>
+                        <div x-show="item.savedOk" style="font-size:10px;color:var(--green);margin-top:1px">✓ Salvo no catálogo</div>
+                        <div x-show="item.savedError" style="font-size:10px;color:var(--red);margin-top:1px" x-text="item.savedError"></div>
+                      </td>
+                      <td>
+                        <span class="badge-type"
+                          :class="{'badge-type-fisico':item.type==='produto_fisico','badge-type-servico':item.type==='servico','badge-type-combo':item.type==='pacote_combo','badge-type-orcamento':item.type==='orcamento'}"
+                          x-text="item.typeLabel"></span>
+                      </td>
+                      <td>
+                        <span x-show="item.price" style="font-weight:700;font-size:12px;color:var(--gold)" x-text="'R$'+item.price.toFixed(2).replace('.',',')"></span>
+                        <span x-show="!item.price&&item.type!=='orcamento'" style="color:var(--mu2);font-size:11px">—</span>
+                        <span x-show="item.type==='orcamento'&&!item.price" class="badge badge-red" style="font-size:10px">a orçar</span>
+                      </td>
+                      <td style="font-size:11px;color:var(--mu);max-width:140px;word-break:break-word" x-text="item.composition||'—'"></td>
+                      <td>
+                        <span class="badge" :class="item.status==='pronto'?'badge-green':'badge-gold'" x-text="item.status"></span>
+                        <div x-show="item.reviewReason" style="font-size:10px;color:var(--mu2);margin-top:1px" x-text="item.reviewReason"></div>
+                      </td>
+                      <td>
+                        <button class="btn" style="padding:3px 8px;font-size:11px" @click="openProductFromIngest(item)" title="Abrir no formulário">↗</button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+
+            <div style="margin-top:10px;padding:10px 14px;background:var(--card2);border-radius:8px;font-size:12px;color:var(--mu);border:1px solid var(--border)">
+              💡 <strong>Salvar selecionados</strong> usa o mesmo fluxo seguro do formulário manual. Use <strong>↗</strong> para revisar individualmente antes de salvar.
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-bottom:20px">
+        <div class="card" style="padding:14px 18px">
+          <div style="font-size:10px;color:var(--mu2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Total</div>
+          <div style="font-size:24px;font-weight:800" x-text="products.length"></div>
+        </div>
+        <div class="card" style="padding:14px 18px">
+          <div style="font-size:10px;color:var(--mu2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Em estoque</div>
+          <div style="font-size:24px;font-weight:800;color:var(--green)" x-text="productsInStock"></div>
+        </div>
+        <div class="card" style="padding:14px 18px">
+          <div style="font-size:10px;color:var(--mu2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Sem estoque</div>
+          <div style="font-size:24px;font-weight:800;color:#ef4444" x-text="productsNoStock"></div>
+        </div>
+        <div class="card" style="padding:14px 18px">
+          <div style="font-size:10px;color:var(--mu2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Filtrados</div>
+          <div style="font-size:24px;font-weight:800;color:var(--blue)" x-text="filteredProducts.length"></div>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div x-show="productsLoading" style="text-align:center;padding:60px 20px;color:var(--mu2);font-size:13px">
+        Carregando catálogo da loja...
+      </div>
+
+      <!-- Empty -->
+      <div x-show="!productsLoading && filteredProducts.length === 0" style="text-align:center;padding:60px 20px;color:var(--mu2);font-size:13px">
+        <div x-show="productSearch || productCategory">Nenhum produto encontrado para essa busca.</div>
+        <div x-show="!productSearch && !productCategory && products.length === 0">
+          Catálogo ainda sem produtos cadastrados. Adicione um produto acima ou contate o suporte.
+        </div>
+      </div>
+
+      <!-- Grid de produtos -->
+      <div x-show="!productsLoading && filteredProducts.length > 0"
+        style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px">
+        <template x-for="p in filteredProducts" :key="p.id">
+          <div class="card prod-card">
+
+            <!-- Imagem / placeholder -->
+            <div class="prod-img">
+              <img x-show="p.image" :src="p.image" :alt="p.name"
+                style="width:100%;height:100%;object-fit:cover" @error="$el.style.display='none'">
+              <div x-show="!p.image" class="prod-img-ph" x-text="(p.category||'?').charAt(0)"></div>
+              <span x-show="p.featured" class="prod-badge-feat">★ Destaque</span>
+              <span x-show="(!p.item_type || p.item_type==='produto_fisico') && (p.stock||0) <= 0" class="prod-badge-out">Sem estoque</span>
+            </div>
+
+            <!-- Corpo -->
+            <div style="padding:12px">
+              <!-- Categoria + SKU + tipo badge -->
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+                <span style="font-size:10px;color:var(--mu2);text-transform:uppercase;letter-spacing:.04em"
+                  x-text="p.category + (p.subcategory ? ' · ' + p.subcategory : '')"></span>
+                <span class="badge-type"
+                  :class="{
+                    'badge-type-fisico':    !p.item_type || p.item_type==='produto_fisico',
+                    'badge-type-servico':   p.item_type==='servico',
+                    'badge-type-combo':     p.item_type==='pacote_combo',
+                    'badge-type-orcamento': p.item_type==='orcamento'
+                  }"
+                  x-text="{produto_fisico:'Produto',servico:'Serviço',pacote_combo:'Pacote',orcamento:'Orçamento'}[p.item_type||'produto_fisico']">
+                </span>
+              </div>
+
+              <!-- SKU -->
+              <div x-show="p.sku" style="font-size:9px;color:var(--mu2);opacity:.6;margin-bottom:2px" x-text="p.sku"></div>
+
+              <!-- Nome -->
+              <div style="font-size:12px;font-weight:700;line-height:1.4;margin-bottom:8px;min-height:34px" x-text="p.name"></div>
+
+              <!-- Tamanhos (apenas produto físico) -->
+              <div x-show="!p.item_type || p.item_type==='produto_fisico'"
+                style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:10px;min-height:22px">
+                <template x-for="sz in (p.sizes||[]).filter(s=>s.stock>0)" :key="sz.size">
+                  <span class="size-chip" x-text="sz.size"></span>
+                </template>
+                <span x-show="!(p.sizes||[]).length && (p.stock||0)>0"
+                  style="font-size:10px;color:var(--mu2);padding:2px 0">Tamanho único</span>
+                <span x-show="!(p.sizes||[]).filter(s=>s.stock>0).length && (p.stock||0)<=0"
+                  style="font-size:10px;color:#ef4444;padding:2px 0">Sem estoque</span>
+              </div>
+
+              <!-- Preço + estoque (físico) ou status (outros) -->
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-weight:800;font-size:14px;color:var(--gold)"
+                  x-text="p.price_type==='sob_consulta' ? 'Sob consulta' : (p.price_type==='a_partir_de' ? 'A partir de ' + fmtBRL(p.price) : fmtBRL(p.price))"></span>
+                <span x-show="!p.item_type || p.item_type==='produto_fisico'"
+                  style="font-size:11px;color:var(--mu2)" x-text="'Estoque: ' + (p.stock||0)"></span>
+                <span x-show="p.item_type && p.item_type!=='produto_fisico'"
+                  class="badge" :class="p.is_active !== false ? 'badge-green' : 'badge-gray'"
+                  x-text="p.is_active !== false ? 'Ativo' : 'Inativo'"></span>
+              </div>
+
+              <!-- Link site -->
+              <a x-show="p.sku && p.url" :href="p.url"
+                target="_blank" rel="noopener"
+                style="display:block;margin-top:8px;font-size:10px;color:var(--blue);opacity:.75;text-decoration:none">
+                🔗 Ver no site
+              </a>
+
+              <!-- CRUD actions -->
+              <div style="display:flex;gap:6px;margin-top:10px">
+                <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:10px;padding:5px 0;gap:4px" @click="openProductModal(p)">
+                  <svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  Editar
+                </button>
+                <button style="flex:0;padding:5px 10px;background:var(--red2);border:1px solid rgba(239,68,68,.2);border-radius:7px;color:#ef4444;cursor:pointer;display:flex;align-items:center" @click="confirm('Deletar este produto?') && deleteProduct(p.id)">
+                  <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>

@@ -1,0 +1,225 @@
+    <div x-show="page === 'dashboard'" class="page-section">
+
+      <!-- Metrics -->
+      <div class="metrics-row">
+        <div class="metric-card" style="cursor:pointer" @click="navigate('leads'); crmStageFilter='comprou'">
+          <div class="metric-top">
+            <div class="metric-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+          </div>
+          <div class="metric-val" x-text="fmtBRL(totalRevenue)"></div>
+          <div class="metric-label">Faturamento</div>
+          <div class="metric-sub" x-text="totalClientes + ' clientes · ticket ' + fmtBRL(ticketMedio)"></div>
+        </div>
+
+        <div class="metric-card blue" style="cursor:pointer" @click="navigate('leads'); crmStageFilter='comprou'">
+          <div class="metric-top">
+            <div class="metric-icon"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+            <span class="metric-delta" x-text="taxaConversao + '%'"></span>
+          </div>
+          <div class="metric-val" x-text="totalClientes"></div>
+          <div class="metric-label">Clientes</div>
+          <div class="metric-sub" x-text="taxaConversao + '% de conversão dos leads'"></div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-top">
+            <div class="metric-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+          </div>
+          <div class="metric-val" x-text="conversations.length"></div>
+          <div class="metric-label">Conversas ativas</div>
+          <div class="metric-sub">sessões com o bot</div>
+        </div>
+
+        <div class="metric-card gold">
+          <div class="metric-top">
+            <div class="metric-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+          </div>
+          <div class="metric-val" x-text="leads.length"></div>
+          <div class="metric-label">Leads capturados</div>
+          <div class="metric-sub" x-text="leadsQuentes + ' quentes · ' + leadsMornos + ' mornos'"></div>
+        </div>
+
+        <div class="metric-card blue">
+          <div class="metric-top">
+            <div class="metric-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></div>
+          </div>
+          <div class="metric-val" x-text="leadsFrios"></div>
+          <div class="metric-label">Leads frios</div>
+          <div class="metric-sub">aguardando reativação</div>
+        </div>
+
+        <div class="metric-card purple">
+          <div class="metric-top">
+            <div class="metric-icon"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+            <span class="metric-delta" :class="botOn ? '' : 'neutral'" x-text="botOn ? 'Online' : 'Offline'"></span>
+          </div>
+          <div class="metric-val" x-text="botOn ? 'Ativo' : 'Pausado'"></div>
+          <div class="metric-label">Status do bot</div>
+          <div class="metric-sub" x-text="cfg.nome_loja || 'Configure a loja'"></div>
+        </div>
+      </div>
+
+      <!-- Follow-up do dia -->
+      <div x-show="followupToday.length > 0"
+        style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:12px;padding:16px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:700;color:#f59e0b;margin-bottom:10px">
+          🔔 Follow-up pendente hoje — <span x-text="followupToday.length"></span> lead(s)
+        </div>
+        <template x-for="lead in followupToday.slice(0,5)" :key="lead.id">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+            <div>
+              <div style="font-size:13px;font-weight:600" x-text="lead.nome || dispPhone(lead.phone)"></div>
+              <div style="font-size:11px;color:var(--mu)" x-text="lead.interesse || '—'"></div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <a :href="crmWhatsApp(lead.phone)" target="_blank" class="btn btn-green" style="font-size:11px;padding:4px 10px">WhatsApp</a>
+              <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" @click="navigate('leads'); $nextTick(() => { const l = leads.find(x=>x.id===lead.id); if(l) selectCrmLead(l); })">CRM</button>
+              <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" @click="followupDone(lead.id, 3)">✓ Feito</button>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Agir agora: leads quentes em negociação prontos pra fechar -->
+      <div x-show="leadsParaAgir.length > 0"
+        style="background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.3);border-radius:12px;padding:16px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:13px;font-weight:700;color:#f97316">🔥 Pra fechar agora — <span x-text="leadsParaAgir.length"></span> em negociação</div>
+          <button class="btn btn-ghost" @click="navigate('leads'); crmStageFilter='negociando'" style="font-size:11px;padding:4px 10px">Ver todos</button>
+        </div>
+        <template x-for="lead in leadsParaAgir.slice(0,5)" :key="lead.id">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+            <div style="min-width:0">
+              <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="lead.nome || dispPhone(lead.phone)"></div>
+              <div style="font-size:11px;color:var(--mu)" x-text="(lead.interesse || 'Sem interesse registrado') + (lead.valor_potencial ? ' · ' + fmtBRL(lead.valor_potencial) : '')"></div>
+            </div>
+            <div style="display:flex;gap:6px;flex-shrink:0">
+              <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;color:#000;align-self:center"
+                :style="`background:${scoreColor(lead.ai_score!=null?lead.ai_score:lead.conversion_score||0)}`"
+                x-text="'⚡' + (lead.ai_score!=null?lead.ai_score:lead.conversion_score||0)"></span>
+              <a :href="crmWhatsApp(lead.phone)" target="_blank" class="btn btn-green" style="font-size:11px;padding:4px 10px">WhatsApp</a>
+              <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" @click="navigate('leads'); $nextTick(() => { const l = leads.find(x=>x.id===lead.id); if(l) selectCrmLead(l); })">CRM</button>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Bot Control + Recent -->
+      <div class="grid-3-1 mb-6">
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">Controle do Bot</div><div class="card-sub">Configure o comportamento em tempo real</div></div>
+            <span class="badge" :class="botOn ? 'badge-green' : 'badge-gray'" x-text="botOn ? 'Online' : 'Offline'"></span>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info"><h4>Bot ativo</h4><p>Responder mensagens automaticamente</p></div>
+            <button class="toggle" :class="{ on: botOn }" @click="botOn = !botOn; autoSaveSettings()"></button>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-info"><h4>Ignorar horário</h4><p>Responder fora do horário comercial</p></div>
+            <button class="toggle" :class="{ on: ignorarHorario }" @click="ignorarHorario = !ignorarHorario; autoSaveSettings()"></button>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-info"><h4>Modo diagnóstico</h4><p>Ativar diagnóstico detalhado</p></div>
+            <button class="toggle" :class="{ on: modoTeste }" @click="modoTeste = !modoTeste"></button>
+          </div>
+
+          <div style="margin-top:20px;padding-top:18px;border-top:1px solid var(--border);">
+            <div style="display:flex;gap:10px;margin-bottom:12px">
+              <div style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">
+                <div style="font-size:10px;color:var(--mu2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">WhatsApp</div>
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600" :style="waConfigured ? 'color:var(--green)' : 'color:var(--gold)'">
+                  <div class="dot-sm" :class="waConfigured ? '' : 'yellow'"></div>
+                  <span x-text="waConfigured ? 'Configurado' : 'Pendente'"></span>
+                </div>
+              </div>
+              <div style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">
+                <div style="font-size:10px;color:var(--mu2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Banco de dados</div>
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--green)">
+                  <div class="dot-sm"></div> Conectado
+                </div>
+              </div>
+              <div style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">
+                <div style="font-size:10px;color:var(--mu2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Bot</div>
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--green)">
+                  <div class="dot-sm"></div> Online
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-green" style="flex:1;justify-content:center" @click="navigate('simulador')">Simular conversa</button>
+              <button class="btn" style="flex:1;justify-content:center" @click="navigate('relatorios')">Ver métricas</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent conversations -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Conversas recentes</div>
+            <button class="btn btn-ghost" @click="navigate('atendimentos')" style="font-size:11px;padding:5px 10px">Ver todas</button>
+          </div>
+          <div class="conv-list">
+            <div x-show="conversations.length === 0" style="padding:24px;text-align:center;color:var(--mu);font-size:12px">
+              Nenhuma conversa ainda. O bot responderá quando o primeiro cliente enviar mensagem.
+            </div>
+            <template x-for="c in conversations.slice(0,5)" :key="c.id">
+              <div class="conv-item" @click="navigate('atendimentos'); selectedConv = c.id">
+                <div class="conv-avatar" x-text="c.avatar || c.name?.charAt(0)"></div>
+                <div class="conv-info">
+                  <div class="conv-name" x-text="c.name || dispPhone(c.phone)"></div>
+                  <div class="conv-msg" x-text="c.msg || c.node"></div>
+                </div>
+                <div class="conv-meta">
+                  <div class="conv-time" x-text="c.time || fmtTime(c.atualizado_em)"></div>
+                  <div class="conv-unread" x-show="c.unread > 0" x-text="c.unread"></div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom row -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Leads por status</div></div>
+          <div style="display:flex;gap:12px">
+            <div style="flex:1;background:var(--red2);border:1px solid rgba(239,68,68,.15);border-radius:10px;padding:16px;text-align:center">
+              <div style="font-size:26px;font-weight:800;color:var(--red)" x-text="leadsQuentes"></div>
+              <div style="font-size:11px;color:var(--mu);margin-top:4px">Quentes 🔥</div>
+            </div>
+            <div style="flex:1;background:var(--gold2);border:1px solid rgba(250,204,21,.15);border-radius:10px;padding:16px;text-align:center">
+              <div style="font-size:26px;font-weight:800;color:var(--gold)" x-text="leadsMornos"></div>
+              <div style="font-size:11px;color:var(--mu);margin-top:4px">Mornos</div>
+            </div>
+            <div style="flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center">
+              <div style="font-size:26px;font-weight:800;color:var(--mu)" x-text="leadsFrios"></div>
+              <div style="font-size:11px;color:var(--mu);margin-top:4px">Frios</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Funil de vendas</div>
+            <button class="btn btn-ghost" @click="navigate('kanban')" style="font-size:11px;padding:5px 10px">Abrir Kanban</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:11px;padding-top:2px">
+            <template x-for="s in stages" :key="s.id">
+              <div style="cursor:pointer" @click="navigate('leads'); crmStageFilter = s.id"
+                :title="s.desc">
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">
+                  <span x-text="s.emoji + ' ' + s.label"></span>
+                  <span style="font-weight:700" x-text="stageCounts[s.id]"></span>
+                </div>
+                <div style="height:8px;background:rgba(255,255,255,.05);border-radius:6px;overflow:hidden">
+                  <div style="height:100%;border-radius:6px;transition:width .35s ease"
+                    :style="`width:${leads.length ? Math.round(stageCounts[s.id]/leads.length*100) : 0}%;background:${s.color}`"></div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>

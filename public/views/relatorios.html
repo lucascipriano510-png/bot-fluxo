@@ -1,0 +1,80 @@
+    <div x-show="page === 'relatorios'" class="page-section">
+      <div x-show="reportsLoading" style="text-align:center;padding:40px;color:var(--mu);font-size:13px">Carregando relatórios...</div>
+      <div x-show="!reportsLoading">
+        <!-- Resumo comercial -->
+        <div class="metrics-row" style="margin-bottom:18px">
+          <div class="metric-card">
+            <div class="metric-top"><div class="metric-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div></div>
+            <div class="metric-val" x-text="fmtBRL(reports?.revenueTotal ?? totalRevenue)"></div>
+            <div class="metric-label">Faturamento total</div>
+          </div>
+          <div class="metric-card blue">
+            <div class="metric-top"><div class="metric-icon"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div></div>
+            <div class="metric-val" x-text="reports?.clientes ?? totalClientes"></div>
+            <div class="metric-label">Clientes</div>
+          </div>
+          <div class="metric-card gold">
+            <div class="metric-top"><div class="metric-icon"><svg viewBox="0 0 24 24"><path d="M20 12V8H6a2 2 0 0 1 0-4h12v4"/><path d="M4 6v12a2 2 0 0 0 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg></div></div>
+            <div class="metric-val" x-text="fmtBRL(reports?.ticketMedio ?? ticketMedio)"></div>
+            <div class="metric-label">Ticket médio</div>
+          </div>
+          <div class="metric-card purple">
+            <div class="metric-top"><div class="metric-icon"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div></div>
+            <div class="metric-val" x-text="(reports?.conversao ?? taxaConversao) + '%'"></div>
+            <div class="metric-label">Conversão (leads→clientes)</div>
+          </div>
+        </div>
+        <div class="grid-2 mb-6">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Faturamento por dia</div><span class="badge badge-green">Últimos 7 dias</span></div>
+            <div style="height:200px"><canvas id="chart-receita"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Atendimentos por dia</div><span class="badge badge-green">Últimos 7 dias</span></div>
+            <div style="height:200px"><canvas id="chart-atend"></canvas></div>
+          </div>
+        </div>
+        <div class="grid-2 mb-6">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Leads gerados por dia</div><span class="badge badge-gold">Últimos 7 dias</span></div>
+            <div style="height:200px"><canvas id="chart-leads"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Funil de vendas</div></div>
+            <div style="display:flex;flex-direction:column;gap:11px;padding-top:2px">
+              <template x-for="s in stages" :key="s.id">
+                <div>
+                  <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">
+                    <span x-text="s.emoji + ' ' + s.label"></span>
+                    <span style="font-weight:700" x-text="stageCounts[s.id]"></span>
+                  </div>
+                  <div style="height:8px;background:rgba(255,255,255,.05);border-radius:6px;overflow:hidden">
+                    <div style="height:100%;border-radius:6px" :style="`width:${leads.length?Math.round(stageCounts[s.id]/leads.length*100):0}%;background:${s.color}`"></div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+        <div class="grid-3">
+          <div class="card" style="text-align:center">
+            <div style="font-size:32px;font-weight:800;color:var(--green);margin-bottom:6px" x-text="(reports?.taxaResposta ?? '—') + (reports ? '%' : '')"></div>
+            <div style="font-size:13px;font-weight:600">Taxa de resposta</div>
+            <div style="font-size:11px;color:var(--mu);margin-top:4px">mensagens respondidas pelo bot (7 dias)</div>
+          </div>
+          <div class="card" style="text-align:center">
+            <div style="font-size:32px;font-weight:800;color:var(--gold);margin-bottom:6px" x-text="reports?.peakHour ?? '—'"></div>
+            <div style="font-size:13px;font-weight:600">Horário de pico</div>
+            <div style="font-size:11px;color:var(--mu);margin-top:4px">hora com mais mensagens recebidas</div>
+          </div>
+          <div class="card" style="text-align:center">
+            <div style="font-size:32px;font-weight:800;color:var(--blue);margin-bottom:6px" x-text="(reports?.pctEncaminhados ?? '—') + (reports ? '%' : '')"></div>
+            <div style="font-size:13px;font-weight:600">Encaminhados p/ humano</div>
+            <div style="font-size:11px;color:var(--mu);margin-top:4px">leads com status "encaminhado"</div>
+          </div>
+        </div>
+        <div style="margin-top:14px;text-align:right">
+          <button class="btn" @click="loadReports()" style="font-size:11px">↺ Atualizar relatórios</button>
+        </div>
+      </div>
+    </div>

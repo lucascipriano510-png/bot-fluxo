@@ -1,0 +1,100 @@
+    <div x-show="page === 'respostas'" class="page-section">
+
+      <!-- Feedback toast -->
+      <div x-show="respostaFeedback !== null" x-transition
+        :style="`position:fixed;bottom:28px;right:28px;z-index:999;background:${respostaFeedback==='ok'?'var(--green)':'#ef4444'};color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.4)`"
+        x-text="respostaFeedbackMsg"></div>
+
+      <!-- Banner setup_needed -->
+      <div x-show="respostaSetupNeeded" style="background:rgba(250,204,21,.08);border:1px solid rgba(250,204,21,.35);border-radius:10px;padding:16px 20px;margin-bottom:20px">
+        <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:6px">Migração necessária</div>
+        <div style="font-size:12px;color:var(--mu);line-height:1.6">Execute o arquivo <code>BOT_SUPABASE_MIGRATION_10.sql</code> no Supabase SQL Editor para habilitar esta funcionalidade.</div>
+      </div>
+
+      <!-- Modal criação/edição -->
+      <div x-show="respostaModal" style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px" @click.self="respostaModal=false">
+        <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto">
+          <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:15px;font-weight:700" x-text="respostaEditId ? 'Editar resposta' : 'Nova resposta rápida'"></div>
+            <button @click="respostaModal=false" style="background:none;border:none;color:var(--mu);cursor:pointer;font-size:18px;line-height:1">×</button>
+          </div>
+          <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+            <div class="field">
+              <label>Título *</label>
+              <input type="text" x-model="respostaForm.titulo" placeholder="Ex: Horário de funcionamento">
+            </div>
+            <div class="field">
+              <label>Gatilhos (palavras-chave, separadas por vírgula)</label>
+              <input type="text" x-model="respostaForm.gatilhos" placeholder="Ex: horário, abre, fecha, funciona">
+              <small style="font-size:11px;color:var(--mu2);margin-top:4px;display:block">O bot ativa esta resposta quando o cliente usar uma dessas palavras.</small>
+            </div>
+            <div class="field">
+              <label>Resposta *</label>
+              <textarea x-model="respostaForm.resposta" rows="4" placeholder="Texto que o bot vai enviar quando ativado..." style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--bg2);color:var(--text);font-size:13px;resize:vertical"></textarea>
+            </div>
+            <div style="display:flex;gap:20px;align-items:center">
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+                <input type="checkbox" x-model="respostaForm.ativo" style="accent-color:var(--accent)"> Ativa
+              </label>
+              <div class="field" style="flex:1;margin:0">
+                <label>Prioridade (0 = normal, maior = preferência)</label>
+                <input type="number" x-model="respostaForm.prioridade" min="0" max="99" style="width:80px">
+              </div>
+            </div>
+          </div>
+          <div style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px">
+            <button class="btn btn-ghost" @click="respostaModal=false">Cancelar</button>
+            <button class="btn btn-green" @click="saveResposta()" :disabled="respostaSaving">
+              <span x-text="respostaSaving ? 'Salvando...' : 'Salvar resposta'"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-size:12px;color:var(--mu)" x-text="respostas.length + ' resposta(s) configurada(s)'"></div>
+        <button class="btn btn-green" @click="openRespostaModal(null)">+ Nova resposta</button>
+      </div>
+
+      <!-- Loading -->
+      <div x-show="respostasLoading" style="text-align:center;padding:40px;color:var(--mu);font-size:13px">Carregando...</div>
+
+      <!-- Empty state -->
+      <div x-show="!respostasLoading && respostas.length === 0 && !respostaSetupNeeded"
+           style="text-align:center;padding:48px 20px;color:var(--mu)">
+        <div style="font-size:32px;margin-bottom:12px">💬</div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:6px">Nenhuma resposta configurada</div>
+        <div style="font-size:12px;margin-bottom:20px">Crie respostas automáticas para perguntas frequentes dos seus clientes.</div>
+        <button class="btn btn-green" @click="openRespostaModal(null)">+ Criar primeira resposta</button>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <template x-for="r in respostas" :key="r.id">
+          <div class="card" style="padding:18px">
+            <div style="display:flex;align-items:flex-start;gap:14px">
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap">
+                  <span style="font-size:13px;font-weight:700" x-text="r.titulo"></span>
+                  <span class="badge" :class="r.ativo ? 'badge-green' : 'badge-gray'" x-text="r.ativo ? 'Ativa' : 'Inativa'"></span>
+                  <span x-show="r.prioridade > 0" class="badge badge-gold" x-text="'P' + r.prioridade"></span>
+                </div>
+                <div x-show="r.gatilhos && r.gatilhos.length > 0" style="font-size:11px;color:var(--mu2);margin-bottom:8px">
+                  Gatilhos: <span style="color:var(--blue)" x-text="Array.isArray(r.gatilhos) ? r.gatilhos.join(', ') : r.gatilhos"></span>
+                </div>
+                <div style="font-size:12px;color:var(--mu);background:var(--card2);border-radius:8px;padding:10px;border:1px solid var(--border);white-space:pre-wrap" x-text="r.resposta"></div>
+              </div>
+              <div style="display:flex;gap:6px;flex-shrink:0;align-items:flex-start">
+                <button class="btn btn-ghost" style="padding:6px 10px;font-size:11px" @click="toggleResposta(r)"
+                        x-text="r.ativo ? 'Desativar' : 'Ativar'"></button>
+                <button class="btn btn-ghost" style="padding:6px 10px;font-size:11px" @click="openRespostaModal(r)">Editar</button>
+                <button @click="deleteResposta(r.id)"
+                        style="background:none;border:none;cursor:pointer;padding:6px;color:var(--mu);border-radius:6px;display:flex;align-items:center;"
+                        title="Excluir">
+                  <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
