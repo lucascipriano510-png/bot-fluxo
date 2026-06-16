@@ -1119,9 +1119,72 @@
         <div class="crm-history">
           <!-- abas -->
           <div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;gap:4px">
+            <button @click="crmHistoryTab='cerco'" :class="crmHistoryTab==='cerco'?'btn btn-green':'btn btn-ghost'" style="font-size:10px;padding:4px 10px;flex:1">🎯 Cerco</button>
             <button @click="crmHistoryTab='timeline'" :class="crmHistoryTab==='timeline'?'btn btn-green':'btn btn-ghost'" style="font-size:10px;padding:4px 10px;flex:1">Timeline</button>
             <button @click="crmHistoryTab='messages'" :class="crmHistoryTab==='messages'?'btn btn-green':'btn btn-ghost'" style="font-size:10px;padding:4px 10px;flex:1">Mensagens</button>
             <button @click="crmHistoryTab='purchases'" :class="crmHistoryTab==='purchases'?'btn btn-green':'btn btn-ghost'" style="font-size:10px;padding:4px 10px;flex:1">Compras</button>
+          </div>
+
+          <!-- 🎯 CERCO — dossiê do que o site sabe sobre o lead -->
+          <div x-show="crmHistoryTab==='cerco'" style="flex:1;overflow-y:auto;padding:14px">
+            <div x-show="!crmLead" style="text-align:center;padding:32px 0;color:var(--mu);font-size:12px">Selecione um lead.</div>
+            <div x-show="crmLead && crmDossieLoading" style="text-align:center;padding:24px 0;color:var(--mu);font-size:12px">Montando o cerco…</div>
+            <div x-show="crmLead && !crmDossieLoading && (!crmDossie || !crmDossie.temSinais)" style="text-align:center;padding:32px 0;color:var(--mu);font-size:12px">Sem sinais do site pra este lead ainda.</div>
+
+            <template x-if="crmLead && !crmDossieLoading && crmDossie && crmDossie.temSinais">
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:var(--card2);border:1px solid var(--border2)" x-text="crmDossie.situacaoLabel"></span>
+                  <span class="badge" :class="statusColor(crmDossie.calor)" style="font-size:9px" x-text="crmDossie.calor"></span>
+                  <span style="font-size:10px;color:var(--mu)" x-text="crmDossie.totalSinais + ' sinais'"></span>
+                </div>
+
+                <template x-if="crmDossie.objetoDesejo">
+                  <div style="background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:12px">
+                    <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mu);margin-bottom:4px">Objeto de desejo</div>
+                    <div style="font-size:14px;font-weight:700;color:var(--tx)" x-text="crmDossie.objetoDesejo.label"></div>
+                    <div x-show="crmDossie.objetoDesejo.price" style="font-size:12px;color:var(--green);font-weight:600;margin-top:2px" x-text="fmtBRL(crmDossie.objetoDesejo.price||0)"></div>
+                  </div>
+                </template>
+
+                <div style="background:var(--card2);border:1px solid var(--green);border-radius:10px;padding:12px">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--green)">Mensagem pronta</div>
+                    <button class="btn btn-green" style="font-size:10px;padding:3px 10px" @click="copyDossieMsg()">Copiar</button>
+                  </div>
+                  <div style="font-size:12px;color:var(--tx);line-height:1.5;white-space:pre-wrap" x-text="crmDossie.mensagemPronta"></div>
+                  <a x-show="crmLead && crmLead.phone" :href="crmWhatsApp(crmLead.phone)" target="_blank" class="btn" style="margin-top:8px;font-size:10px;padding:5px 10px;text-decoration:none;gap:5px;width:100%;justify-content:center">Abrir no WhatsApp →</a>
+                </div>
+
+                <template x-if="crmDossie.interesses && crmDossie.interesses.length">
+                  <div>
+                    <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mu);margin-bottom:6px">Também olhou</div>
+                    <template x-for="(it, i) in crmDossie.interesses" :key="i">
+                      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+                        <span style="font-size:12px;color:var(--tx)" x-text="it.label"></span>
+                        <span x-show="it.price" style="font-size:11px;color:var(--mu)" x-text="fmtBRL(it.price||0)"></span>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+
+                <template x-if="crmDossie.timeline && crmDossie.timeline.length">
+                  <div>
+                    <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mu);margin-bottom:6px">No site</div>
+                    <template x-for="(ev, i) in crmDossie.timeline" :key="i">
+                      <div style="display:flex;gap:8px;padding:5px 0">
+                        <span style="font-size:14px" x-text="ev.icon"></span>
+                        <div style="flex:1">
+                          <span style="font-size:12px;color:var(--tx)" x-text="ev.label"></span>
+                          <span x-show="ev.detail" style="font-size:11px;color:var(--mu)" x-text="' · ' + ev.detail"></span>
+                          <div style="font-size:10px;color:var(--mu2)" x-text="fmtTime(ev.at)"></div>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </div>
+            </template>
           </div>
 
           <!-- Timeline -->

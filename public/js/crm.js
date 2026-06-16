@@ -19,6 +19,29 @@
       } catch (_) {}
       this.loadLeadTimeline(lead.id);
       this.loadLeadPurchases(lead.id);
+      this.loadLeadSignals(lead.id);
+    },
+
+    // Dossiê do "cerco": tudo que o site sabe (objeto de desejo, situação, msg pronta)
+    async loadLeadSignals(leadId) {
+      this.crmDossie = null;
+      this.crmDossieLoading = true;
+      try {
+        const r = await this.authFetch(`/api/leads/${leadId}/signals`);
+        const j = await r.json();
+        if (j.ok && j.data) this.crmDossie = j.data;
+      } catch (_) {} finally {
+        this.crmDossieLoading = false;
+      }
+    },
+
+    copyDossieMsg() {
+      const msg = this.crmDossie?.mensagemPronta || '';
+      if (!msg) return;
+      try { navigator.clipboard.writeText(msg); } catch (_) {}
+      this.crmFeedback = 'ok';
+      this.crmFeedbackMsg = 'Mensagem copiada!';
+      setTimeout(() => { this.crmFeedback = null; }, 2500);
     },
 
     async saveCrmLead() {

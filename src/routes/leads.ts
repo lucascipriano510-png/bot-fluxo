@@ -22,6 +22,7 @@ import { initBaileys, getWaState, sendWaMessage, disconnectBaileys } from '../wh
 import { updateLeadScore, calculateLeadScore } from '../services/leadScoreService';
 import { analyzeSingleLead, processAllLeads, processNewLeads } from '../services/leadIntelligence';
 import { syncSitePurchases } from '../services/sitePurchaseService';
+import { buildLeadDossie } from '../services/leadSignalsService';
 import { errMsg, cronAuthorized } from './_shared';
 
 const router = Router();
@@ -336,6 +337,28 @@ router.get('/leads/:id/timeline', async (req, res) => {
     res.json({ ok: true, data: events });
   } catch (err: unknown) {
     res.json({ ok: false, data: [], error: errMsg(err) });
+  }
+});
+
+// ── Dossiê do "cerco" — sinais do site (read-only) ─────────────────────────────
+router.get('/leads/:id/signals', async (req, res) => {
+  try {
+    const { data: lead } = await supabase
+      .from('bot_leads')
+      .select('id,nome,phone,phone_real')
+      .eq('id', req.params.id)
+      .eq('store_id', req.storeId!)
+      .single();
+    if (!lead) return res.status(404).json({ ok: false, error: 'Lead não encontrado' });
+    let loja: string | undefined;
+    try {
+      const store = await getStoreById(req.storeId!);
+      loja = (store as { nome?: string; name?: string } | null)?.nome || (store as { nome?: string; name?: string } | null)?.name || undefined;
+    } catch { /* default na geração */ }
+    const dossie = await buildLeadDossie(lead, { loja });
+    res.json({ ok: true, data: dossie });
+  } catch (err: unknown) {
+    res.json({ ok: false, error: errMsg(err) });
   }
 });
 

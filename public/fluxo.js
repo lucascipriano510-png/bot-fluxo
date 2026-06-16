@@ -85,6 +85,8 @@ function FluxoCommand() {
     crmFeedbackMsg: '',
     crmTimeline: [],
     crmPurchases: [],
+    crmDossie: null,
+    crmDossieLoading: false,
     crmHistoryTab: 'timeline',
 
     /* kanban */
