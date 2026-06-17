@@ -70,6 +70,7 @@ function inferKanbanStage(
 export async function processMessage(
   session: BotSession,
   messageText: string,
+  opts: { simulate?: boolean } = {},
 ): Promise<BotResponse> {
 
   // Contexto da loja — fonte de verdade é sempre session.store_id (UUID)
@@ -77,8 +78,10 @@ export async function processMessage(
   const storeCtx = await getStoreById(storeId);
 
   // ── PRÉ-CHECAGEM 0: Bot ativo ─────────────────────────────────────────────
+  // O "bot desligado" só silencia o canal REAL (WhatsApp). No SIMULADOR
+  // (opts.simulate) o engine sempre roda, pra você testar sem ir pro ar.
   const rtSettings = await getRuntimeSettings(storeId);
-  if (!rtSettings.bot_ativo) {
+  if (!opts.simulate && !rtSettings.bot_ativo) {
     return { text: '', nextNode: session.current_node || 'INICIO', context: session.context };
   }
 

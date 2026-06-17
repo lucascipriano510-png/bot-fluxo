@@ -85,7 +85,8 @@ router.post('/chat', async (req, res) => {
   }
   try {
     const session  = await getOrCreateSession(req.storeId!, phone);
-    const response = await processMessage(session, message);
+    // simulate:true → o "testar bot" funciona mesmo com o bot desligado pro WhatsApp
+    const response = await processMessage(session, message, { simulate: true });
     return res.json({ ok: true, reply: response.text, nextNode: response.nextNode, intent: response.detectedIntent, confidence: response.confidence });
   } catch (err: unknown) {
     const e = err as Error & { code?: string };
