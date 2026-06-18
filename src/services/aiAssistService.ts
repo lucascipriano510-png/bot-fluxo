@@ -39,6 +39,9 @@ export interface AiAssistContext {
   storeCategories?:     string[];
   segmentInstructions?: string;
   storeBrain?:          string;
+  // A "mente": catálogo real (com cor/preço/descrição) e perfil do lead no CRM
+  catalogSnippet?:      string;
+  leadProfile?:         string;
 }
 
 // ── Guardrails rígidos — nunca removíveis ────────────────────────────────────
@@ -145,22 +148,38 @@ export function createSystemPrompt(ctx: AiAssistContext, intentHint?: string): s
 
   const brainSection = ctx.storeBrain ? `\n${ctx.storeBrain}` : '';
 
+  // A "mente": catálogo real e perfil do cliente
+  const catalogSection = ctx.catalogSnippet
+    ? `\nCATÁLOGO (única fonte de produtos e preços — fale SÓ do que está aqui):\n${ctx.catalogSnippet}`
+    : '';
+  const leadSection = ctx.leadProfile
+    ? `\nCLIENTE (perfil do CRM — use pra personalizar, trate pelo nome se houver):\n${ctx.leadProfile}`
+    : '';
+
   const intentInstruction = intentHint && INTENT_INSTRUCTIONS[intentHint]
     ? `\nCONTEXTO DA MENSAGEM ATUAL:\n${INTENT_INSTRUCTIONS[intentHint]}`
     : '';
 
+  // Com catálogo em mãos, a IA PODE cotar preço/produto que estão nele.
+  const catalogRule = ctx.catalogSnippet
+    ? '- Para produto/preço/cor/tamanho, responda usando SOMENTE o CATÁLOGO acima (pode dizer preço e detalhes que estão nele). Se o cliente pedir algo que NÃO está no catálogo, diga que vai verificar e ofereça o que tem de parecido.'
+    : '';
+
   return [
-    `Você é o assistente de vendas da loja ${storeName}.`,
+    `Você é o vendedor da loja ${storeName} — atende no WhatsApp como um funcionário real, simpático e que entende do produto.`,
     '',
     'DADOS DA LOJA:',
     storeData,
     segmentSection,
     brainSection,
+    catalogSection,
+    leadSection,
     '',
     'REGRAS DE RESPOSTA (OBRIGATÓRIAS):',
     `- ${greetingRule}`,
+    catalogRule,
     '- Respostas SEMPRE completas. NUNCA termine no meio de uma frase ou com vírgula.',
-    '- Máximo 2 linhas. Seja direto, comercial e humano.',
+    '- Máximo 3 linhas. Seja direto, comercial e humano; puxe a venda (sugira tamanho, cor, fechar pedido).',
     '- NUNCA use expressões como "não tenho essa informação" ou "não sei". Em vez disso, ofereça ajuda.',
     missingDataRule ? `- ${missingDataRule.replace(/\n/g, '\n- ')}` : '',
     intentInstruction,

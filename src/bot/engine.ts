@@ -23,6 +23,7 @@ import { detectIntent } from '../services/intentService';
 import { handleIntent } from '../services/chatBrainService';
 import { aiAssist, AiAssistContext, buildSegmentInstructions } from '../services/aiAssistService';
 import { getStoreBrain, buildBrainContext, StoreBrain } from '../services/storeBrainService';
+import { buildCatalogSnippet, buildLeadProfile } from '../services/storeMindService';
 import { buildRuntimeKnowledgeContext } from '../services/storeKnowledgeService';
 import { getRuntimeSettings } from '../services/settingsService';
 
@@ -270,6 +271,11 @@ export async function processMessage(
     // intents que ganham com linguagem adaptada
     'complaint', 'price_sensitivity', 'gift', 'wholesale', 'new_arrivals', 'catalog', 'busca_item',
   ]);
+  // A "mente": catálogo real (cor/preço/descrição) + perfil do lead no CRM.
+  // Calculado uma vez; reusado tanto no AI Assist quanto no fallback do brain.
+  const catalogSnippet = await buildCatalogSnippet(storeId, messageText).catch(() => '');
+  const leadProfile    = await buildLeadProfile(storeId, session.phone).catch(() => '');
+
   if (AI_ASSIST_INTENTS.has(intentResult.intent)) {
     // Carrega brain da loja (cacheado 5min)
     const brain    = await getStoreBrain(storeId).catch(() => ({} as StoreBrain));
@@ -322,6 +328,8 @@ export async function processMessage(
       storeCategories:      storeCategories5.length > 0 ? storeCategories5 : undefined,
       segmentInstructions:  buildSegmentInstructions(ctx._businessType, storeCategories5),
       storeBrain:           brainCtx || undefined,
+      catalogSnippet:       catalogSnippet || undefined,
+      leadProfile:          leadProfile || undefined,
     };
     const aiReply = await aiAssist(messageText, aiCtx, intentResult.intent);
     if (aiReply) {
@@ -357,6 +365,8 @@ export async function processMessage(
         storeCategories:     storeCategories6.length > 0 ? storeCategories6 : undefined,
         segmentInstructions: buildSegmentInstructions(ctx._businessType, storeCategories6),
         storeBrain:          brainCtx6 || undefined,
+        catalogSnippet:      catalogSnippet || undefined,
+        leadProfile:         leadProfile || undefined,
       };
       const aiFallbackReply = await aiAssist(messageText, aiCtx, intentResult.intent);
       if (aiFallbackReply) {
