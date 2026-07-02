@@ -40,7 +40,9 @@ export function mapSiteProductToBotProduct(row: SiteProductRow, storeId: string)
     allSizes,
     colors:                 colors.length ? colors : undefined,
     imageUrl:               row.image_url || row.image || undefined,
-    productUrl:             (SITE_URL && isPhysical) ? `${SITE_URL}/?produto=${row.sku || row.id}` : undefined,
+    // /p/:sku (aceita sku ou id): página com OG por produto — o WhatsApp mostra
+    // foto+preço+descrição no preview do link; humanos são redirecionados pra SPA.
+    productUrl:             (SITE_URL && isPhysical) ? `${SITE_URL}/p/${encodeURIComponent(String(row.sku || row.id))}` : undefined,
     isActive:               isPhysical ? row.stock > 0 : (row.is_active !== false),
     stockQuantity:          isPhysical ? row.stock : undefined,
     isFeatured:             row.featured,
