@@ -12,7 +12,7 @@ import qrcode from 'qrcode';
 import { normalizePhone, canonicalMobileBR } from '../utils/phone';
 import { processMessage } from '../bot/engine';
 import { getOrCreateSession } from '../services/sessionService';
-import { transcribeAudio } from '../services/aiAssistService';
+import { transcribeAudio, describeImage } from '../services/aiAssistService';
 import { getRuntimeSettings } from '../services/settingsService';
 import { startFollowUpLoop } from '../services/followUpService';
 import { setHandoffNotifier } from '../services/handoffBus';
@@ -107,6 +107,27 @@ function cancelAutoReply(phone: string): void {
   }
 }
 
+// Resposta longa vira até 3 bolhas (gente não manda parede de texto)
+function splitBubbles(text: string): string[] {
+  const raw = text.split(/\n\n+/).map(s => s.trim()).filter(Boolean);
+  if (raw.length <= 1) return [text.trim()];
+  const parts = raw.slice(0, 2);
+  const rest  = raw.slice(2).join('\n\n');
+  if (rest) parts.push(rest);
+  return parts;
+}
+
+async function typing(jid: string, forText: string): Promise<void> {
+  if (!_socket) return;
+  try {
+    await _socket.presenceSubscribe(jid);
+    await _socket.sendPresenceUpdate('composing', jid);
+    const ms = Math.min(8_000, Math.max(1_200, forText.length * 35));
+    await new Promise(r => setTimeout(r, ms));
+    await _socket.sendPresenceUpdate('paused', jid);
+  } catch { /* presença é cosmética — nunca bloqueia o envio */ }
+}
+
 async function flushAutoReply(storeId: string, phone: string): Promise<void> {
   const entry = _pending.get(phone);
   _pending.delete(phone);
@@ -116,22 +137,36 @@ async function flushAutoReply(storeId: string, phone: string): Promise<void> {
   try {
     const session  = await getOrCreateSession(storeId, phone);
     const response = await processMessage(session, joined);
-    // texto vazio = bot desligado, humano ativo ou silêncio intencional do engine
-    if (!response.text) return;
+    const media    = response.media || [];
+    // nada a enviar = bot desligado, humano ativo ou silêncio intencional
+    if (!response.text && media.length === 0) return;
 
     const settings = await getRuntimeSettings(storeId);
-    if (settings.delay_resposta) {
+    if (settings.delay_resposta) await typing(entry.jid, response.text || 'foto');
+
+    // Fotos de produto primeiro (a legenda já traz nome + preço)
+    for (const m of media.slice(0, 4)) {
       try {
-        await _socket.presenceSubscribe(entry.jid);
-        await _socket.sendPresenceUpdate('composing', entry.jid);
-        const typingMs = Math.min(8_000, Math.max(1_500, response.text.length * 35));
-        await new Promise(r => setTimeout(r, typingMs));
-        await _socket.sendPresenceUpdate('paused', entry.jid);
-      } catch { /* presença é cosmética — nunca bloqueia o envio */ }
+        await _socket.sendMessage(entry.jid, { image: { url: m.imageUrl }, caption: m.caption });
+        await supabase.from('wa_messages').insert({
+          store_id: storeId, phone, direction: 'out', text: `📷 ${m.caption}`, timestamp: new Date().toISOString(),
+        }).then(null, () => {});
+        await new Promise(r => setTimeout(r, 900));
+      } catch (err) {
+        console.warn('[auto-reply] envio de foto falhou:', (err as Error).message);
+      }
     }
 
-    await sendReplyToJid(entry.jid, phone, response.text, storeId);
-    console.log('[auto-reply]', phone, '→', response.text.slice(0, 80).replace(/\n/g, ' '));
+    // Texto em bolhas humanas
+    if (response.text) {
+      const bubbles = splitBubbles(response.text);
+      for (let i = 0; i < bubbles.length; i++) {
+        if (i > 0 && settings.delay_resposta) await typing(entry.jid, bubbles[i]);
+        await sendReplyToJid(entry.jid, phone, bubbles[i], storeId);
+      }
+    }
+
+    console.log('[auto-reply]', phone, '→', `${media.length} foto(s) +`, (response.text || '').slice(0, 60).replace(/\n/g, ' '));
   } catch (err) {
     console.error('[auto-reply] erro:', (err as Error).message);
   }
@@ -410,6 +445,29 @@ export async function initBaileys(storeId: string): Promise<void> {
             }
           } catch (err) {
             console.warn('[audio] transcrição falhou:', (err as Error).message);
+          }
+        }
+
+        // Visão: cliente mandou FOTO (ex: print de peça que quer) — descreve
+        // via Gemini e o agente busca parecido no catálogo.
+        if (!msg.key.fromMe && AUTO_REPLY && msg.message?.imageMessage) {
+          try {
+            const B = await import('@whiskeysockets/baileys') as any;
+            const buf = await B.downloadMediaMessage(
+              msg, 'buffer', {},
+              { logger: silentLogger, reuploadRequest: _socket?.updateMediaMessage },
+            ) as Buffer;
+            const desc = await describeImage(buf, msg.message.imageMessage.mimetype || 'image/jpeg');
+            if (desc) {
+              const caption = text; // caption da foto, se houver
+              engineText = caption
+                ? `${caption}\n(enviei uma foto de: ${desc})`
+                : `Enviei uma foto de: ${desc} — vocês têm algo assim?`;
+              text = caption ? `${caption} 📷 [foto: ${desc}]` : `📷 [foto: ${desc}]`;
+              console.log('[visao] foto descrita:', desc.slice(0, 80));
+            }
+          } catch (err) {
+            console.warn('[visao] análise de foto falhou:', (err as Error).message);
           }
         }
 

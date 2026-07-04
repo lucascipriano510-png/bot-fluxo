@@ -15,9 +15,12 @@
 //  até 3 rodadas de tool calling. Fallback de modelo automático em erro/429.
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { getCatalogForMind } from './storeMindService';
+import { getCatalogForMind, MindProduct } from './storeMindService';
 import { upsertLeadLight } from './leadService';
 import { notifyHandoff } from './handoffBus';
+import { fetchSiteOrders, summarizeOrderItems } from '../inventory/sitePurchasesBridge';
+import { supabase } from '../lib/supabase';
+import { phoneVariants } from '../utils/phone';
 
 // ── Perfil de voz da loja — base para personalização futura ─────────────────
 export interface StoreVoiceProfile {
@@ -203,6 +206,26 @@ export interface AgentIds {
   phone:   string;
 }
 
+// ── Mídia gerada pelas ferramentas (fotos de produto pro WhatsApp) ──────────
+export interface AgentMedia {
+  imageUrl: string;
+  caption:  string;
+}
+
+export interface AiAssistResult {
+  text:  string | null;
+  media: AgentMedia[];
+}
+
+// Fotos saem pelo proxy wsrv.nl (mesmo padrão do site): o upload original é
+// full-res (1–5 MB); sem o resize o WhatsApp sofre pra baixar e o envio trava.
+function wsrvImage(url: string, width = 800): string {
+  if (!url) return url;
+  return `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=${width}&q=80&output=webp&we&sharp=1`;
+}
+
+const brlA = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
+
 // ── Contador de uso de IA (reinicia a cada dia, em memória) ─────────────────
 const _usage = { date: '', calls: 0, toolCalls: 0, errors: 0, fallbacks: 0, transcriptions: 0 };
 
@@ -250,7 +273,7 @@ const TOOL_DECLARATIONS = [
   },
   {
     name: 'chamar_atendente',
-    description: 'Aciona um atendente humano da loja. Use quando o cliente pedir para falar com uma pessoa, quiser fechar a compra, ou quando você não conseguir resolver.',
+    description: 'Aciona um atendente humano da loja. Use quando o cliente pedir para falar com uma pessoa ou quando você não conseguir resolver.',
     parameters: {
       type: 'object',
       properties: {
@@ -258,39 +281,90 @@ const TOOL_DECLARATIONS = [
       },
     },
   },
+  {
+    name: 'enviar_fotos_produtos',
+    description: 'Envia FOTOS reais de até 4 produtos do catálogo direto no WhatsApp do cliente, com preço na legenda. Use quando o cliente pedir foto, quiser "ver" a peça, ou quando mostrar o produto ajudar a fechar a venda.',
+    parameters: {
+      type: 'object',
+      properties: {
+        busca:     { type: 'string', description: 'Termos do produto, ex: "camisa lacoste preta"' },
+        cor:       { type: 'string' },
+        tamanho:   { type: 'string' },
+        preco_max: { type: 'number' },
+      },
+    },
+  },
+  {
+    name: 'montar_link_sacola',
+    description: 'Monta um link do site que abre com a sacola JÁ PRONTA com os itens escolhidos — o cliente só clica e finaliza a compra. Use quando o cliente decidir levar ("quero", "vou levar", "fecha"). Informe o SKU exato retornado por buscar_produtos ou enviar_fotos_produtos.',
+    parameters: {
+      type: 'object',
+      properties: {
+        itens: {
+          type: 'array',
+          description: 'Itens escolhidos pelo cliente',
+          items: {
+            type: 'object',
+            properties: {
+              sku:     { type: 'string', description: 'SKU exato do produto' },
+              tamanho: { type: 'string', description: 'Tamanho escolhido (obrigatório quando o produto tem tamanhos)' },
+              qtd:     { type: 'number', description: 'Quantidade (padrão 1)' },
+            },
+          },
+        },
+      },
+    },
+  },
+  {
+    name: 'consultar_pedidos_cliente',
+    description: 'Consulta os pedidos que ESTE cliente já fez no site (itens, valor, status). Use quando ele perguntar sobre pedido, compra anterior ou entrega de algo que já comprou.',
+    parameters: { type: 'object', properties: {} },
+  },
 ];
 
 const TOOLS_NOTE = `
 
 FERRAMENTAS DISPONÍVEIS (use-as, não descreva):
 - buscar_produtos: consulta o catálogo REAL. Use antes de afirmar qualquer coisa sobre produto, preço, cor, tamanho ou estoque que não esteja no CATÁLOGO acima.
+- enviar_fotos_produtos: manda a FOTO real da peça com preço na legenda. Foto vende mais que texto — use quando o cliente pedir pra ver ou estiver quase decidindo.
+- montar_link_sacola: quando o cliente decidir levar, monte o link da sacola pronta e envie na resposta — ele só clica e paga. É assim que você FECHA a venda.
+- consultar_pedidos_cliente: pedidos anteriores deste cliente no site.
 - salvar_dados_cliente: registre nome, tamanho, cidade ou interesse assim que o cliente informar.
-- chamar_atendente: acione quando o cliente pedir uma pessoa de verdade ou quiser fechar a compra.
-Se buscar_produtos não retornar nada, ofereça o mais parecido que existir — nunca invente produto ou preço.`;
+- chamar_atendente: acione quando o cliente pedir uma pessoa de verdade ou algo que você não resolve.
+Se buscar_produtos não retornar nada, ofereça o mais parecido que existir — nunca invente produto ou preço.
+Quando enviar fotos, NÃO descreva as fotos no texto: faça um convite curto pra escolher/fechar.`;
 
 const normA = (s: unknown) =>
   String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 
-async function executeTool(
+// Filtro + ranqueamento compartilhado por buscar_produtos e enviar_fotos_produtos
+async function searchCatalog(storeId: string, args: Record<string, unknown>, max: number): Promise<MindProduct[]> {
+  const catalog = await getCatalogForMind(storeId);
+  let list = catalog;
+  if (args.categoria) list = list.filter(p => normA(`${p.category} ${p.subcategory} ${p.type} ${p.name}`).includes(normA(args.categoria)));
+  if (args.cor)       list = list.filter(p => normA([p.color, ...p.secondary].join(' ')).includes(normA(args.cor)));
+  if (args.tamanho)   list = list.filter(p => p.sizes.length === 0 || p.sizes.map(s => s.toUpperCase()).includes(String(args.tamanho).toUpperCase()));
+  if (args.preco_max) list = list.filter(p => (p.promo ?? p.price) <= Number(args.preco_max));
+
+  const tokens = normA(args.busca).split(/\s+/).filter(t => t.length >= 3);
+  const scored = list.map(p => {
+    const hay = normA([p.name, p.category, p.subcategory, p.color, p.secondary.join(' '), p.type, p.tags.join(' '), p.desc].join(' '));
+    return { p, s: tokens.reduce((acc, t) => acc + (hay.includes(t) ? 1 : 0), 0) };
+  }).sort((a, b) => b.s - a.s || (b.p.featured ? 1 : 0) - (a.p.featured ? 1 : 0) || a.p.price - b.p.price);
+
+  return (tokens.length > 0 ? scored.filter(x => x.s > 0) : scored).slice(0, max).map(x => x.p);
+}
+
+// Exportado para o eval/testes — o runtime chama via loop do agente
+export async function executeTool(
   name: string,
   args: Record<string, unknown>,
   ids: AgentIds,
+  collector: { media: AgentMedia[] },
 ): Promise<Record<string, unknown>> {
   if (name === 'buscar_produtos') {
-    const catalog = await getCatalogForMind(ids.storeId);
-    let list = catalog;
-    if (args.categoria) list = list.filter(p => normA(`${p.category} ${p.subcategory} ${p.type} ${p.name}`).includes(normA(args.categoria)));
-    if (args.cor)       list = list.filter(p => normA([p.color, ...p.secondary].join(' ')).includes(normA(args.cor)));
-    if (args.tamanho)   list = list.filter(p => p.sizes.length === 0 || p.sizes.map(s => s.toUpperCase()).includes(String(args.tamanho).toUpperCase()));
-    if (args.preco_max) list = list.filter(p => (p.promo ?? p.price) <= Number(args.preco_max));
-
-    const tokens = normA(args.busca).split(/\s+/).filter(t => t.length >= 3);
-    const scored = list.map(p => {
-      const hay = normA([p.name, p.category, p.subcategory, p.color, p.secondary.join(' '), p.type, p.tags.join(' '), p.desc].join(' '));
-      return { p, s: tokens.reduce((acc, t) => acc + (hay.includes(t) ? 1 : 0), 0) };
-    }).sort((a, b) => b.s - a.s || (b.p.featured ? 1 : 0) - (a.p.featured ? 1 : 0) || a.p.price - b.p.price);
-
-    const top = (tokens.length > 0 ? scored.filter(x => x.s > 0) : scored).slice(0, 8).map(({ p }) => ({
+    const top = (await searchCatalog(ids.storeId, args, 8)).map(p => ({
+      sku:            p.sku || undefined,
       nome:           p.name,
       categoria:      [p.category, p.subcategory].filter(Boolean).join('/') || undefined,
       cor:            [p.color, ...p.secondary].filter(Boolean).join(' e ') || undefined,
@@ -298,8 +372,91 @@ async function executeTool(
       preco_original: p.promo ? p.price : undefined,
       tamanhos:       p.sizes.length > 0 ? p.sizes : undefined,
       descricao:      p.desc ? p.desc.slice(0, 100) : undefined,
+      tem_foto:       !!p.image,
     }));
     return { encontrados: top.length, produtos: top };
+  }
+
+  if (name === 'enviar_fotos_produtos') {
+    const found = (await searchCatalog(ids.storeId, args, 12)).filter(p => p.image).slice(0, 4);
+    for (const p of found) {
+      const preco = p.promo ? `${brlA(p.promo)} (de ${brlA(p.price)})` : brlA(p.price);
+      const tam   = p.sizes.length > 0 ? ` · ${p.sizes.slice(0, 6).join('/')}` : '';
+      collector.media.push({
+        imageUrl: wsrvImage(p.image),
+        caption:  `${p.name} · ${preco}${tam}`,
+      });
+    }
+    return {
+      fotos_enviadas: found.length,
+      produtos: found.map(p => ({ sku: p.sku || undefined, nome: p.name, preco: p.promo ?? p.price, tamanhos: p.sizes })),
+      aviso: found.length > 0
+        ? 'As fotos serão anexadas automaticamente à sua resposta. Escreva só um convite curto pra escolher ou fechar — NÃO descreva as fotos.'
+        : 'Nenhum produto com foto encontrado para esses filtros. Ofereça alternativas via buscar_produtos.',
+    };
+  }
+
+  if (name === 'montar_link_sacola') {
+    const siteUrl = (process.env.SITE_URL || '').replace(/\/$/, '');
+    if (!siteUrl) return { erro: 'Loja sem site configurado. Encaminhe para o atendente fechar o pedido.' };
+
+    const itens = Array.isArray(args.itens) ? args.itens as Array<Record<string, unknown>> : [];
+    if (itens.length === 0) return { erro: 'Nenhum item informado.' };
+
+    const catalog = await getCatalogForMind(ids.storeId);
+    const parts: string[] = [];
+    const confirmados: string[] = [];
+    for (const item of itens) {
+      const sku = String(item.sku || '').trim();
+      if (!sku) continue;
+      const prod = catalog.find(p => p.sku && p.sku.toUpperCase() === sku.toUpperCase());
+      if (!prod) return { erro: `SKU ${sku} não encontrado no catálogo. Confirme o produto com buscar_produtos.` };
+      const tamanho = String(item.tamanho || '').trim().toUpperCase();
+      if (prod.sizes.length > 0 && !tamanho) return { erro: `${prod.name} tem tamanhos (${prod.sizes.join('/')}). Pergunte o tamanho antes de montar a sacola.` };
+      const qtd = Math.max(1, Math.min(10, Number(item.qtd) || 1));
+      parts.push([prod.sku, tamanho || null, qtd > 1 ? qtd : null].filter(Boolean).join(':'));
+      confirmados.push(`${prod.name}${tamanho ? ` tam ${tamanho}` : ''}${qtd > 1 ? ` x${qtd}` : ''}`);
+    }
+    if (parts.length === 0) return { erro: 'Nenhum item válido.' };
+
+    const link = `${siteUrl}/?sacola=${parts.join(',')}`;
+    return {
+      ok: true,
+      link,
+      itens: confirmados,
+      aviso: 'Envie o link na resposta e diga que a sacola já está montada — é só finalizar. Confirme os itens em uma linha.',
+    };
+  }
+
+  if (name === 'consultar_pedidos_cliente') {
+    // O phone da sessão pode ser LID; o telefone real fica em bot_leads.phone_real
+    const { data: lead } = await supabase
+      .from('bot_leads')
+      .select('phone_real')
+      .eq('store_id', ids.storeId)
+      .eq('phone', ids.phone)
+      .maybeSingle();
+
+    const candidates = new Set<string>();
+    for (const raw of [ids.phone, lead?.phone_real].filter(Boolean) as string[]) {
+      for (const v of phoneVariants(raw)) candidates.add(v.replace(/\D/g, '').slice(-8));
+    }
+
+    const orders = await fetchSiteOrders(500);
+    const doCliente = orders.filter(o => {
+      const d = String(o.phone || '').replace(/\D/g, '').slice(-8);
+      return d.length === 8 && candidates.has(d);
+    }).slice(0, 5).map(o => ({
+      pedido: o.order_number || o.id.slice(0, 8),
+      itens:  summarizeOrderItems(o.items),
+      valor:  o.value != null ? Number(o.value) : undefined,
+      status: o.status || undefined,
+      data:   o.created_at ? o.created_at.slice(0, 10) : undefined,
+    }));
+
+    return doCliente.length > 0
+      ? { encontrados: doCliente.length, pedidos: doCliente }
+      : { encontrados: 0, aviso: 'Nenhum pedido encontrado para este cliente no site. Pergunte o número do pedido ou ofereça o atendente.' };
   }
 
   if (name === 'salvar_dados_cliente') {
@@ -338,6 +495,7 @@ async function callGeminiAgent(
   model: string,
   history: Array<{ role: 'user' | 'assistant'; content: string }> | undefined,
   ids: AgentIds,
+  collector: { media: AgentMedia[] },
 ): Promise<string | null> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
   const contents: Array<Record<string, unknown>> = [
@@ -353,7 +511,13 @@ async function callGeminiAgent(
     const body = {
       contents,
       systemInstruction: { parts: [{ text: systemPrompt }] },
-      generationConfig:  { maxOutputTokens: 350, temperature: 0.5 },
+      // Nos modelos 2.5 o "thinking" consome o maxOutputTokens e corta a
+      // resposta no meio — desligamos (não precisa raciocínio longo pra vender)
+      generationConfig:  {
+        maxOutputTokens: 350,
+        temperature: 0.5,
+        ...(model.includes('2.5') ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+      },
       tools:             [{ functionDeclarations: TOOL_DECLARATIONS }],
       toolConfig:        { functionCallingConfig: { mode: lastRound ? 'NONE' : 'AUTO' } },
     };
@@ -383,7 +547,7 @@ async function callGeminiAgent(
     for (const c of calls) {
       bumpUsage('toolCalls');
       const fc     = c.functionCall as { name: string; args?: Record<string, unknown> };
-      const result = await executeTool(fc.name, fc.args || {}, ids)
+      const result = await executeTool(fc.name, fc.args || {}, ids, collector)
         .catch(err => ({ erro: String((err as Error).message || err) }));
       console.log(`[aiAgent] tool ${fc.name}`, JSON.stringify(fc.args || {}).slice(0, 120));
       contents.push({ role: 'user', parts: [{ functionResponse: { name: fc.name, response: result } }] });
@@ -451,7 +615,11 @@ async function callGemini(
   const body = {
     contents,
     systemInstruction: { parts: [{ text: systemPrompt }] },
-    generationConfig:  { maxOutputTokens: 300, temperature: 0.5 },
+    generationConfig:  {
+      maxOutputTokens: 300,
+      temperature: 0.5,
+      ...(model.includes('2.5') ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+    },
   };
 
   const resp = await fetch(url, {
@@ -507,36 +675,88 @@ export async function testAiConnection(): Promise<{ ok: boolean; reply?: string;
 
 // ── Função principal chamada pelo motor do bot ───────────────────────────────
 // Com `ids` (storeId+phone) roda em MODO AGENTE: ferramentas de catálogo/CRM/
-// handoff via function calling. Sem `ids`, mantém o modo one-shot original.
-// Em erro (429/5xx/timeout) tenta automaticamente o modelo de fallback.
-export async function aiAssist(
+// venda via function calling; fotos de produto voltam em `media`. Sem `ids`,
+// mantém o modo one-shot original. Em erro (429/5xx/timeout) tenta o fallback.
+export async function aiAssistFull(
   message: string,
   ctx: AiAssistContext,
   intentHint?: string,
   ids?: AgentIds,
-): Promise<string | null> {
+): Promise<AiAssistResult> {
   const provider = (process.env.AI_ASSIST_PROVIDER || '').toLowerCase();
   const key      = process.env.AI_ASSIST_KEY || '';
   const primary  = process.env.AI_ASSIST_MODEL || 'gemini-2.5-flash';
   const fallback = process.env.AI_ASSIST_MODEL_FALLBACK || 'gemini-2.0-flash';
 
-  if (provider !== 'gemini' || !key) return null;
+  if (provider !== 'gemini' || !key) return { text: null, media: [] };
 
   const systemPrompt = createSystemPrompt(ctx, intentHint) + (ids ? TOOLS_NOTE : '');
   const models = fallback && fallback !== primary ? [primary, fallback] : [primary];
 
   for (let i = 0; i < models.length; i++) {
+    const collector = { media: [] as AgentMedia[] };
     try {
       bumpUsage('calls');
       if (i > 0) bumpUsage('fallbacks');
-      return ids
-        ? await callGeminiAgent(message, systemPrompt, key, models[i], ctx.conversationHistory, ids)
+      const text = ids
+        ? await callGeminiAgent(message, systemPrompt, key, models[i], ctx.conversationHistory, ids, collector)
         : await callGemini(message, systemPrompt, key, models[i], ctx.conversationHistory);
+      return { text, media: collector.media };
     } catch (err) {
       bumpUsage('errors');
       console.error(`[AI Assist] ${models[i]}:`, (err as Error).message);
       // tenta o próximo modelo da lista
     }
   }
-  return null;
+  return { text: null, media: [] };
+}
+
+// Compatibilidade: retorna só o texto (rotas antigas/testes)
+export async function aiAssist(
+  message: string,
+  ctx: AiAssistContext,
+  intentHint?: string,
+  ids?: AgentIds,
+): Promise<string | null> {
+  const result = await aiAssistFull(message, ctx, intentHint, ids);
+  return result.text;
+}
+
+// ── Visão: descreve foto enviada pelo cliente (busca de produto por imagem) ─
+export async function describeImage(image: Buffer, mimeType = 'image/jpeg'): Promise<string | null> {
+  const provider = (process.env.AI_ASSIST_PROVIDER || '').toLowerCase();
+  const key      = process.env.AI_ASSIST_KEY || '';
+  const model    = process.env.AI_ASSIST_MODEL || 'gemini-2.5-flash';
+  if (provider !== 'gemini' || !key) return null;
+  if (image.length > 8 * 1024 * 1024) return null;
+
+  const body = {
+    contents: [{
+      role: 'user',
+      parts: [
+        { inlineData: { mimeType: mimeType.split(';')[0], data: image.toString('base64') } },
+        { text: 'Foto enviada por um cliente de uma loja de roupas no WhatsApp. Descreva em UMA frase curta o que ele quer (tipo de peça, cor, marca/estampa se visível). Responda SOMENTE com a descrição.' },
+      ],
+    }],
+    generationConfig: { maxOutputTokens: 100, temperature: 0.2 },
+  };
+
+  try {
+    const url  = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    const resp = await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+      signal:  AbortSignal.timeout(15_000),
+    });
+    if (!resp.ok) throw new Error(`Gemini ${resp.status}`);
+    const json = await resp.json() as Record<string, any>;
+    const text = (json?.candidates?.[0]?.content?.parts || [])
+      .map((p: Record<string, any>) => p.text).filter(Boolean).join('').trim();
+    return text || null;
+  } catch (err) {
+    bumpUsage('errors');
+    console.error('[AI Assist] visão:', (err as Error).message);
+    return null;
+  }
 }

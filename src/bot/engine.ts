@@ -21,7 +21,8 @@ import {
 } from '../catalog/catalogBridge';
 import { detectIntent } from '../services/intentService';
 import { handleIntent } from '../services/chatBrainService';
-import { aiAssist, AiAssistContext, buildSegmentInstructions } from '../services/aiAssistService';
+import { aiAssistFull, AiAssistContext, buildSegmentInstructions } from '../services/aiAssistService';
+import { maybeUpdateLeadMemory } from '../services/leadMemoryService';
 import { getStoreBrain, buildBrainContext, StoreBrain } from '../services/storeBrainService';
 import { buildCatalogSnippet, buildLeadProfile } from '../services/storeMindService';
 import { buildRuntimeKnowledgeContext } from '../services/storeKnowledgeService';
@@ -331,11 +332,13 @@ export async function processMessage(
       catalogSnippet:       catalogSnippet || undefined,
       leadProfile:          leadProfile || undefined,
     };
-    const aiReply = await aiAssist(messageText, aiCtx, intentResult.intent, { storeId, phone: session.phone });
-    if (aiReply) {
+    const aiResult = await aiAssistFull(messageText, aiCtx, intentResult.intent, { storeId, phone: session.phone });
+    if (aiResult.text || aiResult.media.length > 0) {
+      const logText = aiResult.text || `📷 ${aiResult.media.map(m => m.caption).join(' | ')}`;
       await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
-      await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: aiReply,     node: 'AI_ASSIST' });
-      return { text: aiReply, nextNode: currentNodeId, context: ctx, detectedIntent: intentResult.intent, confidence: intentResult.confidence };
+      await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: logText,     node: 'AI_ASSIST' });
+      maybeUpdateLeadMemory(storeId, session.phone);
+      return { text: aiResult.text || '', nextNode: currentNodeId, context: ctx, detectedIntent: intentResult.intent, confidence: intentResult.confidence, media: aiResult.media };
     }
   }
 
@@ -368,11 +371,13 @@ export async function processMessage(
         catalogSnippet:      catalogSnippet || undefined,
         leadProfile:         leadProfile || undefined,
       };
-      const aiFallbackReply = await aiAssist(messageText, aiCtx, intentResult.intent, { storeId, phone: session.phone });
-      if (aiFallbackReply) {
-        await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText,        node: currentNodeId });
-        await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: aiFallbackReply,    node: 'AI_ASSIST' });
-        return { text: aiFallbackReply, nextNode: currentNodeId, context: ctx, detectedIntent: intentResult.intent, confidence: intentResult.confidence };
+      const aiFallback = await aiAssistFull(messageText, aiCtx, intentResult.intent, { storeId, phone: session.phone });
+      if (aiFallback.text || aiFallback.media.length > 0) {
+        const logText = aiFallback.text || `📷 ${aiFallback.media.map(m => m.caption).join(' | ')}`;
+        await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
+        await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: logText,     node: 'AI_ASSIST' });
+        maybeUpdateLeadMemory(storeId, session.phone);
+        return { text: aiFallback.text || '', nextNode: currentNodeId, context: ctx, detectedIntent: intentResult.intent, confidence: intentResult.confidence, media: aiFallback.media };
       }
     }
 

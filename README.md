@@ -3,6 +3,25 @@
 Bot de WhatsApp da Fluxo Outlet.
 API independente hospedada na Vercel. Banco Supabase (mesmo projeto do site, tabelas separadas).
 
+## O que o bot faz com IA ligada (modo agente)
+
+A IA (Gemini function calling) age como vendedor com ferramentas reais:
+
+| Ferramenta | O que faz |
+|---|---|
+| `buscar_produtos` | Consulta o catálogo real (preço, cor, tamanho, estoque) |
+| `enviar_fotos_produtos` | Manda a FOTO da peça no WhatsApp com preço na legenda (via wsrv.nl) |
+| `montar_link_sacola` | Gera link do site com a sacola pronta (`?sacola=SKU:TAM:QTD`) — cliente só finaliza |
+| `consultar_pedidos_cliente` | Pedidos anteriores do cliente no site |
+| `salvar_dados_cliente` | Grava nome/tamanho/cidade/interesse no CRM durante a conversa |
+| `chamar_atendente` | Handoff: marca lead QUENTE e avisa o operador no WhatsApp |
+
+Além disso: transcreve **áudio**, entende **foto** enviada pelo cliente (visão),
+mantém **memória de longo prazo** por cliente (resumo em `bot_leads.context.memoria`),
+responde em **bolhas** com "digitando..." e agrupa mensagens picadas (debounce 5s).
+
+Regressão: `npm run eval` roda a bateria de cenários pelo motor (sem WhatsApp).
+
 ---
 
 ## URLs

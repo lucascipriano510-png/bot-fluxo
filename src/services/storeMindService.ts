@@ -14,6 +14,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
 export interface MindProduct {
+  sku: string;
   name: string;
   category: string;
   subcategory: string;
@@ -26,6 +27,7 @@ export interface MindProduct {
   promo: number | null;
   featured: boolean;
   sizes: string[];
+  image: string;
 }
 
 const norm = (s: unknown) =>
@@ -59,18 +61,19 @@ export async function getCatalogForMind(storeId: string): Promise<MindProduct[]>
     const c = siteClient();
     if (c) {
       const { data } = await c.from('products')
-        .select('name,category,subcategory,color,secondary_colors,product_type,bot_description,search_tags,price,promotional_price,stock,sizes,featured,is_kit')
+        .select('sku,name,category,subcategory,color,secondary_colors,product_type,bot_description,search_tags,price,promotional_price,stock,sizes,featured,is_kit,image')
         .gt('stock', 0).limit(300);
       rows = (data || []).filter((r) => !r.is_kit);
     }
   } else {
     const { data } = await supabase.from('products')
-      .select('name,category,subcategory,color,product_type,description,tags,price,promotional_price,stock,sizes,featured,is_active')
+      .select('sku,name,category,subcategory,color,product_type,description,tags,price,promotional_price,stock,sizes,featured,is_active,image_url')
       .eq('store_id', storeId).gt('stock', 0).limit(300);
     rows = (data || []).filter((r) => r.is_active !== false);
   }
 
   const mapped: MindProduct[] = rows.map((r) => ({
+    sku: String(r.sku || ''),
     name: String(r.name || ''),
     category: String(r.category || ''),
     subcategory: String(r.subcategory || ''),
@@ -83,6 +86,7 @@ export async function getCatalogForMind(storeId: string): Promise<MindProduct[]>
     promo: r.promotional_price != null && Number(r.promotional_price) > 0 && Number(r.promotional_price) < Number(r.price) ? Number(r.promotional_price) : null,
     featured: !!r.featured,
     sizes: sizesOf(r.sizes),
+    image: String(r.image || r.image_url || ''),
   }));
 
   _cat.set(storeId, { data: mapped, exp: Date.now() + 5 * 60 * 1000 });
@@ -140,7 +144,7 @@ export async function buildLeadProfile(storeId: string, phone: string): Promise<
   try {
     const { data } = await supabase
       .from('bot_leads')
-      .select('nome,status_comercial,interesse,total_purchases,lifetime_value,cidade,tamanho')
+      .select('nome,status_comercial,interesse,total_purchases,lifetime_value,cidade,tamanho,context')
       .eq('store_id', storeId)
       .eq('phone', phone)
       .maybeSingle();
@@ -152,6 +156,9 @@ export async function buildLeadProfile(storeId: string, phone: string): Promise<
     if (data.cidade) parts.push(`Cidade: ${data.cidade}`);
     if (data.tamanho) parts.push(`Tamanho: ${data.tamanho}`);
     if (Number(data.total_purchases) > 0) parts.push(`Já comprou ${data.total_purchases}x (total ${brl(Number(data.lifetime_value) || 0)})`);
+    // Memória de longo prazo: resumo de conversas anteriores (leadMemoryService)
+    const memoria = (data.context as Record<string, unknown> | null)?.memoria;
+    if (memoria && typeof memoria === 'string') parts.push(`Memória de conversas anteriores: ${memoria}`);
     return parts.length ? parts.join(' · ') : '';
   } catch {
     return '';

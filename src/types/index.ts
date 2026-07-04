@@ -48,6 +48,8 @@ export interface BotResponse {
   context?: Record<string, string>;
   detectedIntent?: string;
   confidence?: number;
+  // Fotos de produto anexadas pela IA (ferramenta enviar_fotos_produtos)
+  media?: Array<{ imageUrl: string; caption: string }>;
 }
 
 export interface BotOptOut {
