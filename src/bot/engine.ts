@@ -331,7 +331,7 @@ export async function processMessage(
       catalogSnippet:       catalogSnippet || undefined,
       leadProfile:          leadProfile || undefined,
     };
-    const aiReply = await aiAssist(messageText, aiCtx, intentResult.intent);
+    const aiReply = await aiAssist(messageText, aiCtx, intentResult.intent, { storeId, phone: session.phone });
     if (aiReply) {
       await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText, node: currentNodeId });
       await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: aiReply,     node: 'AI_ASSIST' });
@@ -368,7 +368,7 @@ export async function processMessage(
         catalogSnippet:      catalogSnippet || undefined,
         leadProfile:         leadProfile || undefined,
       };
-      const aiFallbackReply = await aiAssist(messageText, aiCtx, intentResult.intent);
+      const aiFallbackReply = await aiAssist(messageText, aiCtx, intentResult.intent, { storeId, phone: session.phone });
       if (aiFallbackReply) {
         await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'entrada', conteudo: messageText,        node: currentNodeId });
         await saveMensagem({ store_id: storeId, phone: session.phone, direcao: 'saida',   conteudo: aiFallbackReply,    node: 'AI_ASSIST' });

@@ -1,14 +1,26 @@
 // baileys.ts — Real quando ENABLE_BAILEYS=true (Render/Railway/VPS).
 // Sem a variável, retorna stub 'unavailable' (compatível com Vercel serverless).
-// MODO OBSERVADOR — nunca responder automaticamente
+//
+// MODO OBSERVADOR por padrão — nunca responde automaticamente.
+// AUTO-RESPOSTA é opt-in: exige BOT_AUTO_REPLY=true no ambiente. Mesmo ligada,
+// o engine ainda respeita bot_ativo, humano_ativo, opt-out e horário comercial.
+// Pipeline da auto-resposta: debounce 5s (junta mensagens picadas) → engine →
+// "digitando..." proporcional → envio. Áudios são transcritos via Gemini.
 
 import { supabase } from '../lib/supabase';
 import qrcode from 'qrcode';
 import { normalizePhone, canonicalMobileBR } from '../utils/phone';
+import { processMessage } from '../bot/engine';
+import { getOrCreateSession } from '../services/sessionService';
+import { transcribeAudio } from '../services/aiAssistService';
+import { getRuntimeSettings } from '../services/settingsService';
+import { startFollowUpLoop } from '../services/followUpService';
+import { setHandoffNotifier } from '../services/handoffBus';
 
 export type WaStatus = 'connected' | 'qr_pending' | 'disconnected' | 'unavailable';
 
-const ENABLED = process.env.ENABLE_BAILEYS === 'true';
+const ENABLED    = process.env.ENABLE_BAILEYS === 'true';
+const AUTO_REPLY = process.env.BOT_AUTO_REPLY === 'true';
 
 let _status: WaStatus = ENABLED ? 'disconnected' : 'unavailable';
 let _qr: string | null = null;
@@ -59,6 +71,90 @@ async function resolvePhoneReal(msg: any): Promise<string | null> {
     console.warn('[Baileys] resolvePhoneReal falhou:', (err as Error)?.message);
   }
   return null;
+}
+
+// ── Auto-resposta: buffer de mensagens picadas (debounce por telefone) ──────
+// Cliente de WhatsApp digita em rajada ("oi" / "tem calça?" / "jogador").
+// Espera 5s de silêncio (máx 15s desde a primeira) e processa tudo junto:
+// uma chamada ao engine, uma resposta natural, menos custo de IA.
+const DEBOUNCE_MS   = 5_000;
+const MAX_BUFFER_MS = 15_000;
+const _pending = new Map<string, { jid: string; texts: string[]; timer: NodeJS.Timeout; firstAt: number }>();
+
+function queueAutoReply(storeId: string, phone: string, jid: string, text: string): void {
+  const entry = _pending.get(phone);
+  if (entry) {
+    entry.texts.push(text);
+    clearTimeout(entry.timer);
+    const remaining = Math.max(500, MAX_BUFFER_MS - (Date.now() - entry.firstAt));
+    entry.timer = setTimeout(() => flushAutoReply(storeId, phone), Math.min(DEBOUNCE_MS, remaining));
+  } else {
+    _pending.set(phone, {
+      jid,
+      texts:   [text],
+      firstAt: Date.now(),
+      timer:   setTimeout(() => flushAutoReply(storeId, phone), DEBOUNCE_MS),
+    });
+  }
+}
+
+// Operador respondeu manualmente pelo celular → bot não atropela
+function cancelAutoReply(phone: string): void {
+  const entry = _pending.get(phone);
+  if (entry) {
+    clearTimeout(entry.timer);
+    _pending.delete(phone);
+  }
+}
+
+async function flushAutoReply(storeId: string, phone: string): Promise<void> {
+  const entry = _pending.get(phone);
+  _pending.delete(phone);
+  if (!entry || !_socket || _status !== 'connected') return;
+
+  const joined = entry.texts.join('\n');
+  try {
+    const session  = await getOrCreateSession(storeId, phone);
+    const response = await processMessage(session, joined);
+    // texto vazio = bot desligado, humano ativo ou silêncio intencional do engine
+    if (!response.text) return;
+
+    const settings = await getRuntimeSettings(storeId);
+    if (settings.delay_resposta) {
+      try {
+        await _socket.presenceSubscribe(entry.jid);
+        await _socket.sendPresenceUpdate('composing', entry.jid);
+        const typingMs = Math.min(8_000, Math.max(1_500, response.text.length * 35));
+        await new Promise(r => setTimeout(r, typingMs));
+        await _socket.sendPresenceUpdate('paused', entry.jid);
+      } catch { /* presença é cosmética — nunca bloqueia o envio */ }
+    }
+
+    await sendReplyToJid(entry.jid, phone, response.text, storeId);
+    console.log('[auto-reply]', phone, '→', response.text.slice(0, 80).replace(/\n/g, ' '));
+  } catch (err) {
+    console.error('[auto-reply] erro:', (err as Error).message);
+  }
+}
+
+// Envia para o JID exato de origem (funciona para @s.whatsapp.net e @lid)
+// e persiste no inbox como as demais mensagens de saída.
+async function sendReplyToJid(jid: string, phone: string, text: string, storeId: string): Promise<void> {
+  if (!_socket || _status !== 'connected') throw new Error('WhatsApp não conectado.');
+  await _socket.sendMessage(jid, { text });
+
+  const ts = new Date().toISOString();
+  await supabase.from('wa_messages').insert({
+    store_id: storeId, phone, direction: 'out', text, timestamp: ts,
+  }).then(null, () => {});
+
+  await supabase.from('wa_conversations').upsert({
+    store_id:     storeId,
+    phone,
+    last_message: text,
+    last_time:    ts,
+    unread_count: 0,
+  }, { onConflict: 'store_id,phone' }).then(null, () => {});
 }
 
 async function upsertLeadFromInbox(
@@ -237,6 +333,26 @@ export async function initBaileys(storeId: string): Promise<void> {
         _qr = null;
         _initializing = false;
 
+        if (AUTO_REPLY) {
+          console.log('[auto-reply] BOT_AUTO_REPLY=true — bot responde no WhatsApp real (engine ainda respeita bot_ativo/humano/opt-out)');
+
+          // Handoff: quando a IA aciona chamar_atendente, avisa o operador no zap
+          setHandoffNotifier((_sid, phone, motivo) => {
+            const op = process.env.OPERATOR_PHONE;
+            if (!op || !_socket) return;
+            const opJid = normalizePhone(op) + '@s.whatsapp.net';
+            _socket.sendMessage(opJid, {
+              text: `🔔 Fluxo Command: cliente ${formatPhone(phone)} pediu atendimento humano.\nMotivo: ${motivo}`,
+            }).catch(() => {});
+          });
+
+          // Follow-up de leads abandonados (só liga com FOLLOWUP_ATIVO=true)
+          startFollowUpLoop(storeId, async (phone: string, text: string) => {
+            const jid = phone.includes('@') ? phone : `${phone}@s.whatsapp.net`;
+            await sendReplyToJid(jid, phone, text, storeId);
+          });
+        }
+
         const operatorPhone = process.env.OPERATOR_PHONE;
         if (operatorPhone && _disconnectedAt) {
           const fell = _disconnectedAt;
@@ -271,16 +387,39 @@ export async function initBaileys(storeId: string): Promise<void> {
 
         const phone = normalizePhone(jid);
 
-        const text =
+        let text =
           msg.message?.conversation ||
           msg.message?.extendedTextMessage?.text ||
           msg.message?.imageMessage?.caption || '';
+
+        // Áudio (voice note): transcreve via Gemini e segue o fluxo como texto.
+        // engineText vai pro motor sem o prefixo; o inbox guarda com 🎤.
+        let engineText = text;
+        if (!text && !msg.key.fromMe && AUTO_REPLY && msg.message?.audioMessage) {
+          try {
+            const B = await import('@whiskeysockets/baileys') as any;
+            const buf = await B.downloadMediaMessage(
+              msg, 'buffer', {},
+              { logger: silentLogger, reuploadRequest: _socket?.updateMediaMessage },
+            ) as Buffer;
+            const transcript = await transcribeAudio(buf, msg.message.audioMessage.mimetype || 'audio/ogg');
+            if (transcript) {
+              engineText = transcript;
+              text       = `🎤 ${transcript}`;
+              console.log('[audio] transcrito:', transcript.slice(0, 80));
+            }
+          } catch (err) {
+            console.warn('[audio] transcrição falhou:', (err as Error).message);
+          }
+        }
 
         if (!text || !phone) continue;
 
         const ts = new Date(Number(msg.messageTimestamp) * 1000).toISOString();
 
         if (msg.key.fromMe) {
+          // Operador assumiu a conversa pelo celular — bot não atropela
+          cancelAutoReply(phone);
           // Mensagem enviada pelo celular — salva como saída, sem criar lead, sem unread
           await supabase.from('wa_messages').insert({
             store_id: storeId, phone, direction: 'out', text, timestamp: ts,
@@ -324,6 +463,9 @@ export async function initBaileys(storeId: string): Promise<void> {
           lead_id:      leadId,
           unread_count: (existingConv?.unread_count || 0) + 1,
         }, { onConflict: 'store_id,phone' }).then(null, () => {});
+
+        // Auto-resposta (opt-in) — entra no buffer de debounce e o engine decide
+        if (AUTO_REPLY) queueAutoReply(storeId, phone, jid, engineText);
       }
     });
 

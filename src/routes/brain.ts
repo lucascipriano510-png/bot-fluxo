@@ -22,9 +22,15 @@ import { initBaileys, getWaState, sendWaMessage, disconnectBaileys } from '../wh
 import { updateLeadScore, calculateLeadScore } from '../services/leadScoreService';
 import { analyzeSingleLead, processAllLeads, processNewLeads } from '../services/leadIntelligence';
 import { syncSitePurchases } from '../services/sitePurchaseService';
+import { getAiUsage } from '../services/aiAssistService';
 import { errMsg, cronAuthorized, EDGE_BASE, EDGE_AUTH } from './_shared';
 
 const router = Router();
+
+// Uso de IA do dia (chamadas, tool calls, erros, fallbacks, transcrições)
+router.get('/ai/usage', (_req, res) => {
+  res.json({ ok: true, usage: getAiUsage() });
+});
 
 router.get('/brain', async (req, res) => {
   try {

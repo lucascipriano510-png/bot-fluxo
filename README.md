@@ -27,6 +27,10 @@ O bot é uma API Express pura. Não chama nenhuma URL do site para responder men
 | `SITE_SUPABASE_ANON_KEY` | anon key — leitura do catálogo (tabela products) |
 | `LOJA_WHATSAPP` | Número da loja: `5534984148067` |
 | `IGNORAR_HORARIO` | `true` para ignorar horário comercial (obrigatório em testes) |
+| `AI_ASSIST_PROVIDER` / `AI_ASSIST_KEY` | Liga a IA (Gemini). Com IA ligada o bot vira AGENTE: busca produtos, salva lead no CRM e chama atendente sozinho (function calling) |
+| `AI_ASSIST_MODEL_FALLBACK` | Modelo reserva quando o principal falha (default `gemini-2.0-flash`) |
+| `BOT_AUTO_REPLY` | **`true` = bot responde sozinho no WhatsApp real** (Baileys). Desligado por padrão. Inclui debounce 5s de mensagens picadas, "digitando..." e transcrição de áudio |
+| `FOLLOWUP_ATIVO` | `true` = follow-up automático de leads abandonados (45min–24h, máx 5/ciclo). Desligado por padrão |
 
 ---
 

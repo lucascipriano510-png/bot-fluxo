@@ -8,7 +8,16 @@
 //  Guardrails: nunca inventa preço, estoque, produto, prazo, endereço ou promoção.
 //  Quando não há dados, redireciona para atendimento — nunca diz "não sei".
 //  API key NUNCA sai do backend — nunca exposta no frontend ou nos logs.
+//
+//  MODO AGENTE (quando o engine passa storeId+phone): a IA ganha ferramentas
+//  reais — buscar_produtos (catálogo), salvar_dados_cliente (CRM) e
+//  chamar_atendente (handoff) — e decide sozinha quando usá-las, em loop de
+//  até 3 rodadas de tool calling. Fallback de modelo automático em erro/429.
 // ═══════════════════════════════════════════════════════════════════════════
+
+import { getCatalogForMind } from './storeMindService';
+import { upsertLeadLight } from './leadService';
+import { notifyHandoff } from './handoffBus';
 
 // ── Perfil de voz da loja — base para personalização futura ─────────────────
 export interface StoreVoiceProfile {
@@ -188,6 +197,241 @@ export function createSystemPrompt(ctx: AiAssistContext, intentHint?: string): s
   ].filter(s => s !== '').join('\n');
 }
 
+// ── Identificadores que habilitam o modo agente (ferramentas) ───────────────
+export interface AgentIds {
+  storeId: string;
+  phone:   string;
+}
+
+// ── Contador de uso de IA (reinicia a cada dia, em memória) ─────────────────
+const _usage = { date: '', calls: 0, toolCalls: 0, errors: 0, fallbacks: 0, transcriptions: 0 };
+
+function bumpUsage(k: 'calls' | 'toolCalls' | 'errors' | 'fallbacks' | 'transcriptions'): void {
+  const today = new Date().toISOString().slice(0, 10);
+  if (_usage.date !== today) {
+    _usage.date = today;
+    _usage.calls = _usage.toolCalls = _usage.errors = _usage.fallbacks = _usage.transcriptions = 0;
+  }
+  _usage[k]++;
+}
+
+export function getAiUsage() {
+  return { ..._usage };
+}
+
+// ── Ferramentas do agente (Gemini function calling) ─────────────────────────
+const TOOL_DECLARATIONS = [
+  {
+    name: 'buscar_produtos',
+    description: 'Busca produtos REAIS no catálogo da loja, com preço, cores e tamanhos. Use SEMPRE que o cliente perguntar sobre produto, preço, cor, tamanho ou disponibilidade e a resposta não estiver no contexto.',
+    parameters: {
+      type: 'object',
+      properties: {
+        busca:     { type: 'string', description: 'Termos livres de busca, ex: "camisa lacoste preta"' },
+        categoria: { type: 'string', description: 'Categoria, ex: "camisa", "calça", "bermuda"' },
+        cor:       { type: 'string', description: 'Cor desejada, ex: "preta"' },
+        tamanho:   { type: 'string', description: 'Tamanho, ex: "G", "42"' },
+        preco_max: { type: 'number', description: 'Preço máximo em reais' },
+      },
+    },
+  },
+  {
+    name: 'salvar_dados_cliente',
+    description: 'Salva no CRM dados que o cliente informou na conversa (nome, tamanho, cidade, interesse). Chame assim que o cliente informar algo novo — não pergunte de novo o que já foi dito.',
+    parameters: {
+      type: 'object',
+      properties: {
+        nome:      { type: 'string' },
+        tamanho:   { type: 'string' },
+        cidade:    { type: 'string' },
+        interesse: { type: 'string', description: 'O que o cliente está buscando' },
+      },
+    },
+  },
+  {
+    name: 'chamar_atendente',
+    description: 'Aciona um atendente humano da loja. Use quando o cliente pedir para falar com uma pessoa, quiser fechar a compra, ou quando você não conseguir resolver.',
+    parameters: {
+      type: 'object',
+      properties: {
+        motivo: { type: 'string', description: 'Resumo curto do que o cliente precisa' },
+      },
+    },
+  },
+];
+
+const TOOLS_NOTE = `
+
+FERRAMENTAS DISPONÍVEIS (use-as, não descreva):
+- buscar_produtos: consulta o catálogo REAL. Use antes de afirmar qualquer coisa sobre produto, preço, cor, tamanho ou estoque que não esteja no CATÁLOGO acima.
+- salvar_dados_cliente: registre nome, tamanho, cidade ou interesse assim que o cliente informar.
+- chamar_atendente: acione quando o cliente pedir uma pessoa de verdade ou quiser fechar a compra.
+Se buscar_produtos não retornar nada, ofereça o mais parecido que existir — nunca invente produto ou preço.`;
+
+const normA = (s: unknown) =>
+  String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+
+async function executeTool(
+  name: string,
+  args: Record<string, unknown>,
+  ids: AgentIds,
+): Promise<Record<string, unknown>> {
+  if (name === 'buscar_produtos') {
+    const catalog = await getCatalogForMind(ids.storeId);
+    let list = catalog;
+    if (args.categoria) list = list.filter(p => normA(`${p.category} ${p.subcategory} ${p.type} ${p.name}`).includes(normA(args.categoria)));
+    if (args.cor)       list = list.filter(p => normA([p.color, ...p.secondary].join(' ')).includes(normA(args.cor)));
+    if (args.tamanho)   list = list.filter(p => p.sizes.length === 0 || p.sizes.map(s => s.toUpperCase()).includes(String(args.tamanho).toUpperCase()));
+    if (args.preco_max) list = list.filter(p => (p.promo ?? p.price) <= Number(args.preco_max));
+
+    const tokens = normA(args.busca).split(/\s+/).filter(t => t.length >= 3);
+    const scored = list.map(p => {
+      const hay = normA([p.name, p.category, p.subcategory, p.color, p.secondary.join(' '), p.type, p.tags.join(' '), p.desc].join(' '));
+      return { p, s: tokens.reduce((acc, t) => acc + (hay.includes(t) ? 1 : 0), 0) };
+    }).sort((a, b) => b.s - a.s || (b.p.featured ? 1 : 0) - (a.p.featured ? 1 : 0) || a.p.price - b.p.price);
+
+    const top = (tokens.length > 0 ? scored.filter(x => x.s > 0) : scored).slice(0, 8).map(({ p }) => ({
+      nome:           p.name,
+      categoria:      [p.category, p.subcategory].filter(Boolean).join('/') || undefined,
+      cor:            [p.color, ...p.secondary].filter(Boolean).join(' e ') || undefined,
+      preco:          p.promo ?? p.price,
+      preco_original: p.promo ? p.price : undefined,
+      tamanhos:       p.sizes.length > 0 ? p.sizes : undefined,
+      descricao:      p.desc ? p.desc.slice(0, 100) : undefined,
+    }));
+    return { encontrados: top.length, produtos: top };
+  }
+
+  if (name === 'salvar_dados_cliente') {
+    await upsertLeadLight({
+      store_id:         ids.storeId,
+      phone:            ids.phone,
+      nome:             args.nome      ? String(args.nome).slice(0, 50)       : undefined,
+      tamanho:          args.tamanho   ? String(args.tamanho).slice(0, 10)    : undefined,
+      cidade:           args.cidade    ? String(args.cidade).slice(0, 40)     : undefined,
+      interesse:        args.interesse ? String(args.interesse).slice(0, 200) : undefined,
+      status_comercial: 'MORNO',
+    });
+    return { ok: true };
+  }
+
+  if (name === 'chamar_atendente') {
+    const motivo = String(args.motivo || 'cliente pediu atendimento').slice(0, 200);
+    await upsertLeadLight({
+      store_id:         ids.storeId,
+      phone:            ids.phone,
+      status_comercial: 'QUENTE',
+      stage_hint:       'interessado',
+    });
+    notifyHandoff(ids.storeId, ids.phone, motivo);
+    return { ok: true, aviso: 'Atendente notificado. Diga ao cliente que uma pessoa da loja vai falar com ele em instantes.' };
+  }
+
+  return { erro: `ferramenta desconhecida: ${name}` };
+}
+
+// ── Loop do agente: chamada com ferramentas, até 3 rodadas de tool calling ──
+async function callGeminiAgent(
+  message: string,
+  systemPrompt: string,
+  key: string,
+  model: string,
+  history: Array<{ role: 'user' | 'assistant'; content: string }> | undefined,
+  ids: AgentIds,
+): Promise<string | null> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+  const contents: Array<Record<string, unknown>> = [
+    ...(history ?? []).map(turn => ({
+      role:  turn.role === 'user' ? 'user' : 'model',
+      parts: [{ text: turn.content }],
+    })),
+    { role: 'user', parts: [{ text: message }] },
+  ];
+
+  for (let round = 0; round < 4; round++) {
+    const lastRound = round === 3;
+    const body = {
+      contents,
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig:  { maxOutputTokens: 350, temperature: 0.5 },
+      tools:             [{ functionDeclarations: TOOL_DECLARATIONS }],
+      toolConfig:        { functionCallingConfig: { mode: lastRound ? 'NONE' : 'AUTO' } },
+    };
+
+    const resp = await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+      signal:  AbortSignal.timeout(12_000),
+    });
+
+    if (!resp.ok) {
+      const errBody = await resp.text().catch(() => '');
+      throw new Error(`Gemini ${resp.status}: ${errBody.slice(0, 200)}`);
+    }
+
+    const json  = await resp.json() as Record<string, any>;
+    const parts: Array<Record<string, any>> = json?.candidates?.[0]?.content?.parts || [];
+    const calls = parts.filter(p => p.functionCall);
+
+    if (calls.length === 0) {
+      const text = parts.map(p => p.text).filter(Boolean).join('').trim();
+      return text || null;
+    }
+
+    contents.push({ role: 'model', parts });
+    for (const c of calls) {
+      bumpUsage('toolCalls');
+      const fc     = c.functionCall as { name: string; args?: Record<string, unknown> };
+      const result = await executeTool(fc.name, fc.args || {}, ids)
+        .catch(err => ({ erro: String((err as Error).message || err) }));
+      console.log(`[aiAgent] tool ${fc.name}`, JSON.stringify(fc.args || {}).slice(0, 120));
+      contents.push({ role: 'user', parts: [{ functionResponse: { name: fc.name, response: result } }] });
+    }
+  }
+  return null;
+}
+
+// ── Transcrição de áudio (WhatsApp voice notes) via Gemini multimodal ───────
+export async function transcribeAudio(audio: Buffer, mimeType = 'audio/ogg'): Promise<string | null> {
+  const provider = (process.env.AI_ASSIST_PROVIDER || '').toLowerCase();
+  const key      = process.env.AI_ASSIST_KEY || '';
+  const model    = process.env.AI_ASSIST_MODEL || 'gemini-2.5-flash';
+  if (provider !== 'gemini' || !key) return null;
+  if (audio.length > 8 * 1024 * 1024) return null; // grande demais para inline
+
+  const body = {
+    contents: [{
+      role: 'user',
+      parts: [
+        { inlineData: { mimeType: mimeType.split(';')[0], data: audio.toString('base64') } },
+        { text: 'Transcreva este áudio em português do Brasil. Responda SOMENTE com a transcrição, sem comentários.' },
+      ],
+    }],
+    generationConfig: { maxOutputTokens: 600, temperature: 0 },
+  };
+
+  try {
+    bumpUsage('transcriptions');
+    const url  = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    const resp = await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+      signal:  AbortSignal.timeout(20_000),
+    });
+    if (!resp.ok) throw new Error(`Gemini ${resp.status}`);
+    const json = await resp.json() as Record<string, any>;
+    const text = (json?.candidates?.[0]?.content?.parts || [])
+      .map((p: Record<string, any>) => p.text).filter(Boolean).join('').trim();
+    return text || null;
+  } catch (err) {
+    bumpUsage('errors');
+    console.error('[AI Assist] transcrição:', (err as Error).message);
+    return null;
+  }
+}
+
 // ── Chamada à Gemini REST API ────────────────────────────────────────────────
 async function callGemini(
   message: string,
@@ -262,24 +506,37 @@ export async function testAiConnection(): Promise<{ ok: boolean; reply?: string;
 }
 
 // ── Função principal chamada pelo motor do bot ───────────────────────────────
+// Com `ids` (storeId+phone) roda em MODO AGENTE: ferramentas de catálogo/CRM/
+// handoff via function calling. Sem `ids`, mantém o modo one-shot original.
+// Em erro (429/5xx/timeout) tenta automaticamente o modelo de fallback.
 export async function aiAssist(
   message: string,
   ctx: AiAssistContext,
   intentHint?: string,
+  ids?: AgentIds,
 ): Promise<string | null> {
   const provider = (process.env.AI_ASSIST_PROVIDER || '').toLowerCase();
   const key      = process.env.AI_ASSIST_KEY || '';
-  const model    = process.env.AI_ASSIST_MODEL || 'gemini-2.5-flash';
+  const primary  = process.env.AI_ASSIST_MODEL || 'gemini-2.5-flash';
+  const fallback = process.env.AI_ASSIST_MODEL_FALLBACK || 'gemini-2.0-flash';
 
-  if (!provider || !key) return null;
+  if (provider !== 'gemini' || !key) return null;
 
-  try {
-    if (provider === 'gemini') {
-      return await callGemini(message, createSystemPrompt(ctx, intentHint), key, model, ctx.conversationHistory);
+  const systemPrompt = createSystemPrompt(ctx, intentHint) + (ids ? TOOLS_NOTE : '');
+  const models = fallback && fallback !== primary ? [primary, fallback] : [primary];
+
+  for (let i = 0; i < models.length; i++) {
+    try {
+      bumpUsage('calls');
+      if (i > 0) bumpUsage('fallbacks');
+      return ids
+        ? await callGeminiAgent(message, systemPrompt, key, models[i], ctx.conversationHistory, ids)
+        : await callGemini(message, systemPrompt, key, models[i], ctx.conversationHistory);
+    } catch (err) {
+      bumpUsage('errors');
+      console.error(`[AI Assist] ${models[i]}:`, (err as Error).message);
+      // tenta o próximo modelo da lista
     }
-    return null;
-  } catch (err) {
-    console.error('[AI Assist] Erro:', (err as Error).message);
-    return null;
   }
+  return null;
 }
