@@ -12,6 +12,7 @@
 
 import { supabase } from '../lib/supabase';
 import { fetchHistorico } from './mensagemService';
+import { simpleCompletion } from './aiAssistService';
 
 const EVERY_N_REPLIES = 5;
 const _counters = new Map<string, number>(); // `${storeId}:${phone}` → nº de respostas de IA
@@ -27,9 +28,7 @@ export function maybeUpdateLeadMemory(storeId: string, phone: string): void {
 }
 
 async function updateLeadMemory(storeId: string, phone: string): Promise<void> {
-  const key   = process.env.AI_ASSIST_KEY || '';
-  const model = process.env.AI_ASSIST_MODEL_FALLBACK || 'gemini-2.0-flash';
-  if ((process.env.AI_ASSIST_PROVIDER || '').toLowerCase() !== 'gemini' || !key) return;
+  if (!process.env.AI_ASSIST_KEY) return;
 
   const historico = await fetchHistorico(storeId, phone, 24);
   if (historico.length < 4) return;
@@ -57,21 +56,8 @@ async function updateLeadMemory(storeId: string, phone: string): Promise<void> {
     'Responda SOMENTE com a memória atualizada, sem comentários.',
   ].filter(Boolean).join('\n');
 
-  const url  = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-  const resp = await fetch(url, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({
-      contents:         [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 200, temperature: 0.2 },
-    }),
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!resp.ok) throw new Error(`Gemini ${resp.status}`);
-
-  const json    = await resp.json() as Record<string, any>;
-  const memoria = (json?.candidates?.[0]?.content?.parts || [])
-    .map((p: Record<string, any>) => p.text).filter(Boolean).join('').trim();
+  // Roteia pelo provider configurado (Gemini barato ou Claude Haiku)
+  const memoria = await simpleCompletion(prompt, 200);
   if (!memoria) return;
 
   const context = { ...(lead.context as Record<string, unknown> || {}), memoria, memoria_atualizada: new Date().toISOString() };

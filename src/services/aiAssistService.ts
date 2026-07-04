@@ -1,9 +1,11 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  aiAssistService — Camada de IA controlada para respostas conversacionais
 //
-//  Provider atual: Gemini (Google Generative AI REST API)
-//  Ativação: definir AI_ASSIST_PROVIDER=gemini e AI_ASSIST_KEY nas env vars.
-//  Modelo padrão: AI_ASSIST_MODEL=gemini-2.5-flash
+//  Providers suportados (AI_ASSIST_PROVIDER):
+//    gemini    — Google Generative AI (REST). Modelo padrão gemini-2.5-flash.
+//                Multimodal completo: agente + áudio + visão na mesma chave.
+//    anthropic — Claude via SDK oficial. Modelo padrão claude-haiku-4-5.
+//                Agente + visão; áudio precisa de GEMINI_KEY separada (opcional).
 //
 //  Guardrails: nunca inventa preço, estoque, produto, prazo, endereço ou promoção.
 //  Quando não há dados, redireciona para atendimento — nunca diz "não sei".
@@ -15,12 +17,20 @@
 //  até 3 rodadas de tool calling. Fallback de modelo automático em erro/429.
 // ═══════════════════════════════════════════════════════════════════════════
 
+import Anthropic from '@anthropic-ai/sdk';
 import { getCatalogForMind, MindProduct } from './storeMindService';
 import { upsertLeadLight } from './leadService';
 import { notifyHandoff } from './handoffBus';
 import { fetchSiteOrders, summarizeOrderItems } from '../inventory/sitePurchasesBridge';
 import { supabase } from '../lib/supabase';
 import { phoneVariants } from '../utils/phone';
+
+// ── Cliente Anthropic (provider "anthropic" — Claude Haiku como cérebro) ────
+let _anthropic: Anthropic | null = null;
+function anthropicClient(key: string): Anthropic {
+  if (!_anthropic) _anthropic = new Anthropic({ apiKey: key });
+  return _anthropic;
+}
 
 // ── Perfil de voz da loja — base para personalização futura ─────────────────
 export interface StoreVoiceProfile {
@@ -322,6 +332,13 @@ const TOOL_DECLARATIONS = [
   },
 ];
 
+// Mesmas ferramentas no formato da API Anthropic (name/description/input_schema)
+const ANTHROPIC_TOOLS: Anthropic.Tool[] = TOOL_DECLARATIONS.map(t => ({
+  name:         t.name,
+  description:  t.description,
+  input_schema: t.parameters as Anthropic.Tool.InputSchema,
+}));
+
 const TOOLS_NOTE = `
 
 FERRAMENTAS DISPONÍVEIS (use-as, não descreva):
@@ -556,12 +573,141 @@ async function callGeminiAgent(
   return null;
 }
 
+// ── Loop do agente via Claude (Anthropic Messages API + tool use) ───────────
+async function callClaudeAgent(
+  message: string,
+  systemPrompt: string,
+  key: string,
+  model: string,
+  history: Array<{ role: 'user' | 'assistant'; content: string }> | undefined,
+  ids: AgentIds,
+  collector: { media: AgentMedia[] },
+): Promise<string | null> {
+  const client = anthropicClient(key);
+  const messages: Anthropic.MessageParam[] = [
+    ...(history ?? []).map(turn => ({
+      role:    turn.role === 'user' ? 'user' as const : 'assistant' as const,
+      content: turn.content,
+    })),
+    { role: 'user', content: message },
+  ];
+
+  for (let round = 0; round < 4; round++) {
+    const response = await client.messages.create({
+      model,
+      max_tokens: 600,
+      system:     systemPrompt,
+      messages,
+      tools:      ANTHROPIC_TOOLS,
+    }, { timeout: 25_000 });
+
+    const toolUses = response.content.filter(
+      (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
+    );
+
+    if (response.stop_reason !== 'tool_use' || toolUses.length === 0) {
+      const text = response.content
+        .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+        .map(b => b.text).join('').trim();
+      return text || null;
+    }
+
+    messages.push({ role: 'assistant', content: response.content });
+
+    const results: Anthropic.ToolResultBlockParam[] = [];
+    for (const tu of toolUses) {
+      bumpUsage('toolCalls');
+      const result = await executeTool(tu.name, (tu.input || {}) as Record<string, unknown>, ids, collector)
+        .catch(err => ({ erro: String((err as Error).message || err) }));
+      console.log(`[aiAgent] tool ${tu.name}`, JSON.stringify(tu.input || {}).slice(0, 120));
+      results.push({ type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(result) });
+    }
+    messages.push({ role: 'user', content: results });
+  }
+  return null;
+}
+
+// Claude sem ferramentas (one-shot — teste de conexão e modo simples)
+async function callClaude(
+  message: string,
+  systemPrompt: string,
+  key: string,
+  model: string,
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>,
+): Promise<string | null> {
+  const response = await anthropicClient(key).messages.create({
+    model,
+    max_tokens: 400,
+    system:     systemPrompt,
+    messages: [
+      ...(history ?? []).map(turn => ({
+        role:    turn.role === 'user' ? 'user' as const : 'assistant' as const,
+        content: turn.content,
+      })),
+      { role: 'user', content: message },
+    ],
+  }, { timeout: 15_000 });
+
+  return response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .map(b => b.text).join('').trim() || null;
+}
+
+// ── Completação simples e barata (memória de leads, resumos internos) ───────
+// Roteia pelo provider configurado; usada pelo leadMemoryService.
+export async function simpleCompletion(prompt: string, maxTokens = 250): Promise<string | null> {
+  const provider = (process.env.AI_ASSIST_PROVIDER || '').toLowerCase();
+  const key      = process.env.AI_ASSIST_KEY || '';
+  if (!key) return null;
+
+  try {
+    if (provider === 'anthropic') {
+      const model = process.env.AI_ASSIST_MODEL || 'claude-haiku-4-5';
+      const r = await anthropicClient(key).messages.create({
+        model, max_tokens: maxTokens,
+        messages: [{ role: 'user', content: prompt }],
+      }, { timeout: 15_000 });
+      return r.content
+        .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+        .map(b => b.text).join('').trim() || null;
+    }
+    if (provider === 'gemini') {
+      const model = process.env.AI_ASSIST_MODEL_FALLBACK || 'gemini-2.0-flash';
+      const url   = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+      const resp  = await fetch(url, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          contents:         [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: maxTokens, temperature: 0.2 },
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!resp.ok) throw new Error(`Gemini ${resp.status}`);
+      const json = await resp.json() as Record<string, any>;
+      return (json?.candidates?.[0]?.content?.parts || [])
+        .map((p: Record<string, any>) => p.text).filter(Boolean).join('').trim() || null;
+    }
+    return null;
+  } catch (err) {
+    bumpUsage('errors');
+    console.error('[AI Assist] simpleCompletion:', (err as Error).message);
+    return null;
+  }
+}
+
 // ── Transcrição de áudio (WhatsApp voice notes) via Gemini multimodal ───────
 export async function transcribeAudio(audio: Buffer, mimeType = 'audio/ogg'): Promise<string | null> {
   const provider = (process.env.AI_ASSIST_PROVIDER || '').toLowerCase();
-  const key      = process.env.AI_ASSIST_KEY || '';
-  const model    = process.env.AI_ASSIST_MODEL || 'gemini-2.5-flash';
-  if (provider !== 'gemini' || !key) return null;
+  // Claude não transcreve áudio — com provider anthropic, usa GEMINI_KEY
+  // separada (free tier aguenta: transcrição é esporádica e leve).
+  const key = provider === 'gemini'
+    ? (process.env.AI_ASSIST_KEY || '')
+    : (process.env.GEMINI_KEY || '');
+  const model = provider === 'gemini'
+    ? (process.env.AI_ASSIST_MODEL || 'gemini-2.5-flash')
+    : 'gemini-2.0-flash';
+  if (!key) return null;
   if (audio.length > 8 * 1024 * 1024) return null; // grande demais para inline
 
   const body = {
@@ -663,7 +809,17 @@ export async function testAiConnection(): Promise<{ ok: boolean; reply?: string;
       );
       return { ok: true, reply: reply || 'Resposta vazia.', provider, model };
     }
-    return { ok: false, error: `Provider "${provider}" não suportado. Use: gemini.` };
+    if (provider === 'anthropic') {
+      const claudeModel = process.env.AI_ASSIST_MODEL || 'claude-haiku-4-5';
+      const reply = await callClaude(
+        'Responda apenas: "IA Generativa funcionando corretamente."',
+        'Você é um assistente de teste. Responda exatamente o que for pedido, em português.',
+        key,
+        claudeModel,
+      );
+      return { ok: true, reply: reply || 'Resposta vazia.', provider, model: claudeModel };
+    }
+    return { ok: false, error: `Provider "${provider}" não suportado. Use: gemini ou anthropic.` };
   } catch (err) {
     const msg = (err as Error).message || String(err);
     if (msg.includes('TimeoutError') || msg.includes('timeout')) {
@@ -688,9 +844,28 @@ export async function aiAssistFull(
   const primary  = process.env.AI_ASSIST_MODEL || 'gemini-2.5-flash';
   const fallback = process.env.AI_ASSIST_MODEL_FALLBACK || 'gemini-2.0-flash';
 
-  if (provider !== 'gemini' || !key) return { text: null, media: [] };
+  if (!key) return { text: null, media: [] };
 
   const systemPrompt = createSystemPrompt(ctx, intentHint) + (ids ? TOOLS_NOTE : '');
+
+  // ── Provider: Claude (Anthropic) ───────────────────────────────────────────
+  if (provider === 'anthropic') {
+    const model = process.env.AI_ASSIST_MODEL || 'claude-haiku-4-5';
+    const collector = { media: [] as AgentMedia[] };
+    try {
+      bumpUsage('calls');
+      const text = ids
+        ? await callClaudeAgent(message, systemPrompt, key, model, ctx.conversationHistory, ids, collector)
+        : await callClaude(message, systemPrompt, key, model, ctx.conversationHistory);
+      return { text, media: collector.media };
+    } catch (err) {
+      bumpUsage('errors');
+      console.error(`[AI Assist] ${model}:`, (err as Error).message);
+      return { text: null, media: [] };
+    }
+  }
+
+  if (provider !== 'gemini') return { text: null, media: [] };
   const models = fallback && fallback !== primary ? [primary, fallback] : [primary];
 
   for (let i = 0; i < models.length; i++) {
@@ -726,9 +901,39 @@ export async function aiAssist(
 export async function describeImage(image: Buffer, mimeType = 'image/jpeg'): Promise<string | null> {
   const provider = (process.env.AI_ASSIST_PROVIDER || '').toLowerCase();
   const key      = process.env.AI_ASSIST_KEY || '';
-  const model    = process.env.AI_ASSIST_MODEL || 'gemini-2.5-flash';
-  if (provider !== 'gemini' || !key) return null;
+  if (!key) return null;
   if (image.length > 8 * 1024 * 1024) return null;
+
+  const VISION_PROMPT = 'Foto enviada por um cliente de uma loja de roupas no WhatsApp. Descreva em UMA frase curta o que ele quer (tipo de peça, cor, marca/estampa se visível). Responda SOMENTE com a descrição.';
+
+  // Claude tem visão nativa — provider anthropic descreve direto
+  if (provider === 'anthropic') {
+    try {
+      const model = process.env.AI_ASSIST_MODEL || 'claude-haiku-4-5';
+      const media = mimeType.split(';')[0];
+      const okTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      const r = await anthropicClient(key).messages.create({
+        model, max_tokens: 100,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: (okTypes.includes(media) ? media : 'image/jpeg') as 'image/jpeg', data: image.toString('base64') } },
+            { type: 'text', text: VISION_PROMPT },
+          ],
+        }],
+      }, { timeout: 15_000 });
+      return r.content
+        .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+        .map(b => b.text).join('').trim() || null;
+    } catch (err) {
+      bumpUsage('errors');
+      console.error('[AI Assist] visão (claude):', (err as Error).message);
+      return null;
+    }
+  }
+
+  if (provider !== 'gemini') return null;
+  const model = process.env.AI_ASSIST_MODEL || 'gemini-2.5-flash';
 
   const body = {
     contents: [{
