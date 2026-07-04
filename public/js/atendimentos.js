@@ -137,10 +137,12 @@
         if (ta) { ta.style.height = 'auto'; }
       });
       try {
-        // Tenta enviar pelo Baileys (Render) se a conversa existe lá
-        const isWaConv = this.waConversations.some(w => w.phone === this.atendPhone);
+        // Canal principal: WhatsApp real via Baileys (Render). Sempre tenta
+        // primeiro quando há servidor configurado — a checagem antiga comparava
+        // telefone SEM normalizar e nunca batia, então o envio real era pulado.
         let ok = false;
-        if (isWaConv) {
+        let waErr = '';
+        if (this.waBaseUrl) {
           try {
             const headers = { 'Content-Type': 'application/json' };
             if (this._authToken) headers['Authorization'] = 'Bearer ' + this._authToken;
@@ -148,15 +150,20 @@
               method: 'POST', headers, body: JSON.stringify({ phone: this.atendPhone, text: sent }),
             });
             const j = await r.json();
-            if (j.ok) ok = true;
+            if (j.ok) ok = true; else waErr = j.error || '';
           } catch (_) {}
         }
         if (!ok) {
+          // Fallback: registra no histórico e tenta Evolution (se configurado).
           const r = await this.authFetch(`/api/sessions/${this.atendPhone}/message`, {
             method: 'POST', body: JSON.stringify({ text: sent }),
           });
           const j = await r.json();
           if (!j.ok) throw new Error(j.error || 'Erro ao enviar');
+          // NUNCA fingir entrega: se nenhum canal entregou, avisa na hora.
+          if (j.whatsappSent === false) {
+            alert('⚠️ A mensagem foi salva no histórico, mas NÃO chegou no WhatsApp do cliente' + (waErr ? ' (' + waErr + ')' : '') + '. Confira a conexão na aba WhatsApp.');
+          }
         }
         this.atendMessages.push({ from: 'bot', text: sent, time: this.timeNow(), ts: Date.now(), direction: 'out' });
         this.scrollChat();

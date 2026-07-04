@@ -534,12 +534,32 @@ export async function initBaileys(storeId: string): Promise<void> {
   }
 }
 
+// Resolve o JID de SAÍDA correto. O WhatsApp esconde muitos contatos atrás de
+// LID (bot_leads.phone guarda o LID; o número real fica em phone_real). Mandar
+// LID para @s.whatsapp.net falha silenciosamente — precisa ir para @lid.
+async function resolveOutgoingJid(digits: string, storeId: string): Promise<string> {
+  if (digits.includes('@')) return digits;
+  try {
+    const { data } = await supabase
+      .from('bot_leads')
+      .select('phone_real')
+      .eq('store_id', storeId)
+      .eq('phone', digits)
+      .maybeSingle();
+    const real = String(data?.phone_real || '').replace(/\D/g, '');
+    if (real && real !== digits) return `${digits}@lid`;
+  } catch { /* segue pra heurística */ }
+  // LIDs são IDs longos; número BR canônico tem 12–13 dígitos
+  if (digits.length >= 14) return `${digits}@lid`;
+  return `${digits}@s.whatsapp.net`;
+}
+
 export async function sendWaMessage(phone: string, text: string, storeId: string): Promise<void> {
   if (!ENABLED || !_socket || _status !== 'connected') {
     throw new Error('WhatsApp não conectado.');
   }
   const normalizedPhone = normalizePhone(phone);
-  const jid = normalizedPhone.includes('@') ? normalizedPhone : `${normalizedPhone}@s.whatsapp.net`;
+  const jid = await resolveOutgoingJid(normalizedPhone, storeId);
   await _socket.sendMessage(jid, { text });
 
   const ts = new Date().toISOString();
