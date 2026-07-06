@@ -93,7 +93,7 @@
         this.waCurrentLoading = false;
       }
       // mark read locally
-      const conv = this.waConversations.find(c => c.phone === phone);
+      const conv = this.waConversations.find(c => this.normalizePhone(c.phone) === this.normalizePhone(phone));
       if (conv) conv.unread_count = 0;
     },
 
@@ -164,7 +164,7 @@
         const r = await this.authFetch('/api/products');
         const j = await r.json();
         if (j.ok && Array.isArray(j.data)) this.products = j.data;
-      } catch (_) {}
+      } catch (_) { this.loadErrToast(); }
       finally { this.productsLoading = false; }
     },
 

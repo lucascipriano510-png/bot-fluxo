@@ -42,6 +42,12 @@ function FluxoCommand() {
     selectedConv: null,
     modoTeste: false,
 
+    /* toast global — feedback de QUALQUER ação (sucesso/erro) */
+    toastMsg: '',
+    toastType: 'ok',
+    _toastTimer: null,
+    _loadErrAt: 0,
+
     /* data — starts empty, populated by real API after login */
     conversations: [],
     convMessages: {},
@@ -426,9 +432,26 @@ function FluxoCommand() {
     get productsInStock()  { return this.products.filter(p => (p.stock || 0) > 0).length; },
     get productsNoStock()  { return this.products.filter(p => (p.stock || 0) <= 0).length; },
 
+    /* Toast global: erro fica 6s (dá tempo de ler), sucesso 3,5s */
+    toast(msg, type = 'ok') {
+      this.toastMsg  = msg;
+      this.toastType = type;
+      clearTimeout(this._toastTimer);
+      this._toastTimer = setTimeout(() => { this.toastMsg = ''; }, type === 'err' ? 6000 : 3500);
+    },
+
+    /* Aviso de falha de carga — com trava de 30s pra não virar spam
+       (o Render free hiberna e a primeira carga pode falhar em rajada) */
+    loadErrToast() {
+      const now = Date.now();
+      if (now - this._loadErrAt < 30000) return;
+      this._loadErrAt = now;
+      this.toast('Falha ao carregar dados do servidor. Verifique a conexão e recarregue.', 'err');
+    },
+
     async autoSaveSettings() {
       try {
-        await this.authFetch('/api/settings', {
+        const _r = await this.authFetch('/api/settings', {
           method: 'POST',
           body: JSON.stringify({
             nome_loja:          this.cfg.nome_loja,
@@ -454,7 +477,12 @@ function FluxoCommand() {
             discount_rules:     this.cfg.discount_rules     || null,
           }),
         });
-      } catch (_) {}
+        // Nunca mentir que salvou: config da loja (inclusive bot ligado/desligado)
+        const _j = await _r.json().catch(() => ({ ok: false }));
+        if (!_j.ok) this.toast('Configuração NÃO foi salva' + (_j.error ? ` (${_j.error})` : '') + '. Tente de novo.', 'err');
+      } catch (_) {
+        this.toast('Configuração NÃO foi salva — sem conexão com o servidor.', 'err');
+      }
     },
 
     /* navigation */
@@ -728,7 +756,7 @@ function FluxoCommand() {
         const r = await this.authFetch('/api/leads');
         const j = await r.json();
         if (j.ok && Array.isArray(j.data)) this.leads = j.data;
-      } catch (_) {}
+      } catch (_) { this.loadErrToast(); }
     },
 
     async loadFollowupToday() {
@@ -1023,7 +1051,10 @@ function FluxoCommand() {
         const j = await r.json();
         if (j.setup_needed) { this.respostaSetupNeeded = true; return; }
         if (j.ok) await this.loadRespostas();
-      } catch (_) {}
+        else this.toast('Não consegui excluir a resposta' + (j.error ? ` (${j.error})` : '') + '.', 'err');
+      } catch (_) {
+        this.toast('Não consegui excluir a resposta — sem conexão com o servidor.', 'err');
+      }
     },
 
     async toggleResposta(item) {
@@ -1036,8 +1067,12 @@ function FluxoCommand() {
         if (j.ok) {
           const idx = this.respostas.findIndex(r => r.id === item.id);
           if (idx !== -1) this.respostas[idx] = { ...this.respostas[idx], ativo: !item.ativo };
+        } else {
+          this.toast('Não consegui ' + (item.ativo ? 'desativar' : 'ativar') + ' a resposta.', 'err');
         }
-      } catch (_) {}
+      } catch (_) {
+        this.toast('Não consegui alterar a resposta — sem conexão com o servidor.', 'err');
+      }
     },
   };
 

@@ -92,8 +92,12 @@
           await this.selectCrmLead({ id: leadId, phone: this.crmLead.phone });
           this.crmFeedback = 'ok';
           this.crmFeedbackMsg = 'Compra registrada!';
+        } else {
+          this.toast('Compra NÃO foi registrada' + (j.error ? ` (${j.error})` : '') + '.', 'err');
         }
-      } catch (_) {}
+      } catch (_) {
+        this.toast('Compra NÃO foi registrada — sem conexão.', 'err');
+      }
       finally { setTimeout(() => { this.crmFeedback = null; }, 3000); }
     },
 
@@ -199,8 +203,12 @@
           this.followupToday = this.followupToday.filter(l => l.id !== id);
           this.crmFeedback = 'ok';
           this.crmFeedbackMsg = `Follow-up reagendado para ${dias} dias.`;
+        } else {
+          this.toast('Follow-up NÃO foi reagendado' + (j.error ? ` (${j.error})` : '') + '.', 'err');
         }
-      } catch (_) {}
+      } catch (_) {
+        this.toast('Follow-up NÃO foi reagendado — sem conexão.', 'err');
+      }
       finally { setTimeout(() => { this.crmFeedback = null; }, 3000); }
     },
 

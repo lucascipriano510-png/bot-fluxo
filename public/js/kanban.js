@@ -30,7 +30,7 @@
         const comprou = byId['comprou']?.items.length || 0;
         const ativos  = this.pipelineCount - (byId['perdido']?.items.length || 0);
         this.pipelineConversion = ativos > 0 ? Math.round((comprou / ativos) * 100) : 0;
-      } catch (_) {}
+      } catch (_) { this.loadErrToast(); }
     },
 
     kanbanDragStart(id, stage) {
@@ -39,10 +39,16 @@
     },
 
     async kanbanMoveToSuggested(leadId, suggestedStage) {
-      await this.authFetch(`/api/leads/${leadId}/stage`, {
-        method: 'PATCH',
-        body: JSON.stringify({ stage: suggestedStage }),
-      }).catch(() => {});
+      try {
+        const r = await this.authFetch(`/api/leads/${leadId}/stage`, {
+          method: 'PATCH',
+          body: JSON.stringify({ stage: suggestedStage }),
+        });
+        const j = await r.json().catch(() => ({ ok: false }));
+        if (!j.ok) this.toast('Não consegui mover o lead' + (j.error ? ` (${j.error})` : '') + '.', 'err');
+      } catch (_) {
+        this.toast('Não consegui mover o lead — sem conexão.', 'err');
+      }
       await this.loadKanban();
     },
 
@@ -68,7 +74,19 @@
       if (lead) { lead.kanban_stage = targetStage; lead.kanban_movido_por = 'manual'; lead.kanban_movido_manualmente_em = new Date().toISOString(); }
       this.kanbanDragId = null;
       this.kanbanDragStage = null;
-      await this.authFetch(`/api/leads/${id}/stage`, { method: 'PATCH', body: JSON.stringify({ stage: targetStage }) });
+      // Move otimista já aconteceu na UI acima — se o servidor recusar,
+      // avisa E desfaz recarregando o estado real (a UI nunca pode mentir).
+      try {
+        const r = await this.authFetch(`/api/leads/${id}/stage`, { method: 'PATCH', body: JSON.stringify({ stage: targetStage }) });
+        const j = await r.json().catch(() => ({ ok: false }));
+        if (!j.ok) {
+          this.toast('O card voltou: o servidor não salvou a mudança' + (j.error ? ` (${j.error})` : '') + '.', 'err');
+          await this.loadKanban();
+        }
+      } catch (_) {
+        this.toast('O card voltou: sem conexão com o servidor.', 'err');
+        await this.loadKanban();
+      }
     },
 
 });

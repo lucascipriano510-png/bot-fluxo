@@ -215,7 +215,9 @@
     // (o `phone`/LID continua sendo a chave técnica de seleção das conversas).
     realPhone(p) {
       if (!p) return '';
-      const lead = (this.leadByPhone && this.leadByPhone[p]) || this.leads.find(l => l.phone === p);
+      const np = this.normalizePhone(p);
+      const lead = (this.leadByPhone && (this.leadByPhone[p] || this.leadByPhone[np]))
+                || this.leads.find(l => this.normalizePhone(l.phone) === np);
       let real = (lead && lead.phone_real) ? lead.phone_real : '';
       if (!real) {
         const digits = String(p).replace(/\D/g, '');
@@ -243,8 +245,9 @@
       if (!this.atendPhone || this.addingToCrm) return;
       this.addingToCrm   = true;
       this.addToCrmError = null;
-      const conv = this.waConversations.find(c => c.phone === this.atendPhone)
-                || this.conversations.find(c => c.phone === this.atendPhone);
+      const npAtend = this.normalizePhone(this.atendPhone);
+      const conv = this.waConversations.find(c => this.normalizePhone(c.phone) === npAtend)
+                || this.conversations.find(c => this.normalizePhone(c.phone) === npAtend);
       const nome = conv?.name || this.atendPhone;
       try {
         const r = await this.authFetch('/api/leads', {

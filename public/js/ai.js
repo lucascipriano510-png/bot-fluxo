@@ -18,9 +18,12 @@
             ai_analisado_em:     new Date().toISOString(),
           };
         }
+        if (!j.ok) this.toast('Análise de IA falhou' + (j.error ? ` (${j.error})` : '') + '.', 'err');
         await this.loadLeads();
         if (this.page === 'kanban') await this.loadKanban();
-      } catch (_) {}
+      } catch (_) {
+        this.toast('Análise de IA falhou — sem conexão.', 'err');
+      }
       finally { this.aiAnalyzing = false; }
     },
 
@@ -37,8 +40,12 @@
             this.loadLeads();
             if (this.page === 'kanban') this.loadKanban();
           }, 15000);
+        } else {
+          this.toast('Análise em massa falhou' + (j.error ? ` (${j.error})` : '') + '.', 'err');
         }
-      } catch (_) {}
+      } catch (_) {
+        this.toast('Análise em massa falhou — sem conexão.', 'err');
+      }
       finally { this.aiAnalyzingAll = false; }
     },
 

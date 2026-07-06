@@ -78,11 +78,15 @@
       if (!this._crmSaveTimers) this._crmSaveTimers = {};
       this._crmSaveTimers[field] = setTimeout(async () => {
         try {
-          await this.authFetch(`/api/leads/${this.atendLead.id}`, {
+          const r = await this.authFetch(`/api/leads/${this.atendLead.id}`, {
             method: 'PATCH',
             body: JSON.stringify({ [field]: value }),
           });
-        } catch (_) {}
+          const j = await r.json().catch(() => ({ ok: false }));
+          if (!j.ok) this.toast('Alteração no lead NÃO foi salva' + (j.error ? ` (${j.error})` : '') + '.', 'err');
+        } catch (_) {
+          this.toast('Alteração no lead NÃO foi salva — sem conexão com o servidor.', 'err');
+        }
       }, 800);
     },
 
@@ -90,40 +94,67 @@
       const newVal = !this.cfg.bot_ativo;
       this.cfg.bot_ativo = newVal;
       try {
-        await this.authFetch('/api/settings', {
+        const r = await this.authFetch('/api/settings', {
           method: 'POST',
           body: JSON.stringify({ bot_ativo: newVal }),
         });
+        const j = await r.json().catch(() => ({ ok: false }));
+        if (!j.ok) {
+          this.cfg.bot_ativo = !newVal; // reverte — o servidor não confirmou
+          this.toast('Não consegui ' + (newVal ? 'ligar' : 'desligar') + ' o bot. Tente de novo.', 'err');
+        }
       } catch (_) {
         this.cfg.bot_ativo = !newVal; // reverte se falhar
+        this.toast('Não consegui ' + (newVal ? 'ligar' : 'desligar') + ' o bot — sem conexão.', 'err');
       }
     },
 
     async updateLeadStage(stage) {
       if (!this.atendLead?.id) return;
       try {
-        await this.authFetch(`/api/leads/${this.atendLead.id}/stage`, {
+        const r = await this.authFetch(`/api/leads/${this.atendLead.id}/stage`, {
           method: 'PATCH',
           body: JSON.stringify({ stage }),
         });
+        const j = await r.json().catch(() => ({ ok: false }));
+        if (!j.ok) {
+          this.toast('Mudança de estágio NÃO foi salva' + (j.error ? ` (${j.error})` : '') + '.', 'err');
+          return; // não atualiza a UI com um estado que o servidor recusou
+        }
         const nowIso = new Date().toISOString();
         this.atendLead = { ...this.atendLead, kanban_stage: stage, kanban_movido_por: 'manual', kanban_movido_manualmente_em: nowIso };
         const lead = this.leads.find(l => l.id === this.atendLead.id);
         if (lead) { lead.kanban_stage = stage; lead.kanban_movido_por = 'manual'; lead.kanban_movido_manualmente_em = nowIso; }
         this.loadKanban();
-      } catch (_) {}
+      } catch (_) {
+        this.toast('Mudança de estágio NÃO foi salva — sem conexão.', 'err');
+      }
     },
 
     async assumeConv() {
       if (!this.atendPhone) return;
-      await this.authFetch(`/api/sessions/${this.atendPhone}/assume`, { method: 'POST' });
-      this.atendHumano = true;
+      try {
+        const r = await this.authFetch(`/api/sessions/${this.atendPhone}/assume`, { method: 'POST' });
+        const j = await r.json().catch(() => ({ ok: false }));
+        if (!j.ok) return this.toast('Não consegui assumir a conversa. Tente de novo.', 'err');
+        this.atendHumano = true;
+        this.toast('Você assumiu a conversa — o bot ficou mudo aqui.');
+      } catch (_) {
+        this.toast('Não consegui assumir a conversa — sem conexão.', 'err');
+      }
     },
 
     async releaseConv() {
       if (!this.atendPhone) return;
-      await this.authFetch(`/api/sessions/${this.atendPhone}/release`, { method: 'POST' });
-      this.atendHumano = false;
+      try {
+        const r = await this.authFetch(`/api/sessions/${this.atendPhone}/release`, { method: 'POST' });
+        const j = await r.json().catch(() => ({ ok: false }));
+        if (!j.ok) return this.toast('Não consegui devolver a conversa pro bot.', 'err');
+        this.atendHumano = false;
+        this.toast('Conversa devolvida pro bot.');
+      } catch (_) {
+        this.toast('Não consegui devolver a conversa — sem conexão.', 'err');
+      }
     },
 
     async sendAtendReply() {

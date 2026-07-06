@@ -311,6 +311,11 @@
 
 </div><!-- /painel autenticado -->
 
+<!-- Toast global — feedback de qualquer ação; clique fecha -->
+<div x-show="toastMsg" x-transition.opacity @click="toastMsg = ''"
+     :style="'position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:99999;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:600;max-width:90vw;cursor:pointer;box-shadow:0 8px 30px rgba(0,0,0,.35);color:#fff;background:' + (toastType === 'err' ? '#dc2626' : '#16a34a')"
+     x-text="toastMsg"></div>
+
 <!-- Módulos de feature (registram-se em window.FluxoModules; carregar ANTES do core) -->
 <script src="/js/whatsapp.js"></script>
 <script src="/js/simulador.js"></script>
