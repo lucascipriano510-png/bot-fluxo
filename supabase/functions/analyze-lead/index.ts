@@ -119,6 +119,16 @@ serve(async (req) => {
       }))
     }
 
+    // 2b. Lead sem conversa nenhuma: não gasta cota do Gemini pra ouvir
+    // "frio, score 5" — pula e deixa os campos ai_* como estão.
+    if (msgs.length === 0) {
+      console.log(`[AI] Lead ${lead.nome ?? lead.phone}: sem mensagens — pulado (cota preservada)`)
+      return new Response(
+        JSON.stringify({ success: true, skipped: 'sem_mensagens', leadId }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // 3. Calcular horas desde última mensagem do cliente
     const ultimaDoCliente = [...msgs]
       .filter(m => m.direction === 'in' && m.timestamp)
@@ -168,6 +178,18 @@ Valores de urgencia: alta, media, baixa` }] }],
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text()
+      // 429 PROPAGADO como 429 (antes virava 500 no catch e o retry do
+      // analyze-all-leads nunca disparava). Repassa o retryDelay que o
+      // Gemini manda no RetryInfo como header Retry-After padrão.
+      if (geminiRes.status === 429) {
+        const m = errText.match(/"retryDelay"\s*:\s*"(\d+)/)
+        const retryAfter = m ? m[1] : '30'
+        console.warn(`[AI] Gemini rate limit (retry em ${retryAfter}s)`)
+        return new Response(
+          JSON.stringify({ error: 'gemini_rate_limited', retryAfterSeconds: Number(retryAfter) }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': retryAfter } }
+        )
+      }
       throw new Error(`Gemini HTTP ${geminiRes.status}: ${errText}`)
     }
 
