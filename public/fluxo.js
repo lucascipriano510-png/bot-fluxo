@@ -182,6 +182,7 @@ function FluxoCommand() {
     /* atendimentos */
     atendMessages: [],
     atendPhone: null,
+    atendAltPhones: [],   // identidades extras do cliente (LID ↔ número real)
     atendReply: '',
     atendSending: false,
     atendLead: null,
@@ -253,24 +254,50 @@ function FluxoCommand() {
     },
 
     get inboxConversations() {
+      // Chave canônica: o WhatsApp endereça por LID e o bot pelo número real.
+      // Sem unificar, o MESMO cliente vira duas conversas com as mensagens
+      // divididas entre elas. Quando o CRM conhece o par (phone=LID,
+      // phone_real=número), as duas fontes caem na mesma chave.
+      const realByNorm = {};
+      for (const l of this.leads) {
+        if (!l.phone) continue;
+        realByNorm[this.normalizePhone(l.phone)] = l.phone_real ? this.normalizePhone(l.phone_real) : '';
+      }
+      const keyOf = (p) => {
+        const np = this.normalizePhone(p || '');
+        return realByNorm[np] || np;
+      };
+
       const merged = new Map();
+      const addAlt = (entry, rawPhone) => {
+        entry._altPhones = entry._altPhones || [];
+        if (rawPhone && rawPhone !== entry.phone && !entry._altPhones.includes(rawPhone)) entry._altPhones.push(rawPhone);
+        return entry;
+      };
+
       for (const c of this.conversations) {
-        merged.set(c.phone, { ...c, last_time: c.atualizado_em });
+        const k = keyOf(c.phone);
+        const ex = merged.get(k);
+        if (ex) { merged.set(k, addAlt(ex, c.phone)); continue; }
+        merged.set(k, addAlt({ ...c, last_time: c.atualizado_em }, null));
       }
       for (const w of this.waConversations) {
-        const ex = merged.get(w.phone);
+        const k = keyOf(w.phone);
+        const ex = merged.get(k);
         if (ex) {
-          merged.set(w.phone, {
+          // A mensagem mais RECENTE ganha, venha de onde vier
+          const waNewer = !ex.last_time || (w.last_time && new Date(w.last_time) > new Date(ex.last_time));
+          merged.set(k, addAlt({
             ...ex,
             name: w.name || ex.name,
-            msg: w.last_message || ex.msg,
-            last_time: w.last_time || ex.atualizado_em,
+            msg: waNewer ? (w.last_message || ex.msg) : (ex.msg || w.last_message),
+            last_time: waNewer ? w.last_time : ex.last_time,
             unread: Math.max(w.unread_count || 0, ex.unread || 0),
             is_group: w.is_group || false,
-          });
+          }, w.phone));
         } else {
           const n = w.name || w.phone;
-          merged.set(w.phone, {
+          merged.set(k, addAlt({
             id: w.id, phone: w.phone, name: n,
             avatar: n.charAt(0).toUpperCase(),
             msg: w.last_message || '—',
@@ -278,15 +305,17 @@ function FluxoCommand() {
             unread: w.unread_count || 0,
             is_group: w.is_group || false,
             humano_ativo: false, tag: 'novo', node: 'INICIO', context: {},
-          });
+          }, null));
         }
       }
       let result = [...merged.values()];
-      // Filtrar grupos: is_group, phone com @, JIDs de grupo (16+ dígitos)
+      // Filtrar grupos: is_group e phone com @. Cuidado com heurística de
+      // dígitos: LID de CLIENTE tem 14–16 dígitos — filtrar 16+ fazia
+      // conversa legítima SUMIR do inbox. JID numérico de grupo tem 17+.
       result = result.filter(c =>
         !c.is_group &&
         !(c.phone || '').includes('@') &&
-        !/^\d{16,}$/.test(c.phone || '')
+        !/^\d{17,}$/.test(c.phone || '')
       );
       const q = this.inboxSearch.trim().toLowerCase();
       if (q) result = result.filter(c =>
@@ -303,8 +332,15 @@ function FluxoCommand() {
     },
 
     get leadByPhone() {
+      // Indexado pelo phone cru E normalizado E pelo phone_real — acha o
+      // lead venha a busca de qual identidade vier (LID ou número real)
       const m = {};
-      for (const l of this.leads) if (l.phone) m[l.phone] = l;
+      for (const l of this.leads) {
+        if (!l.phone) continue;
+        m[l.phone] = l;
+        m[this.normalizePhone(l.phone)] = l;
+        if (l.phone_real) m[this.normalizePhone(l.phone_real)] = l;
+      }
       return m;
     },
 
@@ -628,7 +664,7 @@ function FluxoCommand() {
           if (this.atendPhone) {
             const snapPhone = this.atendPhone;
             try {
-              const msgs = await this._loadAtendMessages(snapPhone);
+              const msgs = await this._loadAtendMessages(snapPhone, this.atendAltPhones);
               if (this.atendPhone !== snapPhone) return; // usuário trocou de conversa durante o fetch
               if (msgs.length >= this.atendMessages.length && msgs.length > 0) {
                 this.atendMessages = msgs;
@@ -764,7 +800,7 @@ function FluxoCommand() {
         const r = await this.authFetch('/api/recovery/today');
         const j = await r.json();
         if (j.ok && Array.isArray(j.data)) this.followupToday = j.data;
-      } catch (_) {}
+      } catch (_) { this.loadErrToast(); }
     },
 
     async loadBrain() {
@@ -772,7 +808,7 @@ function FluxoCommand() {
         const r = await this.authFetch('/api/brain');
         const j = await r.json();
         if (j.ok && j.data) this.brain = j.data;
-      } catch (_) {}
+      } catch (_) { this.loadErrToast(); }
     },
 
     /* helpers */
@@ -986,7 +1022,7 @@ function FluxoCommand() {
         const j = await r.json();
         this.respostaSetupNeeded = j.setup_needed === true;
         if (j.ok && Array.isArray(j.data)) this.respostas = j.data;
-      } catch (_) {}
+      } catch (_) { this.loadErrToast(); }
       finally { this.respostasLoading = false; }
     },
 

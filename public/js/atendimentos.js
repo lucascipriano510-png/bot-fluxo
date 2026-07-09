@@ -1,32 +1,40 @@
 (window.FluxoModules = window.FluxoModules || []).push({
     /* ── Atendimentos ────────────────────────────────────────────────── */
-    async _loadAtendMessages(phone) {
+    async _loadAtendMessages(phone, altPhones = []) {
       const toTs = s => { try { return new Date(s).getTime(); } catch { return 0; } };
-      const normPhone = this.normalizePhone(phone);
-      const [botRes, waRes] = await Promise.allSettled([
-        this.authFetch('/api/messages/' + normPhone).then(r => r.json()),
-        this.authFetch(this.waBaseUrl + '/api/wa/messages/' + normPhone).then(r => r.json()).catch(() => ({ ok: false })),
-      ]);
-      const botMsgs = (botRes.status === 'fulfilled' && botRes.value?.ok && Array.isArray(botRes.value.data))
-        ? botRes.value.data.map(m => ({
+      // O mesmo cliente pode ter mensagens sob DUAS identidades (LID e número
+      // real). Busca em todas — senão a conversa aparece pela metade.
+      const phones = [...new Set([phone, ...altPhones].filter(Boolean).map(p => this.normalizePhone(p)))];
+      const fetches = [];
+      for (const np of phones) {
+        fetches.push(this.authFetch('/api/messages/' + np).then(r => r.json()).then(j => ({ src: 'bot', j })).catch(() => ({ src: 'bot', j: { ok: false } })));
+        fetches.push(this.authFetch(this.waBaseUrl + '/api/wa/messages/' + np).then(r => r.json()).then(j => ({ src: 'wa', j })).catch(() => ({ src: 'wa', j: { ok: false } })));
+      }
+      const settled = await Promise.all(fetches);
+      const botMsgs = [];
+      const waMsgs  = [];
+      for (const { src, j } of settled) {
+        if (!j?.ok || !Array.isArray(j.data)) continue;
+        if (src === 'bot') {
+          for (const m of j.data) botMsgs.push({
             from:      m.direcao === 'saida' ? 'bot' : 'user',
             text:      m.conteudo,
             time:      this.fmtTime(m.criado_em || m.created_at),
             ts:        toTs(m.criado_em || m.created_at),
             direction: m.direcao === 'saida' ? 'out' : 'in',
             _src:      'bot',
-          }))
-        : [];
-      const waMsgs = (waRes.status === 'fulfilled' && waRes.value?.ok && Array.isArray(waRes.value.data))
-        ? waRes.value.data.map(m => ({
+          });
+        } else {
+          for (const m of j.data) waMsgs.push({
             from:      m.direction === 'out' ? 'bot' : 'user',
             text:      m.text,
             time:      this.fmtTime(m.timestamp),
             ts:        toTs(m.timestamp),
             direction: m.direction,
             _src:      'wa',
-          }))
-        : [];
+          });
+        }
+      }
       // Merge, ordena e deduplica por texto+ts próximos (janela 3s)
       const all = [...botMsgs, ...waMsgs].sort((a, b) => a.ts - b.ts);
       const deduped = [];
@@ -44,6 +52,7 @@
       this.selectedConv  = String(conv.id);
       const targetPhone  = conv.phone;
       this.atendPhone    = targetPhone;
+      this.atendAltPhones = conv._altPhones || [];
       this.atendMessages = [];
       this.atendLoading  = true;
       this.atendHumano   = conv.humano_ativo || false;
@@ -62,7 +71,7 @@
         }
       }
       try {
-        const msgs = await this._loadAtendMessages(targetPhone);
+        const msgs = await this._loadAtendMessages(targetPhone, this.atendAltPhones);
         if (this.atendPhone !== targetPhone) return; // usuário trocou durante o fetch
         this.atendMessages = msgs;
         this.scrollChat();

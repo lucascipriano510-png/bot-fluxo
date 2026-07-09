@@ -191,7 +191,7 @@
             context:      s.context || {},
           }));
         }
-      } catch (_) {}
+      } catch (_) { this.loadErrToast(); }
     },
 
 });

@@ -64,7 +64,7 @@
         const r = await this.authFetch(`/api/leads/${leadId}/timeline`);
         const j = await r.json();
         if (j.ok && Array.isArray(j.data)) this.crmTimeline = j.data;
-      } catch (_) {}
+      } catch (_) { this.loadErrToast(); }
     },
 
     async loadLeadPurchases(leadId) {
@@ -72,7 +72,7 @@
         const r = await this.authFetch(`/api/leads/${leadId}/purchases`);
         const j = await r.json();
         if (j.ok && Array.isArray(j.data)) this.crmPurchases = j.data;
-      } catch (_) {}
+      } catch (_) { this.loadErrToast(); }
     },
 
     async addPurchase(leadId) {
