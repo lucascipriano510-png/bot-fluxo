@@ -215,7 +215,7 @@
         Reconectar WhatsApp
       </button>
     </div>
-    <div class="sb-status-row"><div class="dot-sm"></div> Dados sincronizados</div>
+    <div class="sb-status-row"><div class="dot-sm" :class="dbOk ? '' : 'red'"></div> <span x-text="dbOk ? 'Dados sincronizados' : 'Sem conexão com o servidor'"></span></div>
   </div>
 </aside>
 

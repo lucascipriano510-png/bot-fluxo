@@ -136,14 +136,16 @@
               </div>
               <div style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">
                 <div style="font-size:10px;color:var(--mu2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Banco de dados</div>
-                <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--green)">
-                  <div class="dot-sm"></div> Conectado
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600" :style="dbOk ? 'color:var(--green)' : 'color:#ef4444'">
+                  <div class="dot-sm" :class="dbOk ? '' : 'red'"></div>
+                  <span x-text="dbOk ? 'Conectado' : 'Sem conexão'"></span>
                 </div>
               </div>
               <div style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">
                 <div style="font-size:10px;color:var(--mu2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Bot</div>
-                <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--green)">
-                  <div class="dot-sm"></div> Online
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600" :style="botOn ? 'color:var(--green)' : 'color:var(--gold)'">
+                  <div class="dot-sm" :class="botOn ? '' : 'yellow'"></div>
+                  <span x-text="botOn ? 'Online' : 'Pausado'"></span>
                 </div>
               </div>
             </div>

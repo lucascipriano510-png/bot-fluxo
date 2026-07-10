@@ -215,7 +215,7 @@
         Reconectar WhatsApp
       </button>
     </div>
-    <div class="sb-status-row"><div class="dot-sm"></div> Dados sincronizados</div>
+    <div class="sb-status-row"><div class="dot-sm" :class="dbOk ? '' : 'red'"></div> <span x-text="dbOk ? 'Dados sincronizados' : 'Sem conexão com o servidor'"></span></div>
   </div>
 </aside>
 
@@ -416,14 +416,16 @@
               </div>
               <div style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">
                 <div style="font-size:10px;color:var(--mu2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Banco de dados</div>
-                <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--green)">
-                  <div class="dot-sm"></div> Conectado
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600" :style="dbOk ? 'color:var(--green)' : 'color:#ef4444'">
+                  <div class="dot-sm" :class="dbOk ? '' : 'red'"></div>
+                  <span x-text="dbOk ? 'Conectado' : 'Sem conexão'"></span>
                 </div>
               </div>
               <div style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">
                 <div style="font-size:10px;color:var(--mu2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Bot</div>
-                <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--green)">
-                  <div class="dot-sm"></div> Online
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600" :style="botOn ? 'color:var(--green)' : 'color:var(--gold)'">
+                  <div class="dot-sm" :class="botOn ? '' : 'yellow'"></div>
+                  <span x-text="botOn ? 'Online' : 'Pausado'"></span>
                 </div>
               </div>
             </div>
@@ -864,7 +866,7 @@
           <!-- Ações -->
           <section class="inbox-ficha-section">
             <div class="inbox-section-label">Ações</div>
-            <a x-show="atendPhone" :href="(()=>{let n=(atendPhone||'').replace(/\D/g,'');if(n&&!n.startsWith('55'))n='55'+n;return n?'https://wa.me/'+n:'#';})()"
+            <a x-show="atendPhone" :href="crmWhatsApp(atendPhone)"
               target="_blank" class="inbox-btn-full green">
               <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.106.549 4.085 1.513 5.8L0 24l6.37-1.49A11.96 11.96 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.854 0-3.6-.502-5.1-1.378l-.364-.217-3.78.885.914-3.686-.236-.374A9.94 9.94 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
               Abrir no WhatsApp

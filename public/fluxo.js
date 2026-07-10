@@ -47,6 +47,7 @@ function FluxoCommand() {
     toastType: 'ok',
     _toastTimer: null,
     _loadErrAt: 0,
+    dbOk: true,   // servidor/banco alcançável — vira false quando um load falha por rede
 
     /* data — starts empty, populated by real API after login */
     conversations: [],
@@ -479,6 +480,7 @@ function FluxoCommand() {
     /* Aviso de falha de carga — com trava de 30s pra não virar spam
        (o Render free hiberna e a primeira carga pode falhar em rajada) */
     loadErrToast() {
+      this.dbOk = false;
       const now = Date.now();
       if (now - this._loadErrAt < 30000) return;
       this._loadErrAt = now;
@@ -791,6 +793,7 @@ function FluxoCommand() {
       try {
         const r = await this.authFetch('/api/leads');
         const j = await r.json();
+        this.dbOk = true;   // o servidor respondeu — banco alcançável
         if (j.ok && Array.isArray(j.data)) this.leads = j.data;
       } catch (_) { this.loadErrToast(); }
     },
