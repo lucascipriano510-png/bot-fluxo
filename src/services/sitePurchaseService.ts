@@ -18,6 +18,7 @@
 import { supabase } from '../lib/supabase';
 import { normalizePhone, phoneVariants } from '../utils/phone';
 import { updateLeadScore } from '../services/leadScoreService';
+import { recordPurchase } from '../services/leadService';
 import { recordConversion } from '../services/storeBrainService';
 import { fetchSiteOrders, summarizeOrderItems } from '../inventory/sitePurchasesBridge';
 
@@ -154,38 +155,19 @@ export async function linkSitePurchaseToLead(input: SitePurchaseInput): Promise<
     created = true;
   }
 
-  // Registra a compra (idempotente via índice único em external_ref).
-  const { error: purErr } = await supabase.from('lead_purchases').insert({
-    store_id:     storeId,
-    lead_id:      lead.id,
+  // Registro pela fonte única (idempotente via índice único em external_ref).
+  // markConverted espelha o /leads/:id/convert: concluido + QUENTE + finalizado.
+  const pr = await recordPurchase(storeId, lead.id, {
     phone,
-    produto:      input.produto || 'Compra no site',
-    valor:        input.value || null,
-    data_compra:  when,
+    produto:       input.produto || 'Compra no site',
+    valor:         input.value || null,
     source,
-    external_ref: input.externalRef,
+    externalRef:   input.externalRef,
+    markConverted: true,
   });
-  // Corrida: outra execução inseriu primeiro → trata como duplicata.
-  if (purErr) {
-    if ((purErr as { code?: string }).code === '23505') return { status: 'duplicate' };
-    return { status: 'skipped', reason: purErr.message };
-  }
+  if (pr.duplicate) return { status: 'duplicate' };
+  if (!pr.ok)       return { status: 'skipped', reason: pr.error || 'falha ao registrar compra' };
 
-  // Atualiza métricas do lead + marca como convertido (espelha /leads/:id/convert).
-  await supabase
-    .from('bot_leads')
-    .update({
-      total_purchases:  (lead.total_purchases || 0) + 1,
-      lifetime_value:   Number(lead.lifetime_value || 0) + Number(input.value || 0),
-      status:           'concluido',
-      status_comercial: 'QUENTE',
-      kanban_stage:     'finalizado',
-      atualizado_em:    new Date().toISOString(),
-    })
-    .eq('id', lead.id)
-    .eq('store_id', storeId);
-
-  await updateLeadScore(storeId, lead.id);
   recordConversion(storeId, phone, 'human_converted').catch(() => {});
 
   return { status: 'linked', leadId: lead.id, created };

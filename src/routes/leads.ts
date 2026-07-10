@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import { supabase } from '../lib/supabase';
 import { normalizePhone } from '../utils/phone';
-import { fetchLeads } from '../services/leadService';
+import { fetchLeads, recordPurchase } from '../services/leadService';
 import { fetchHistorico } from '../services/mensagemService';
 import { FLOW_MAP } from '../bot/flowMap';
 import { loadFlowConfig, invalidateFlowCache } from '../services/flowConfigService';
@@ -119,23 +119,18 @@ router.post('/leads/:id/convert', async (req, res) => {
     if (error) throw error;
     const { data: convLead } = await supabase
       .from('bot_leads')
-      .select('phone, interesse, valor_potencial, total_purchases, lifetime_value')
+      .select('phone, interesse, valor_potencial')
       .eq('id', req.params.id)
       .eq('store_id', req.storeId!)
       .single();
     if (convLead) {
-      await supabase.from('lead_purchases').insert({
-        store_id:    req.storeId!,
-        lead_id:     req.params.id,
-        phone:       convLead.phone,
-        produto:     convLead.interesse || 'Venda',
-        valor:       convLead.valor_potencial || null,
-        data_compra: new Date().toISOString(),
+      // O UPDATE acima já marcou concluido/QUENTE/finalizado; aqui só registra a
+      // compra e as métricas pela fonte única (recordPurchase).
+      await recordPurchase(req.storeId!, req.params.id, {
+        phone:   convLead.phone,
+        produto: convLead.interesse || 'Venda',
+        valor:   convLead.valor_potencial || null,
       });
-      await supabase.from('bot_leads').update({
-        total_purchases: (convLead.total_purchases || 0) + 1,
-        lifetime_value:  Number(convLead.lifetime_value || 0) + Number(convLead.valor_potencial || 0),
-      }).eq('id', req.params.id).eq('store_id', req.storeId!);
       if (convLead.phone) recordConversion(req.storeId!, convLead.phone, 'human_converted').catch(() => {});
     }
     res.json({ ok: true });
@@ -356,23 +351,14 @@ router.post('/leads/:id/purchases', async (req, res) => {
   const { produto, valor, notes } = req.body as { produto?: string; valor?: number; notes?: string };
   try {
     const { data: lead } = await supabase
-      .from('bot_leads').select('phone, total_purchases, lifetime_value')
+      .from('bot_leads').select('phone')
       .eq('id', req.params.id).eq('store_id', req.storeId!).single();
     if (!lead) return res.status(404).json({ ok: false, error: 'Lead não encontrado' });
 
-    const { error } = await supabase.from('lead_purchases').insert({
-      store_id: req.storeId!, lead_id: req.params.id, phone: lead.phone,
-      produto: produto || null, valor: valor || null, notes: notes || null,
-      data_compra: new Date().toISOString(),
+    const pr = await recordPurchase(req.storeId!, req.params.id, {
+      phone: lead.phone, produto: produto || null, valor: valor || null, notes: notes || null,
     });
-    if (error) throw error;
-
-    await supabase.from('bot_leads').update({
-      total_purchases: (lead.total_purchases || 0) + 1,
-      lifetime_value:  Number(lead.lifetime_value || 0) + Number(valor || 0),
-    }).eq('id', req.params.id).eq('store_id', req.storeId!);
-
-    await updateLeadScore(req.storeId!, req.params.id);
+    if (!pr.ok && !pr.duplicate) throw new Error(pr.error || 'Falha ao registrar compra');
     res.json({ ok: true });
   } catch (err: unknown) {
     res.json({ ok: false, error: errMsg(err) });

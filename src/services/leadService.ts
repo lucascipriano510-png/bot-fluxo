@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { BotLead } from '../types';
+import { updateLeadScore } from './leadScoreService';
 
 // ── Regra ÚNICA de temperatura comercial ──────────────────────────────────────
 // A temperatura é MONOTÔNICA no fluxo automático do bot: um sinal (uma mensagem,
@@ -97,6 +98,65 @@ export async function upsertLeadLight(params: {
   } catch (err) {
     console.error('[leadService] upsertLeadLight error:', err);
   }
+}
+
+// ── Registro ÚNICO de compra ───────────────────────────────────────────────────
+// Fonte única para: inserir em lead_purchases, somar total_purchases/lifetime_value
+// e recalcular o score. Antes esta matemática (a base do faturamento) vivia
+// TRIPLICADA em /convert, /purchases e sitePurchaseService, cada uma divergente.
+export async function recordPurchase(
+  storeId: string,
+  leadId: string,
+  opts: {
+    phone?: string | null;
+    produto?: string | null;
+    valor?: number | null;
+    notes?: string | null;
+    source?: string;
+    externalRef?: string | undefined;
+    markConverted?: boolean;   // marca status=concluido + QUENTE + finalizado
+  },
+): Promise<{ ok: boolean; duplicate?: boolean; error?: string }> {
+  const { data: lead } = await supabase
+    .from('bot_leads')
+    .select('total_purchases, lifetime_value')
+    .eq('id', leadId)
+    .eq('store_id', storeId)
+    .single();
+
+  const purchase: Record<string, unknown> = {
+    store_id:    storeId,
+    lead_id:     leadId,
+    phone:       opts.phone ?? null,
+    produto:     opts.produto ?? null,
+    valor:       opts.valor ?? null,
+    notes:       opts.notes ?? null,
+    data_compra: new Date().toISOString(),
+  };
+  if (opts.source)      purchase.source = opts.source;
+  if (opts.externalRef) purchase.external_ref = opts.externalRef;
+
+  const { error: purErr } = await supabase.from('lead_purchases').insert(purchase);
+  if (purErr) {
+    // 23505 = índice único (external_ref): compra já registrada → idempotente.
+    if ((purErr as { code?: string }).code === '23505') return { ok: false, duplicate: true };
+    return { ok: false, error: purErr.message };
+  }
+
+  const metrics: Record<string, unknown> = {
+    total_purchases: (lead?.total_purchases || 0) + 1,
+    lifetime_value:  Number(lead?.lifetime_value || 0) + Number(opts.valor || 0),
+    atualizado_em:   new Date().toISOString(),
+  };
+  if (opts.markConverted) {
+    metrics.status           = 'concluido';
+    metrics.status_comercial = 'QUENTE';
+    metrics.kanban_stage     = 'finalizado';
+  }
+  await supabase.from('bot_leads').update(metrics).eq('id', leadId).eq('store_id', storeId);
+
+  await updateLeadScore(storeId, leadId);
+  return { ok: true };
 }
 
 export async function fetchLeads(storeId: string, status?: string): Promise<BotLead[]> {
