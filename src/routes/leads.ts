@@ -121,6 +121,7 @@ router.post('/leads/:id/convert', async (req, res) => {
       .from('bot_leads')
       .select('phone, interesse, valor_potencial, total_purchases, lifetime_value')
       .eq('id', req.params.id)
+      .eq('store_id', req.storeId!)
       .single();
     if (convLead) {
       await supabase.from('lead_purchases').insert({

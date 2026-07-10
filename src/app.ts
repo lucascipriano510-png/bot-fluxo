@@ -19,6 +19,7 @@ console.log('[STARTUP] SUPABASE_URL presente:    ', !!process.env.SUPABASE_URL);
 console.log('[STARTUP] SUPABASE_SERVICE_KEY:     ', !!process.env.SUPABASE_SERVICE_KEY);
 console.log('[STARTUP] STORE_ID:                 ', !!process.env.STORE_ID);
 console.log('[STARTUP] ENABLE_BAILEYS:           ', process.env.ENABLE_BAILEYS);
+if (!WEBHOOK_SECRET) console.warn('[STARTUP] ⚠️  WEBHOOK_SECRET ausente — endpoints /webhook estão fail-closed (rejeitam tudo). Recebimento é via Baileys direto.');
 
 const app = express();
 
@@ -60,7 +61,9 @@ app.get('/status', (_req, res) => {
 // Cada loja registra seu webhook com a URL: /webhook/<slug-da-loja>
 // Ex: /webhook/fluxo-outlet  /webhook/lava-jato-x
 app.post('/webhook/:storeSlug', resolveStoreBySlug, async (req, res) => {
-  if (WEBHOOK_SECRET && req.headers['x-webhook-secret'] !== WEBHOOK_SECRET) {
+  // Fail-closed: sem WEBHOOK_SECRET configurado, rejeita tudo. O recebimento
+  // real é via Baileys direto; estes endpoints (Evolution) ficam fechados.
+  if (!WEBHOOK_SECRET || req.headers['x-webhook-secret'] !== WEBHOOK_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -88,7 +91,9 @@ app.post('/webhook/:storeSlug', resolveStoreBySlug, async (req, res) => {
 
 // ── Webhook legado: /webhook (usa LOJA_WHATSAPP do env) ──────────────────────
 app.post('/webhook', async (req, res) => {
-  if (WEBHOOK_SECRET && req.headers['x-webhook-secret'] !== WEBHOOK_SECRET) {
+  // Fail-closed: sem WEBHOOK_SECRET configurado, rejeita tudo. O recebimento
+  // real é via Baileys direto; estes endpoints (Evolution) ficam fechados.
+  if (!WEBHOOK_SECRET || req.headers['x-webhook-secret'] !== WEBHOOK_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

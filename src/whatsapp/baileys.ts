@@ -22,6 +22,11 @@ export type WaStatus = 'connected' | 'qr_pending' | 'disconnected' | 'unavailabl
 const ENABLED    = process.env.ENABLE_BAILEYS === 'true';
 const AUTO_REPLY = process.env.BOT_AUTO_REPLY === 'true';
 
+// Escritas no Supabase antes eram fire-and-forget silenciosas (.then(null,()=>{})),
+// então mensagem/conversa podia não persistir sem nenhum rastro. Agora loga a falha.
+const logWrite = (tag: string) => (e: unknown) =>
+  console.warn(`[wa-persist] falha ao gravar ${tag}:`, (e as Error)?.message || e);
+
 let _status: WaStatus = ENABLED ? 'disconnected' : 'unavailable';
 let _qr: string | null = null;
 let _socket: any = null;
@@ -150,7 +155,7 @@ async function flushAutoReply(storeId: string, phone: string): Promise<void> {
         await _socket.sendMessage(entry.jid, { image: { url: m.imageUrl }, caption: m.caption });
         await supabase.from('wa_messages').insert({
           store_id: storeId, phone, direction: 'out', text: `📷 ${m.caption}`, timestamp: new Date().toISOString(),
-        }).then(null, () => {});
+        }).then(null, logWrite('wa_messages'));
         await new Promise(r => setTimeout(r, 900));
       } catch (err) {
         console.warn('[auto-reply] envio de foto falhou:', (err as Error).message);
@@ -181,7 +186,7 @@ async function sendReplyToJid(jid: string, phone: string, text: string, storeId:
   const ts = new Date().toISOString();
   await supabase.from('wa_messages').insert({
     store_id: storeId, phone, direction: 'out', text, timestamp: ts,
-  }).then(null, () => {});
+  }).then(null, logWrite('wa_messages'));
 
   await supabase.from('wa_conversations').upsert({
     store_id:     storeId,
@@ -189,7 +194,7 @@ async function sendReplyToJid(jid: string, phone: string, text: string, storeId:
     last_message: text,
     last_time:    ts,
     unread_count: 0,
-  }, { onConflict: 'store_id,phone' }).then(null, () => {});
+  }, { onConflict: 'store_id,phone' }).then(null, logWrite('wa_conversations'));
 }
 
 async function upsertLeadFromInbox(
@@ -481,7 +486,7 @@ export async function initBaileys(storeId: string): Promise<void> {
           // Mensagem enviada pelo celular — salva como saída, sem criar lead, sem unread
           await supabase.from('wa_messages').insert({
             store_id: storeId, phone, direction: 'out', text, timestamp: ts,
-          }).then(null, () => {});
+          }).then(null, logWrite('wa_messages'));
 
           await supabase.from('wa_conversations').upsert({
             store_id:     storeId,
@@ -489,7 +494,7 @@ export async function initBaileys(storeId: string): Promise<void> {
             last_message: text,
             last_time:    ts,
             is_group:     false,
-          }, { onConflict: 'store_id,phone' }).then(null, () => {});
+          }, { onConflict: 'store_id,phone' }).then(null, logWrite('wa_conversations'));
           continue;
         }
 
@@ -502,7 +507,7 @@ export async function initBaileys(storeId: string): Promise<void> {
 
         await supabase.from('wa_messages').insert({
           store_id: storeId, phone, direction: 'in', text, timestamp: ts, lead_id: leadId,
-        }).then(null, () => {});
+        }).then(null, logWrite('wa_messages'));
 
         const { data: existingConv } = await supabase
           .from('wa_conversations')
@@ -520,7 +525,7 @@ export async function initBaileys(storeId: string): Promise<void> {
           is_group:     false,
           lead_id:      leadId,
           unread_count: (existingConv?.unread_count || 0) + 1,
-        }, { onConflict: 'store_id,phone' }).then(null, () => {});
+        }, { onConflict: 'store_id,phone' }).then(null, logWrite('wa_conversations'));
 
         // Auto-resposta (opt-in) — entra no buffer de debounce e o engine decide
         if (AUTO_REPLY) queueAutoReply(storeId, phone, jid, engineText);
@@ -565,7 +570,7 @@ export async function sendWaMessage(phone: string, text: string, storeId: string
   const ts = new Date().toISOString();
   await supabase.from('wa_messages').insert({
     store_id: storeId, phone: normalizedPhone, direction: 'out', text, timestamp: ts,
-  }).then(null, () => {});
+  }).then(null, logWrite('wa_messages'));
 
   await supabase.from('wa_conversations').upsert({
     store_id:     storeId,
@@ -573,7 +578,7 @@ export async function sendWaMessage(phone: string, text: string, storeId: string
     last_message: text,
     last_time:    ts,
     unread_count: 0,
-  }, { onConflict: 'store_id,phone' }).then(null, () => {});
+  }, { onConflict: 'store_id,phone' }).then(null, logWrite('wa_conversations'));
 }
 
 export async function disconnectBaileys(): Promise<void> {
