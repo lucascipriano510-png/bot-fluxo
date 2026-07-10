@@ -48,8 +48,12 @@ async function getRespostasRapidas(storeId: string) {
   return result;
 }
 
-function estimateValue(_ctx: Record<string, string>): number {
-  return 100;
+// Sem preço real conhecido, o valor potencial fica DESCONHECIDO (undefined→null).
+// Inventar um número (era 100 fixo) polui o "valor potencial total" do pipeline e
+// o faturamento na conversão. O valor real entra pelo catálogo (offers[].price).
+function estimateValue(ctx: Record<string, string>): number | undefined {
+  const seen = Number(ctx.ultimo_preco_visto ?? ctx.valor_potencial);
+  return Number.isFinite(seen) && seen > 0 ? seen : undefined;
 }
 
 const OPTOUT_TRIGGER = /\b(parar|stop|sair|cancelar|n[aã]o quero|remover|descadastrar|opt.?out)\b/i;

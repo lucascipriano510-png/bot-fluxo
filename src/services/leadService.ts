@@ -1,6 +1,18 @@
 import { supabase } from '../lib/supabase';
 import { BotLead } from '../types';
 
+// ── Regra ÚNICA de temperatura comercial ──────────────────────────────────────
+// A temperatura é MONOTÔNICA no fluxo automático do bot: um sinal (uma mensagem,
+// um intent) nunca REBAIXA o lead (MORNO não vira FRIO por causa de um clique).
+// Só esfria via análise de IA ou edição manual no CRM. Antes, cada caminho de
+// escrita deixava o último valor vencer, então o mesmo lead oscilava.
+export type Temp = 'FRIO' | 'MORNO' | 'QUENTE';
+const TEMP_RANK: Record<Temp, number> = { FRIO: 0, MORNO: 1, QUENTE: 2 };
+export function warmerTemp(a?: string | null, b?: string | null): Temp {
+  const A = (a || 'FRIO') as Temp, B = (b || 'FRIO') as Temp;
+  return (TEMP_RANK[A] ?? 0) >= (TEMP_RANK[B] ?? 0) ? A : B;
+}
+
 export async function registerLead(lead: Omit<BotLead, 'id' | 'qualificado_em'>): Promise<void> {
   const { error } = await supabase
     .from('bot_leads')
@@ -64,7 +76,8 @@ export async function upsertLeadLight(params: {
       cidade:              params.cidade    || existing?.cidade    || null,
       tamanho:             params.tamanho   || null,
       valor_potencial:     params.valor_potencial || existing?.valor_potencial || null,
-      status_comercial:    params.status_comercial || existing?.status_comercial || 'FRIO',
+      // Nunca rebaixa: pega a temperatura mais quente entre o sinal atual e a existente.
+      status_comercial:    warmerTemp(params.status_comercial, existing?.status_comercial),
       kanban_stage:        newStage,
       status:              'em_conversa',
       last_interaction_at: new Date().toISOString(),
