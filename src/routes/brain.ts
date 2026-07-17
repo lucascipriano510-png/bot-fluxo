@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { supabase } from '../lib/supabase';
 import { normalizePhone } from '../utils/phone';
@@ -54,7 +54,10 @@ router.post('/brain/analyze', async (req, res) => {
   }
 });
 
-router.post('/brain/cron', async (req, res) => {
+// O Vercel Cron chama com GET; POST fica para chamadas manuais (Render/curl).
+// Só com POST a rota respondia 404 ao agendador — o sync de vendas do site
+// parou em 14/06 por isso (lead_purchases congelado enquanto orders crescia).
+const brainCronHandler = async (req: Request, res: Response) => {
   if (!cronAuthorized(req)) {
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
   }
@@ -74,7 +77,9 @@ router.post('/brain/cron', async (req, res) => {
   } catch (err: unknown) {
     res.json({ ok: false, error: errMsg(err) });
   }
-});
+};
+router.get('/brain/cron', brainCronHandler);
+router.post('/brain/cron', brainCronHandler);
 
 // ── Integração de compras do site (Fase A: pull/cron) ──────────────────────────
 // Lê os pedidos finalizados/cancelados do site (read-only) e liga aos leads do
